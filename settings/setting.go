@@ -18,12 +18,12 @@ const (
 type ValueType string
 
 const (
-	ValuePassword ValueType = "password"
-	ValueText     ValueType = "text"
-	ValueInt64    ValueType = "int64"
-	ValueBool     ValueType = "bool"
-	ValueJSON     ValueType = "json"
-	ValueYaml     ValueType = "yaml"
+	ValueSecret ValueType = "secret"
+	ValueText   ValueType = "text"
+	ValueInt64  ValueType = "int64"
+	ValueBool   ValueType = "bool"
+	ValueJSON   ValueType = "json"
+	ValueYaml   ValueType = "yaml"
 )
 
 // SettingItem 系统配置
@@ -49,7 +49,7 @@ func (item SettingItem) Identify() string {
 
 // PasswordValue 密码原文
 func (item *SettingItem) PasswordValue() string {
-	if item.ValueType == ValuePassword {
+	if item.ValueType == ValueSecret {
 		return DecryptPassword(item.Value)
 	}
 	return item.Value
@@ -179,7 +179,7 @@ func Updates(sets ...*SettingItem) error {
 		} else {
 			sql = sql.Where("`group` = ? AND `key` = ?", set.Group, set.Key)
 		}
-		if set.ValueType == ValuePassword {
+		if set.ValueType == ValueSecret {
 			set.Value = EncryptPassword(set.Value)
 		}
 		err := sql.Update("value", set.Value).Error

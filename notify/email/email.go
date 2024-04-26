@@ -66,8 +66,8 @@ func (opt SMTPOption) ToSettings() []*settings.SettingItem {
 			Name:      "账号密码",
 			Describe:  "邮箱的SMTP账号密码",
 			Group:     smtpSettingGroup,
-			Key:       "password",
-			ValueType: settings.ValuePassword,
+			Key:       "secret",
+			ValueType: settings.ValueSecret,
 			Value:     opt.Password,
 		}, {
 			Name:      "发送人昵称",
