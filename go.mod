@@ -7,6 +7,7 @@ require (
 	github.com/gomodule/redigo v1.9.2
 	github.com/mr-tron/base58 v1.2.0
 	github.com/redis/go-redis/v9 v9.5.1
+	github.com/satori/go.uuid v1.2.0
 	github.com/xen0n/go-workwx v1.7.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.22.0
