@@ -1,75 +1,57 @@
 package encryptor
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
-	"encoding/base64"
+	"crypto/rand"
+	"fmt"
+	"io"
 
 	"github.com/mr-tron/base58"
 )
 
-func pkcs5Padding(ciphertext []byte, blockSize int) []byte {
-	padding := blockSize - len(ciphertext)%blockSize
-	padtext := bytes.Repeat([]byte{byte(padding)}, padding)
-	return append(ciphertext, padtext...)
-}
-
-func pkcs5UnPadding(origData []byte) []byte {
-	length := len(origData)
-	unpadding := int(origData[length-1])
-	return origData[:(length - unpadding)]
-}
-
 // AesEncrypt 加密
-func AesEncrypt(origData, key []byte) ([]byte, error) {
+func AesEncrypt(key, plainText []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
 	blockSize := block.BlockSize()
-	origData = pkcs5Padding(origData, blockSize)
+	plainText = pad(plainText, blockSize)
 	blockMode := cipher.NewCBCEncrypter(block, key[:blockSize])
-	crypted := make([]byte, len(origData))
-	blockMode.CryptBlocks(crypted, origData)
-	return crypted, nil
+	cipherText := make([]byte, len(plainText))
+	blockMode.CryptBlocks(cipherText, plainText)
+	return cipherText, nil
 }
 
 // AesDecrypt 解密
-func AesDecrypt(crypted, key []byte) ([]byte, error) {
+func AesDecrypt(key, cipherText []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
+
 	blockSize := block.BlockSize()
 	blockMode := cipher.NewCBCDecrypter(block, key[:blockSize])
-	origData := make([]byte, len(crypted))
-	blockMode.CryptBlocks(origData, crypted)
-	origData = pkcs5UnPadding(origData)
-	return origData, nil
+	plainText := make([]byte, len(cipherText))
+	blockMode.CryptBlocks(plainText, cipherText)
+	plainText = unpad(plainText)
+	return plainText, nil
 }
 
 // AesEncryptToBase64 加密并输出base64后的字符串
-func AesEncryptToBase64(origData, key []byte) (string, error) {
-	encripted, err := AesEncrypt(origData, key)
-	if err != nil {
-		return "", err
-	}
-	return base64.StdEncoding.EncodeToString(encripted), nil
+func AesEncryptToBase64(key, plainText []byte) (string, error) {
+	return EncryptToBase64(AesEncrypt, key, plainText)
 }
 
 // AesDecryptFromBase64 解密被base64过的密文
-func AesDecryptFromBase64(crypted string, key []byte) ([]byte, error) {
-	buf, err := base64.StdEncoding.DecodeString(crypted)
-	if err != nil {
-		return nil, err
-	}
-	return AesDecrypt(buf, key)
+func AesDecryptFromBase64(key []byte, cipherText string) ([]byte, error) {
+	return DecryptFromBase64(AesDecrypt, key, cipherText)
 }
 
 // AesEncryptToBase58 加密并输出base58后的字符串
-func AesEncryptToBase58(origData, key []byte) (string, error) {
-	encripted, err := AesEncrypt(origData, key)
+func AesEncryptToBase58(key, plainText []byte) (string, error) {
+	encripted, err := AesEncrypt(key, plainText)
 	if err != nil {
 		return "", err
 	}
@@ -77,10 +59,49 @@ func AesEncryptToBase58(origData, key []byte) (string, error) {
 }
 
 // AesDecryptFromBase58 解密被base58过的密文
-func AesDecryptFromBase58(crypted string, key []byte) ([]byte, error) {
-	buf, err := base58.Decode(crypted)
+func AesDecryptFromBase58(key []byte, cipherText string) ([]byte, error) {
+	buf, err := base58.Decode(cipherText)
 	if err != nil {
 		return nil, err
 	}
-	return AesDecrypt(buf, key)
+	return AesDecrypt(key, buf)
+}
+
+func EncryptAesCBC(key, plainText []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	paddedText := pad(plainText, aes.BlockSize)
+	cipherText := make([]byte, len(paddedText))
+	iv := make([]byte, aes.BlockSize)
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, err
+	}
+
+	mode := cipher.NewCBCEncrypter(block, iv)
+	mode.CryptBlocks(cipherText, paddedText)
+
+	return append(iv, cipherText...), nil
+}
+
+func DecryptAesCBC(key, cipherText []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(cipherText) < aes.BlockSize {
+		return nil, fmt.Errorf("cipherText too short")
+	}
+
+	iv := cipherText[:aes.BlockSize]
+	cipherText = cipherText[aes.BlockSize:]
+
+	plainText := make([]byte, len(cipherText))
+	mode := cipher.NewCBCDecrypter(block, iv)
+	mode.CryptBlocks(plainText, cipherText)
+
+	return unpad(plainText), nil
 }
