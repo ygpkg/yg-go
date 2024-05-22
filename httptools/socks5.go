@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"github.com/ygpkg/yg-go/config"
+	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/settings"
-	"github.com/ygpkg/yg-go/utils/logs"
 	"golang.org/x/net/proxy"
 )
 

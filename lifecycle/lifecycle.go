@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ygpkg/yg-go/utils/logs"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 var std *LifeCycle

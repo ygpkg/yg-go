@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/ygpkg/yg-go/utils/logs"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 type Cache struct {

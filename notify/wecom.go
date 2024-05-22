@@ -3,7 +3,7 @@ package notify
 import (
 	"github.com/xen0n/go-workwx"
 	"github.com/ygpkg/yg-go/config"
-	"github.com/ygpkg/yg-go/utils/logs"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 // SendWecomTextMsg 发送企业微信文本消息

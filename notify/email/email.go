@@ -5,8 +5,8 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/settings"
-	"github.com/ygpkg/yg-go/utils/logs"
 	gomail "gopkg.in/gomail.v2"
 )
 

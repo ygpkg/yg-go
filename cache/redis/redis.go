@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/gomodule/redigo/redis"
-	"github.com/ygpkg/yg-go/utils/cache"
+	"github.com/ygpkg/yg-go/cache"
 )
 
 var _ cache.Cache = (*Redis)(nil)

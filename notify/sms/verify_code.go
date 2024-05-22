@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/ygpkg/yg-go/config"
+	"github.com/ygpkg/yg-go/dbutil"
+	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/settings"
-	"github.com/ygpkg/yg-go/utils/dbutil"
-	"github.com/ygpkg/yg-go/utils/logs"
 	"gorm.io/gorm"
 )
 

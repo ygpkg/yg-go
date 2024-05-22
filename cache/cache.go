@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/ygpkg/yg-go/utils/logs"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 // Cache interface

@@ -3,8 +3,8 @@ package settings
 import (
 	"strings"
 
-	"github.com/ygpkg/yg-go/utils/encryptor"
-	"github.com/ygpkg/yg-go/utils/logs"
+	"github.com/ygpkg/yg-go/encryptor"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 const (

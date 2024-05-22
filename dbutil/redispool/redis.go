@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/settings"
-	"github.com/ygpkg/yg-go/utils/logs"
 )
 
 var stdRedis *redis.Client

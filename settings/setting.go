@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ygpkg/yg-go/utils/dbutil"
-	"github.com/ygpkg/yg-go/utils/logs"
+	"github.com/ygpkg/yg-go/dbutil"
+	"github.com/ygpkg/yg-go/logs"
 	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

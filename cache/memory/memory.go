@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ygpkg/yg-go/utils/cache"
+	"github.com/ygpkg/yg-go/cache"
 )
 
 var _ cache.Cache = (*Memory)(nil)

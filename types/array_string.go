@@ -3,7 +3,7 @@ package types
 import (
 	"encoding/json"
 
-	"github.com/ygpkg/yg-go/utils/logs"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 // StringArray 字符串数组，用于Mysql数据库和接口之间的转换

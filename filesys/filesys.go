@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/ygpkg/yg-go/utils/random"
+	"github.com/ygpkg/yg-go/random"
 )
 
 // CreateRandomFile 创建随机文件

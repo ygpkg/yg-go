@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ygpkg/yg-go/utils/cache"
-	"github.com/ygpkg/yg-go/utils/logs"
+	"github.com/ygpkg/yg-go/cache"
+	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 )
 
