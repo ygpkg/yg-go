@@ -1,12 +1,10 @@
 package types
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"math/big"
 	"strings"
 
-	uuid "github.com/satori/go.uuid"
 	"github.com/ygpkg/yg-go/utils/encryptor"
 	"github.com/ygpkg/yg-go/utils/logs"
 )
@@ -114,12 +112,7 @@ func dec(str string) ([]byte, error) {
 	return dec, nil
 }
 
-// GenerateUUID 生成UUID
-func GenerateUUID() string {
-	return uuid.Must(uuid.NewV4(), nil).String()
-}
-
 // GenerateID 生成ID
 func GenerateID() string {
-	return hex.EncodeToString(uuid.Must(uuid.NewV4(), nil).Bytes())
+	return encryptor.UUID()
 }
