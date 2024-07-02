@@ -18,7 +18,7 @@ var (
 	_ zapcore.WriteSyncer = (*workwxWriteWyncer)(nil)
 )
 
-// NewWorkwxCore 企业微信日志
+// NewWorkwxSyncer 企业微信日志
 func NewWorkwxSyncer(wxKey string) zapcore.WriteSyncer {
 	ws := &workwxWriteWyncer{
 		wxcli: workwx.NewWebhookClient(wxKey),

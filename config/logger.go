@@ -13,13 +13,14 @@ type LogConfig struct {
 	// Writer 日志输出位置 console/file/workwx
 	Writer string `yaml:"writer"`
 	// Encoder 编码格式
-	Encoder            string        `yaml:"encoder"`
-	Level              zapcore.Level `yaml:"level"`
-	Key                string        `yaml:"key,omitempty"`
+	Encoder            string           `yaml:"encoder"`
+	Level              zapcore.Level    `yaml:"level"`
+	Key                string           `yaml:"key,omitempty"`
+	AliyunSLS          *AliyunSLSConfig `yaml:",inline"`
 	*lumberjack.Logger `yaml:",inline"`
 }
 
-// Get() 。
+// Get 获取日志配置
 func (c LogsConfig) Get(name string) []LogConfig {
 	cfg, ok := c[name]
 	if !ok {
@@ -28,7 +29,7 @@ func (c LogsConfig) Get(name string) []LogConfig {
 	return cfg
 }
 
-// Default 。
+// Default 获取默认日志配置
 func (c LogsConfig) Default() []LogConfig {
 	for _, name := range []string{"main", "default"} {
 		cfg, ok := c[name]
@@ -43,4 +44,12 @@ func (c LogsConfig) Default() []LogConfig {
 var defaultLogConfig = LogConfig{
 	Writer: "console",
 	Level:  zapcore.InfoLevel,
+}
+
+// AliyunSLSConfig 阿里云日志服务配置
+type AliyunSLSConfig struct {
+	AliConfig
+
+	Project  string `yaml:"project"`
+	Logstore string `yaml:"logstore"`
 }

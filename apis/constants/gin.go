@@ -11,10 +11,8 @@ const (
 )
 
 const (
-	CtxKeyAccountID          = "accountid"          // 用户端登录账户
-	CtxKeyUserID             = "userid"             // 用户端家庭成员
-	CtxKeyCompanyID          = "companyid"          // 大客户企业
-	CtxKeyDcEmployeeID       = "dcemployeeid"       // 大客户企业员工
-	CtxKeyOperatorID         = "operatorid"         // 运营端员工
-	CtxKeyHealthSpecialistID = "healthspecialistid" // 健康师
+	CtxKeyAccountID  = "accountid" // 用户端登录账户
+	CtxKeyCustomerID = "customerid"
+	CtxKeyCompanyID  = "companyid"
+	CtxKeyEmployeeID = "employeeid" // 运营端员工
 )

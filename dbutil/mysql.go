@@ -6,6 +6,7 @@ import (
 
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/driver/mysql"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -47,6 +48,26 @@ func InitMySQL(name, dburl string) (*gorm.DB, error) {
 		return nil, err
 	}
 	logs.Infof("[init-db] open mysql(%s) success", name)
+
+	if name == "" {
+		name = "default"
+	}
+	dbsLocker.Lock()
+	dbs[name] = db
+	dbsLocker.Unlock()
+
+	return db, nil
+}
+
+func InitSQLite(name, dburl string) (*gorm.DB, error) {
+	db, err := gorm.Open(sqlite.Open(dburl), &gorm.Config{
+		CreateBatchSize: 20,
+	})
+	if err != nil {
+		logs.Errorf("[init-db] open sqlite(%s) failed, %s", name, err)
+		return nil, err
+	}
+	logs.Infof("[init-db] open sqlite(%s) success", name)
 
 	if name == "" {
 		name = "default"

@@ -9,18 +9,22 @@ import (
 	"go.uber.org/zap"
 )
 
+// Logger 日志
 func Logger(ctx *gin.Context) *zap.SugaredLogger {
 	return ctx.MustGet(constants.CtxKeyLogger).(*zap.SugaredLogger)
 }
 
+// RequestID 请求ID
 func RequestID(ctx *gin.Context) string {
 	return ctx.MustGet(constants.CtxKeyRequestID).(string)
 }
 
+// LoginStatus 登录状态
 func LoginStatus(ctx *gin.Context) *auth.LoginStatus {
 	return ctx.MustGet(constants.CtxKeyLoginStatus).(*auth.LoginStatus)
 }
 
+// GetRealIP 平台
 func GetRealIP(req *http.Request) string {
 	xrel := req.Header.Get("X-Real-Ip")
 	if xrel != "" {

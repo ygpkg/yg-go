@@ -6,14 +6,22 @@ import (
 	"github.com/ygpkg/yg-go/apis/constants"
 )
 
+// CompanyID 企业ID
 func CompanyID(ctx *gin.Context) uint {
 	return LoginStatus(ctx).GetID(constants.CtxKeyCompanyID)
 }
 
+// EmployeeID 员工ID
 func EmployeeID(ctx *gin.Context) uint {
-	return LoginStatus(ctx).GetID(constants.CtxKeyDcEmployeeID)
+	return LoginStatus(ctx).GetID(constants.CtxKeyEmployeeID)
 }
 
-func UserID(ctx *gin.Context) uint {
-	return LoginStatus(ctx).GetID(constants.CtxKeyUserID)
+// CustomerID 客户ID
+func CustomerID(ctx *gin.Context) uint {
+	return LoginStatus(ctx).GetID(constants.CtxKeyCustomerID)
+}
+
+// AccountID 账户ID
+func AccountID(ctx *gin.Context) uint {
+	return LoginStatus(ctx).GetID(constants.CtxKeyAccountID)
 }

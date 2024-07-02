@@ -151,6 +151,9 @@ func (lw *loggerWrapper) load(module string, cfgs []config.LogConfig) {
 			syncer = zapcore.AddSync(wxLgr)
 		case "console", "stdout", "":
 			syncer = zapcore.Lock(os.Stdout)
+		case "aliyunsls", "aliyun", "sls":
+			slsLgr := NewAliyunSlsSyncer(*lcfg.AliyunSLS)
+			syncer = zapcore.AddSync(slsLgr)
 		default:
 			panic(fmt.Errorf("unsupport logger writer (%s)", lcfg.Encoder))
 		}

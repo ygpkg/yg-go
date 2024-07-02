@@ -41,12 +41,12 @@ type LocalStorageConfig struct {
 // AliOSSConfig .
 type AliOSSConfig struct {
 	AliConfig
-	Endpoint string `yaml:"endpoint"`
-	Bucket   string `yaml:"bucket"`
+	Bucket string `yaml:"bucket"`
 }
 
 type AliConfig struct {
 	RegionID        string `yaml:"region_id"`
+	Endpoint        string `yaml:"endpoint"`
 	AccessKeyID     string `yaml:"access_key_id"`
 	AccessKeySecret string `yaml:"access_key_secret"`
 }
