@@ -13,7 +13,8 @@ var std *MainConfig
 // Conf .
 func Conf() *MainConfig {
 	if std == nil {
-		panic(fmt.Errorf("config is nil"))
+		fmt.Println("config is nil")
+		std = &MainConfig{}
 	}
 	return std
 }
