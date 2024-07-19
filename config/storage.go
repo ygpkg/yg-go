@@ -63,6 +63,7 @@ type TencentConfig struct {
 	SecretID  string `yaml:"secret_id"`
 	SecretKey string `yaml:"secret_key"`
 	Region    string `yaml:"region"`
+	Endpoint  string `yaml:"endpoint"`
 }
 
 // TencentCOSConfig 腾讯云对象存储配置

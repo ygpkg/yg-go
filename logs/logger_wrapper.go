@@ -2,6 +2,7 @@ package logs
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sync"
 
@@ -17,7 +18,8 @@ type loggerWrapper struct {
 }
 
 var (
-	loggers = map[string]*loggerWrapper{
+	closerList []io.Closer = []io.Closer{}
+	loggers                = map[string]*loggerWrapper{
 		"default": {name: "default"},
 	}
 	loggersLock = new(sync.RWMutex)
@@ -138,9 +140,15 @@ func (lw *loggerWrapper) load(module string, cfgs []config.LogConfig) {
 			syncer = zapcore.AddSync(wxLgr)
 		case "console", "stdout", "":
 			syncer = zapcore.Lock(os.Stdout)
-		case "aliyunsls", "aliyun", "sls":
-			slsLgr := NewAliyunSlsSyncer(*lcfg.AliyunSLS)
-			syncer = zapcore.AddSync(slsLgr)
+		// case "aliyunsls", "aliyun", "sls":
+		// 	slsLgr := NewAliyunSlsSyncer(*lcfg.AliyunSLS)
+		// 	syncer = zapcore.AddSync(slsLgr)
+		case "tencentcls", "tencent", "cls":
+			clsLgr, err := NewTencentClsSyncer(*lcfg.TencentCLS)
+			if err != nil {
+				panic(err)
+			}
+			syncer = zapcore.AddSync(clsLgr)
 		default:
 			panic(fmt.Errorf("unsupport logger writer (%s)", lcfg.Encoder))
 		}
@@ -184,4 +192,11 @@ func SetLevel(lvl zapcore.Level) {
 		zapcore.Lock(os.Stdout),
 		zap.NewAtomicLevelAt(lvl)))
 	logger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1)).Sugar()
+}
+
+// Close 关闭日志
+func Close() {
+	for _, c := range closerList {
+		c.Close()
+	}
 }
