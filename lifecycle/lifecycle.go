@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"context"
 	"io"
 	"os"
 	"os/signal"
@@ -15,6 +16,8 @@ var std *LifeCycle
 
 // LifeCycle 应用程序生命周期
 type LifeCycle struct {
+	ctx    context.Context
+	cancle context.CancelFunc
 	chExit chan struct{}
 
 	// exitTimeout 退出过期时间
@@ -27,7 +30,10 @@ type LifeCycle struct {
 
 // New .
 func New() *LifeCycle {
+	ctx, cancle := context.WithCancel(context.Background())
 	lc := &LifeCycle{
+		ctx:         ctx,
+		cancle:      cancle,
 		chExit:      make(chan struct{}),
 		exitTimeout: time.Second * 15,
 		listenSigs:  []os.Signal{syscall.SIGINT},
@@ -107,6 +113,7 @@ func (l *LifeCycle) exit() {
 		}
 	}()
 
+	l.cancle()
 	var wg sync.WaitGroup
 	wg.Add(len(l.preExitRun))
 	for _, v := range l.preExitRun {
