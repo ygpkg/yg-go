@@ -9,14 +9,12 @@ import (
 	glogger "gorm.io/gorm/logger"
 )
 
+// GetGorm 获取gorm日志
 func GetGorm(lgrName string) glogger.Interface {
-	lw := loggers[lgrName]
-	if lw == nil {
-		panic(fmt.Errorf("not found gorm logger %q", lgrName))
-	}
+	lw := Get(lgrName)
 
 	return &gormLogger{
-		l: lw.logger.Desugar().WithOptions(zap.AddCallerSkip(2)).Sugar(),
+		l: lw.Desugar().WithOptions(zap.AddCallerSkip(2)).Sugar(),
 	}
 }
 

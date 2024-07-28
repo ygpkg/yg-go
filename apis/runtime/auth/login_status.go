@@ -26,12 +26,10 @@ const (
 	RoleNil Role = iota
 	// RoleUser 普通用户
 	RoleUser
-	// RoleOperator 运营用户
-	RoleOperator
-	// RoleDistributor 大客户
-	RoleDistributor
-	// RoleHealthSpecialist 健康师
-	RoleHealthSpecialist
+	// RoleEmployee 运营用户
+	RoleEmployee
+	// RoleCustomer 客户
+	RoleCustomer
 )
 
 // LoginStatus
