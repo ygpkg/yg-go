@@ -8,19 +8,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var std *Config
+var std *CoreConfig
 
 // Config 。
-type Config struct {
+type CoreConfig struct {
 	MainConf MainConfig `yaml:"main"`
 	LogsConf LogsConfig `yaml:"logger"`
 }
 
 // Conf .
-func Conf() *Config {
+func Conf() *CoreConfig {
 	if std == nil {
 		fmt.Println("config is nil")
-		std = &Config{}
+		std = &CoreConfig{}
 	}
 	return std
 }
@@ -31,16 +31,13 @@ type MainConfig struct {
 	HttpAddr    string            `yaml:"http_addr"`
 	GrpcAddr    string            `yaml:"grpc_addr"`
 	OpenDocsAPI bool              `yaml:"open_docs_api"`
-	BaseURL     string            `yaml:"base_url"`
-	WebDir      string            `yaml:"web_dir"`
 	MysqlConns  map[string]string `yaml:"mysql_conns"`
-	TmpDir      string            `yaml:"tmp_dir"`
 	Env         string            `yaml:"env"`
 }
 
-// LoadMainConfigFromFile .
-func LoadMainConfigFromFile(filepath string) (*Config, error) {
-	cfg := &Config{}
+// LoadCoreConfigFromFile .
+func LoadCoreConfigFromFile(filepath string) (*CoreConfig, error) {
+	cfg := &CoreConfig{}
 	err := LoadYamlLocalFile(filepath, cfg)
 	if err != nil {
 		return nil, err
