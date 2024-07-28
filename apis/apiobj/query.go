@@ -40,14 +40,10 @@ type PageQuery struct {
 	BeginTime time.Time `json:",omitempty"`
 	EndTime   time.Time `json:",omitempty"`
 
-	IsBackend    bool `json:"-"`
-	CompanyID    uint `json:"-"` // CompanyID 大客户企业id
-	DcEmployeeID uint `json:"-"` // DcEmployeeID 大客户员工id
-	OperatorID   uint `json:"-"` // OperatorID 运营平台员工id
-	AccountID    uint `json:"-"` // AccountID 用户小程序账户id
-	UserID       uint `json:"-"` // UserID 用户id
-	HsID         uint `json:"-"` // HsID 健康师id
-	//CustomerID   uint `json:"-"` // HsID 健康师的客户id
+	IsBackend  bool `json:"-"`
+	CompanyID  uint `json:"-"` // CompanyID 大客户企业id
+	EmployeeID uint `json:"-"` // DcEmployeeID 大客户员工id
+	CustomerID uint `json:"-"` // HsID 健康师的客户id
 }
 
 // Filter 过滤条件
