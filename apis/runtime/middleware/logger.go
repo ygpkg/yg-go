@@ -16,7 +16,7 @@ func Logger() gin.HandlerFunc {
 		reqid := ctx.GetString(constants.CtxKeyRequestID)
 		logger := logs.RequestLogger(reqid)
 
-		logs.SetContextFields(ctx, "req_id", reqid)
+		logs.SetContextFields(ctx, "reqid", reqid)
 		currReq := fmt.Sprintf("%s %s", ctx.Request.Method, ctx.FullPath())
 		for _, whitelistItem := range []string{
 			"POST /apis/zmdevice/v1/ping",
