@@ -106,12 +106,6 @@ func (svr *Router) G(action string, hdrs ...interface{}) {
 	P(svr.pgr.GET, action, hdrs...)
 }
 
-// PRequireEmployee 运营平台员工
-func (svr *Router) PRequireEmployee(action string, hdrs ...interface{}) {
-	// newhdrs := append([]interface{}{opmds.RequireEmployeeLoginMD}, hdrs...)
-	// svr.P(action, newhdrs...)
-}
-
 // ListAllRouters 列出所有路由
 func (svr *Router) ListAllRouters() {
 	rts := svr.eng.Routes()
@@ -146,4 +140,22 @@ func P(mf MethodFunc, action string, hdrs ...interface{}) {
 		}
 	}
 	mf(action, ginhdrs...)
+}
+
+// PRequireLogin .
+func (svr *Router) PRequireLogin(action string, hdrs ...interface{}) {
+	newhdrs := append([]interface{}{middleware.AuthMiddleWare}, hdrs...)
+	svr.P(action, newhdrs...)
+}
+
+// PRequireEmployee .
+func (svr *Router) PRequireEmployee(action string, hdrs ...interface{}) {
+	newhdrs := append([]interface{}{middleware.AuthMiddleWare}, hdrs...)
+	svr.P(action, newhdrs...)
+}
+
+// PRequireCustomer .
+func (svr *Router) PRequireCustomer(action string, hdrs ...interface{}) {
+	newhdrs := append([]interface{}{middleware.AuthMiddleWare}, hdrs...)
+	svr.P(action, newhdrs...)
 }
