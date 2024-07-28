@@ -11,7 +11,7 @@ import (
 
 // CustomerHeader .
 func CustomerHeader() gin.HandlerFunc {
-	env := config.Conf().Env
+	env := config.Conf().MainConf.Env
 	return func(ctx *gin.Context) {
 		if env == "" {
 			return

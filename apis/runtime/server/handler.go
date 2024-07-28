@@ -112,7 +112,7 @@ func fixBaseResponse(ctx *gin.Context, val reflect.Value) {
 					br.Message = errcode.GetMessage(br.Code)
 				}
 				br.RequestID = ctx.GetString(constants.CtxKeyRequestID)
-				br.Env = config.Conf().Env
+				br.Env = config.Conf().MainConf.Env
 				field.Set(reflect.ValueOf(br))
 				return
 			}

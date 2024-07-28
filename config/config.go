@@ -8,13 +8,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var std *MainConfig
+var std *Config
+
+// Config 。
+type Config struct {
+	MainConf MainConfig `yaml:"main"`
+	LogsConf LogsConfig `yaml:"logger"`
+}
 
 // Conf .
-func Conf() *MainConfig {
+func Conf() *Config {
 	if std == nil {
 		fmt.Println("config is nil")
-		std = &MainConfig{}
+		std = &Config{}
 	}
 	return std
 }
@@ -33,8 +39,8 @@ type MainConfig struct {
 }
 
 // LoadMainConfigFromFile .
-func LoadMainConfigFromFile(filepath string) (*MainConfig, error) {
-	cfg := &MainConfig{}
+func LoadMainConfigFromFile(filepath string) (*Config, error) {
+	cfg := &Config{}
 	err := LoadYamlLocalFile(filepath, cfg)
 	if err != nil {
 		return nil, err

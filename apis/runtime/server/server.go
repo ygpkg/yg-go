@@ -54,7 +54,7 @@ func NewRouter(apiPrefix string) *Router {
 			},
 		},
 	}
-	if config.Conf().Env != "test" {
+	if config.Conf().MainConf.Env != "test" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
