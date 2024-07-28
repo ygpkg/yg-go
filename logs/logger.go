@@ -3,6 +3,7 @@ package logs
 import (
 	"context"
 
+	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
@@ -131,16 +132,37 @@ func WithContextLogger(ctx context.Context, l *zap.SugaredLogger) context.Contex
 
 // SetContextFields 设置日志上下文
 func SetContextFields(ctx context.Context, fields ...interface{}) {
+	if gctx, ok := ctx.(*gin.Context); ok {
+		logger := LoggerFromContext(ctx)
+		logger = logger.With(fields...)
+		gctx.Set(string(contextKeyLogger), logger)
+		return
+	}
 	ctx = WithContextFields(ctx, fields...)
 }
 
 // SetContextLogger 设置日志上下文
 func SetContextLogger(ctx context.Context, l *zap.SugaredLogger) {
+	if gctx, ok := ctx.(*gin.Context); ok {
+		gctx.Set(string(contextKeyLogger), l)
+		return
+	}
 	ctx = WithContextLogger(ctx, l)
 }
 
 // LoggerFromContext 获取日志上下文
 func LoggerFromContext(ctx context.Context) *zap.SugaredLogger {
+	if gctx, ok := ctx.(*gin.Context); ok {
+		val, ok := gctx.Get(string(contextKeyLogger))
+		if !ok {
+			return logger
+		}
+		l, ok := val.(*zap.SugaredLogger)
+		if !ok {
+			return logger
+		}
+		return l
+	}
 	val := ctx.Value(contextKeyLogger)
 	if val == nil {
 		return logger
