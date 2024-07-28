@@ -8,12 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ygpkg/yg-go/apis/apiobj"
 	"github.com/ygpkg/yg-go/apis/errcode"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 // ResponseMessage 返回消息
 func ResponseMessage(ctx *gin.Context, msgCode uint32, msg string) {
 	m := apiobj.BaseResponse{Code: uint32(msgCode), Message: msg}
-	Logger(ctx).Warnf("badrequest code %v, message: %s", m.Code, m.Message)
+	logs.WarnContextf(ctx, "badrequest code %v, message: %s", m.Code, m.Message)
 	body, _ := json.Marshal(m)
 	ctx.Writer.Write(body)
 	ctx.Abort()

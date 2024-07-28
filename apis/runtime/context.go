@@ -6,12 +6,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ygpkg/yg-go/apis/constants"
 	"github.com/ygpkg/yg-go/apis/runtime/auth"
+	"github.com/ygpkg/yg-go/logs"
 	"go.uber.org/zap"
 )
 
 // Logger 日志
 func Logger(ctx *gin.Context) *zap.SugaredLogger {
-	return ctx.MustGet(constants.CtxKeyLogger).(*zap.SugaredLogger)
+	return logs.LoggerFromContext(ctx)
 }
 
 // RequestID 请求ID

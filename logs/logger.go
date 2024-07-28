@@ -64,43 +64,43 @@ func Errorw(msg string, keysAndValues ...interface{}) { logger.Errorw(msg, keysA
 func Fatalw(msg string, keysAndValues ...interface{}) { logger.Fatalw(msg, keysAndValues...) }
 
 // DebugContext 调试
-func DebugContext(ctx context.Context, args ...interface{}) { getContextLogger(ctx).Debug(args...) }
+func DebugContext(ctx context.Context, args ...interface{}) { LoggerFromContext(ctx).Debug(args...) }
 
 // InfoContext 提示信息
-func InfoContext(ctx context.Context, args ...interface{}) { getContextLogger(ctx).Info(args...) }
+func InfoContext(ctx context.Context, args ...interface{}) { LoggerFromContext(ctx).Info(args...) }
 
 // WarnContext 警告信息
-func WarnContext(ctx context.Context, args ...interface{}) { getContextLogger(ctx).Warn(args...) }
+func WarnContext(ctx context.Context, args ...interface{}) { LoggerFromContext(ctx).Warn(args...) }
 
 // ErrorContext 错误信息
-func ErrorContext(ctx context.Context, args ...interface{}) { getContextLogger(ctx).Error(args...) }
+func ErrorContext(ctx context.Context, args ...interface{}) { LoggerFromContext(ctx).Error(args...) }
 
 // FatalContext 致命错误
-func FatalContext(ctx context.Context, args ...interface{}) { getContextLogger(ctx).Fatal(args...) }
+func FatalContext(ctx context.Context, args ...interface{}) { LoggerFromContext(ctx).Fatal(args...) }
 
 // DebugContextf 调试
 func DebugContextf(ctx context.Context, template string, args ...interface{}) {
-	getContextLogger(ctx).Debugf(template, args...)
+	LoggerFromContext(ctx).Debugf(template, args...)
 }
 
 // InfoContextf 提示信息
 func InfoContextf(ctx context.Context, template string, args ...interface{}) {
-	getContextLogger(ctx).Infof(template, args...)
+	LoggerFromContext(ctx).Infof(template, args...)
 }
 
 // WarnContextf 警告信息
 func WarnContextf(ctx context.Context, template string, args ...interface{}) {
-	getContextLogger(ctx).Warnf(template, args...)
+	LoggerFromContext(ctx).Warnf(template, args...)
 }
 
 // ErrorContextf 错误信息
 func ErrorContextf(ctx context.Context, template string, args ...interface{}) {
-	getContextLogger(ctx).Errorf(template, args...)
+	LoggerFromContext(ctx).Errorf(template, args...)
 }
 
 // FatalContextf 致命错误
 func FatalContextf(ctx context.Context, template string, args ...interface{}) {
-	getContextLogger(ctx).Fatalf(template, args...)
+	LoggerFromContext(ctx).Fatalf(template, args...)
 }
 
 // WithContextFields 设置日志字段上下文
@@ -129,7 +129,18 @@ func WithContextLogger(ctx context.Context, l *zap.SugaredLogger) context.Contex
 	return context.WithValue(ctx, contextKeyLogger, l)
 }
 
-func getContextLogger(ctx context.Context) *zap.SugaredLogger {
+// SetContextFields 设置日志上下文
+func SetContextFields(ctx context.Context, fields ...interface{}) {
+	ctx = WithContextFields(ctx, fields...)
+}
+
+// SetContextLogger 设置日志上下文
+func SetContextLogger(ctx context.Context, l *zap.SugaredLogger) {
+	ctx = WithContextLogger(ctx, l)
+}
+
+// LoggerFromContext 获取日志上下文
+func LoggerFromContext(ctx context.Context) *zap.SugaredLogger {
 	val := ctx.Value(contextKeyLogger)
 	if val == nil {
 		return logger
