@@ -84,6 +84,7 @@ func (l *LifeCycle) WaitExit() {
 	for {
 		select {
 		case sig := <-sigChan:
+			logs.Infof("catch signal: %v", sig)
 			for _, lisSig := range l.listenSigs {
 				if lisSig == sig {
 					logs.Warnf("^C exit.")
