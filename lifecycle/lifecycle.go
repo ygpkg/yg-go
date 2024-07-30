@@ -36,7 +36,7 @@ func New() *LifeCycle {
 		cancle:      cancle,
 		chExit:      make(chan struct{}),
 		exitTimeout: time.Second * 15,
-		listenSigs:  []os.Signal{syscall.SIGINT},
+		listenSigs:  []os.Signal{syscall.SIGINT, syscall.SIGTERM},
 	}
 
 	return lc
