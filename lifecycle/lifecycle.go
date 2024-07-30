@@ -36,7 +36,7 @@ func New() *LifeCycle {
 		cancle:      cancle,
 		chExit:      make(chan struct{}),
 		exitTimeout: time.Second * 15,
-		listenSigs:  []os.Signal{syscall.SIGINT, syscall.SIGTERM},
+		listenSigs:  []os.Signal{syscall.SIGTERM, os.Interrupt},
 	}
 
 	return lc
@@ -78,7 +78,7 @@ func (l *LifeCycle) Exit() {
 
 // WaitExit .
 func (l *LifeCycle) WaitExit() {
-	sigChan := make(chan os.Signal)
+	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, l.listenSigs...)
 
 	for {
