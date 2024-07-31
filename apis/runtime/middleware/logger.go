@@ -14,7 +14,6 @@ import (
 func Logger() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		reqid := ctx.GetString(constants.CtxKeyRequestID)
-		logger := logs.RequestLogger(reqid)
 
 		logs.SetContextFields(ctx, "reqid", reqid)
 		currReq := fmt.Sprintf("%s %s", ctx.Request.Method, ctx.FullPath())
@@ -32,7 +31,7 @@ func Logger() gin.HandlerFunc {
 		ctx.Next()
 		cost := time.Since(start)
 
-		logger.Infow(fmt.Sprint(ctx.Writer.Status()),
+		logs.LoggerFromContext(ctx).Infow(fmt.Sprint(ctx.Writer.Status()),
 			"method", ctx.Request.Method,
 			"uri", ctx.Request.RequestURI,
 			"reqsize", ctx.Request.ContentLength,

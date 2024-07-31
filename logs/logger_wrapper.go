@@ -76,7 +76,7 @@ func Get(lgr string) *zap.SugaredLogger {
 	defer loggersLock.RUnlock()
 	lw := loggers[lgr]
 	if lw == nil {
-		logger.Errorf("not found logger (%s)", lgr)
+		// logger.Errorf("not found logger (%s)", lgr)
 		return logger
 	}
 	return lw.logger
