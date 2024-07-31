@@ -13,10 +13,10 @@ type LogConfig struct {
 	// Writer 日志输出位置 console/file/workwx
 	Writer string `yaml:"writer"`
 	// Encoder 编码格式
-	Encoder            string            `yaml:"encoder"`
-	Level              zapcore.Level     `yaml:"level"`
-	Key                string            `yaml:"key,omitempty"`
-	AliyunSLS          *AliyunSLSConfig  `yaml:"aliyun_sls,omitempty"`
+	Encoder string        `yaml:"encoder"`
+	Level   zapcore.Level `yaml:"level"`
+	Key     string        `yaml:"key,omitempty"`
+	// AliyunSLS          *AliyunSLSConfig  `yaml:"aliyun_sls,omitempty"`
 	TencentCLS         *TencentCLSConfig `yaml:"tencent_cls,omitempty"`
 	*lumberjack.Logger `yaml:",inline"`
 }
@@ -47,17 +47,17 @@ var defaultLogConfig = LogConfig{
 	Level:  zapcore.InfoLevel,
 }
 
-// AliyunSLSConfig 阿里云日志服务配置
-type AliyunSLSConfig struct {
-	AliConfig
+// // AliyunSLSConfig 阿里云日志服务配置
+// type AliyunSLSConfig struct {
+// 	AliConfig
 
-	Project  string `yaml:"project"`
-	Logstore string `yaml:"logstore"`
-}
+// 	Project  string `yaml:"project"`
+// 	Logstore string `yaml:"logstore"`
+// }
 
 // TencentCLSConfig 腾讯云日志服务配置
 type TencentCLSConfig struct {
-	TencentConfig
+	TencentConfig `yaml:",inline"`
 
 	TopicID string `yaml:"topic_id"`
 }
