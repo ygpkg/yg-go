@@ -73,3 +73,24 @@ func LoadYamlReader(r io.Reader, cfg interface{}) error {
 
 	return nil
 }
+
+// Env 获取环境
+func Env() string {
+	if cfgEnv := Conf().MainConf.Env; cfgEnv != "" {
+		return cfgEnv
+	}
+	if env := os.Getenv("ENV"); env != "" {
+		return env
+	}
+	return ""
+}
+
+// IsProd 是否生产环境
+func IsProd() bool {
+	return Env() == "prod"
+}
+
+// IsDev 是否开发环境
+func IsDev() bool {
+	return Env() == "dev"
+}
