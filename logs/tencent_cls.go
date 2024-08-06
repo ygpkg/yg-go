@@ -18,7 +18,6 @@ const (
 type tencentClsWriteWyncer struct {
 	client *cls.AsyncProducerClient
 	cfg    config.TencentCLSConfig
-	buf    []*cls.Log
 	sync.Mutex
 }
 
@@ -32,6 +31,7 @@ func NewTencentClsSyncer(cfg config.TencentCLSConfig) (zapcore.WriteSyncer, erro
 	producerConfig.Endpoint = cfg.Endpoint
 	producerConfig.AccessKeyID = cfg.SecretID
 	producerConfig.AccessKeySecret = cfg.SecretKey
+	producerConfig.MaxBlockSec = 5
 
 	producerInstance, err := cls.NewAsyncProducerClient(producerConfig)
 	if err != nil {
@@ -43,10 +43,13 @@ func NewTencentClsSyncer(cfg config.TencentCLSConfig) (zapcore.WriteSyncer, erro
 	log := &tencentClsWriteWyncer{
 		client: producerInstance,
 		cfg:    cfg,
-		buf:    make([]*cls.Log, 0, tencentClsMaxBatchSize),
 	}
 	closerList = append(closerList, log)
 	return log, nil
+}
+
+func (c *tencentClsWriteWyncer) Sync() error {
+	return nil
 }
 
 // Write .
@@ -64,30 +67,13 @@ func (c *tencentClsWriteWyncer) Write(p []byte) (n int, err error) {
 	}
 	log := cls.NewCLSLog(time.Now().Unix(), addLogMap)
 
-	c.Lock()
-	c.buf = append(c.buf, log)
-	c.Unlock()
-
-	if len(c.buf) >= tencentClsMaxBatchSize {
-		c.Sync()
+	err = c.client.SendLog(c.cfg.TopicID, log, c)
+	if err != nil {
+		fmt.Println("send tencent cls message failed:", err)
+		return 0, err
 	}
 
 	return len(p), nil
-}
-
-func (c *tencentClsWriteWyncer) Sync() error {
-	c.Lock()
-	loglist := c.buf[:]
-	c.buf = c.buf[:0]
-	c.Unlock()
-
-	err := c.client.SendLogList(c.cfg.TopicID, loglist, c)
-	if err != nil {
-		fmt.Println("send tencent cls message failed:", err)
-		return err
-	}
-
-	return nil
 }
 
 func (c *tencentClsWriteWyncer) Success(result *cls.Result) {
