@@ -1,29 +1,26 @@
 package cache
 
 import (
-	"encoding/json"
-	"time"
-
-	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/cache/cachetype"
+	"github.com/ygpkg/yg-go/cache/memory"
 )
 
-// Cache interface
-type Cache interface {
-	Get(key string, val interface{}) error
-	Set(key string, val interface{}, timeout time.Duration) error
-	IsExist(key string) bool
-	Delete(key string) error
+var std cachetype.Cache
+
+// InitCache init cache
+func InitCache(c cachetype.Cache) {
+	std = c
 }
 
-func Marshal(val interface{}) string {
-	bs, err := json.Marshal(val)
-	if err != nil {
-		logs.Errorf("[cache] marshal %T failed, %s", val, err)
-		return ""
+// Std get std cache
+func Std() cachetype.Cache {
+	if std == nil {
+		std = memory.NewCache()
 	}
-	return string(bs)
+	return std
 }
 
-func Unmarshal(data []byte, val interface{}) error {
-	return json.Unmarshal(data, val)
+// WechatCache wechat cache
+func WechatCache() *wechatCache {
+	return &wechatCache{c: Std()}
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ygpkg/yg-go/cache"
+	"github.com/ygpkg/yg-go/cache/cachetype"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 )
@@ -22,7 +22,7 @@ type CacheVal struct {
 
 func (*CacheVal) TableName() string { return TableName }
 
-var _ cache.Cache = (*MysqlCache)(nil)
+var _ cachetype.Cache = (*MysqlCache)(nil)
 
 type MysqlCache struct {
 	db *gorm.DB
@@ -48,7 +48,7 @@ func (mc *MysqlCache) Get(key string, val interface{}) error {
 		return fmt.Errorf("key(%s) expired at %s", key, cv.ExpiredAt)
 	}
 
-	if err := cache.Unmarshal([]byte(cv.Val), val); err != nil {
+	if err := cachetype.Unmarshal([]byte(cv.Val), val); err != nil {
 		logs.Errorf("[mysql-cache] got key(%s) unmarshal failed %s", key, err)
 		return err
 	}
@@ -61,7 +61,7 @@ func (mc *MysqlCache) Set(key string, val interface{}, timeout time.Duration) er
 	if err != nil {
 		return mc.db.Create(&CacheVal{
 			Key:       key,
-			Val:       cache.Marshal(val),
+			Val:       cachetype.Marshal(val),
 			ExpiredAt: time.Now().Add(timeout),
 		}).Error
 	}
@@ -69,7 +69,7 @@ func (mc *MysqlCache) Set(key string, val interface{}, timeout time.Duration) er
 	return mc.db.Table(TableName).
 		Where("id = ? AND version = ?", cv.Key, cv.Version).Updates(map[string]interface{}{
 		"expired_at": time.Now().Add(timeout),
-		"value":      cache.Marshal(val),
+		"value":      cachetype.Marshal(val),
 		"version":    gorm.Expr("version+1"),
 	}).Error
 }

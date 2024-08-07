@@ -5,10 +5,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ygpkg/yg-go/cache"
+	"github.com/ygpkg/yg-go/cache/cachetype"
 )
 
-var _ cache.Cache = (*Memory)(nil)
+var _ cachetype.Cache = (*Memory)(nil)
 
 // Memory struct contains *memcache.Client
 type Memory struct {

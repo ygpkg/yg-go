@@ -35,17 +35,10 @@ func InitRedis(group, key string) error {
 	return nil
 }
 
+// Redis 获取redis连接
 func Redis() *redis.Client {
 	if stdRedis == nil {
 		panic(fmt.Errorf("redis is nil"))
 	}
 	return stdRedis
-}
-
-// WechatCache 兼容微信包的cache
-func WechatCache() *wechatCache {
-	return &wechatCache{
-		ctx:  context.Background(),
-		conn: Redis(),
-	}
 }
