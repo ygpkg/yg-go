@@ -94,6 +94,12 @@ func (svr *Router) router() {
 	})
 }
 
+// Any .
+func (svr *Router) Any(action string, hdrs ...interface{}) {
+	svr.routerMap[action] = nil
+	P(svr.pgr.Any, action, hdrs...)
+}
+
 // P .
 func (svr *Router) P(action string, hdrs ...interface{}) {
 	svr.routerMap[action] = nil
