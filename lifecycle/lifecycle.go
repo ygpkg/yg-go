@@ -47,6 +47,11 @@ func (l *LifeCycle) SetSignals(sigs ...os.Signal) {
 	l.listenSigs = sigs
 }
 
+// Context 上下文
+func (l *LifeCycle) Context() context.Context {
+	return l.ctx
+}
+
 // C .
 func (l *LifeCycle) C() <-chan struct{} {
 	return l.chExit
