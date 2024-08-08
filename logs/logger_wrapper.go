@@ -102,7 +102,7 @@ func Desugar() *zap.Logger { return logger.Desugar() }
 
 // Named 获取并设置命名日志实例
 func Named(name string) *zap.SugaredLogger {
-	return zap.New(getDefaultLoggerWrapper().core, zap.AddCaller(), zap.AddCallerSkip(0)).Sugar().Named(name)
+	return logger.Named(name)
 }
 
 // RequestLogger 接口请求日志 需要配置access日志
@@ -158,7 +158,7 @@ func (lw *loggerWrapper) load(module string, cfgs []config.LogConfig) {
 
 	opts := []zap.Option{zap.AddCaller(), zap.AddCallerSkip(1)}
 	fields := []zap.Field{}
-	if module != "-" || lw.name != "" {
+	if module != "-" && lw.name != "" {
 		fields = append(fields, zap.String("module", module))
 	}
 	if lw.name != "default" {
