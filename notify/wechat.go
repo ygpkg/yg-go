@@ -1,11 +1,25 @@
 package notify
 
 import (
-	"github.com/silenceper/wechat/v2"
-	"github.com/ygpkg/yg-go/cache"
+	"context"
+
+	"github.com/silenceper/wechat/v2/officialaccount/message"
+	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/wechatmp"
 )
 
-func SendWechatTemplateMsg() {
-	wc := wechat.NewWechat()
-	wc.SetCache(cache.WechatCache())
+// SendWechatOfficialAccountTemplateMsg 发送微信公众号模板消息
+func SendWechatOfficialAccountTemplateMsg(ctx context.Context, group, key string, msg *message.TemplateMessage) {
+	mp, err := wechatmp.GetWechatOfficialAccount(group, key)
+	if err != nil {
+		logs.ErrorContextf(ctx, "SendWechatTemplateMsg: get wechat official account failed, %s", err)
+		return
+	}
+
+	msgid, err := mp.GetTemplate().Send(msg)
+	if err != nil {
+		logs.ErrorContextf(ctx, "SendWechatTemplateMsg: send template message failed, %s", err)
+		return
+	}
+	logs.Infof("SendWechatTemplateMsg: send template message success, msgid: %v, body: %+v", msgid, msg)
 }

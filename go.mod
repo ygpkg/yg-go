@@ -6,7 +6,6 @@ require (
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.726
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
-	github.com/gomodule/redigo v1.9.2
 	github.com/mr-tron/base58 v1.2.0
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/satori/go.uuid v1.2.0
