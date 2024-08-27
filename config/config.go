@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/ygpkg/yg-go/settings/remote"
 	"gopkg.in/yaml.v3"
 )
 
@@ -46,6 +47,17 @@ func LoadCoreConfigFromFile(filepath string) (*CoreConfig, error) {
 	return cfg, nil
 }
 
+// LoadCoreConfigFromEnv 通过环境变量获取远程配置
+func LoadCoreConfigFromEnv(key string) (*CoreConfig, error) {
+	cfg := &CoreConfig{}
+	err := remote.GetRemoteYAML(key, cfg)
+	if err != nil {
+		return nil, err
+	}
+	std = cfg
+	return cfg, nil
+}
+
 // LoadYamlLocalFile .
 func LoadYamlLocalFile(file string, cfg interface{}) error {
 	f, err := os.Open(file)
@@ -53,6 +65,7 @@ func LoadYamlLocalFile(file string, cfg interface{}) error {
 		fmt.Printf("[config] laod %s failed, %s\n", file, err)
 		return err
 	}
+	defer f.Close()
 
 	err = yaml.NewDecoder(f).Decode(cfg)
 	if err != nil {

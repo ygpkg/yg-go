@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/ygpkg/yg-go/types"
 )
 
 const (
@@ -91,14 +89,14 @@ func (p PageQuery) IsValite(allower interface{}) error {
 			ob = strings.ToLower(ob)
 			ob = strings.TrimSuffix(ob, " desc")
 			ob = strings.TrimSuffix(ob, " asc")
-			if !types.ContainsString(allowOrderFields, ob) {
+			if !containsString(allowOrderFields, ob) {
 				return fmt.Errorf("不支持的排序字段: %s" + ob)
 			}
 		}
 	}
 	if allowFilterFields != nil {
 		for _, f := range p.Filters {
-			if !types.ContainsString(allowFilterFields, f.Field) {
+			if !containsString(allowFilterFields, f.Field) {
 				return fmt.Errorf("不支持的过滤字段: %s" + f.Field)
 			}
 			if len(f.Value) == 0 {
@@ -119,4 +117,14 @@ type QueryResponse struct {
 	Total  int64 `json:"total"`
 	Offset int   `json:"offset"`
 	Limit  int   `json:"limit"`
+}
+
+// containsString 判断字符串是否在字符串数组中
+func containsString(arr []string, str string) bool {
+	for _, v := range arr {
+		if v == str {
+			return true
+		}
+	}
+	return false
 }
