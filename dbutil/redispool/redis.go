@@ -42,3 +42,11 @@ func Redis() *redis.Client {
 	}
 	return stdRedis
 }
+
+// GetRedis 获取redis连接, 可能为nil
+func GetRedis() (*redis.Client, error) {
+	if stdRedis == nil {
+		return nil, fmt.Errorf("redis is nil")
+	}
+	return stdRedis, nil
+}
