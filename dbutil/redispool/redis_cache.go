@@ -115,3 +115,14 @@ func GetJSON(key string, v interface{}) error {
 	}
 	return json.Unmarshal([]byte(data), v)
 }
+
+// GetLock 获取锁
+func GetLock(key string, expired time.Duration) bool {
+	cache := CacheInstance()
+	result, err := cache.client.SetNX(context.Background(), key, 1, expired).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call GetLock failed,err=%v", err)
+		return false
+	}
+	return result
+}

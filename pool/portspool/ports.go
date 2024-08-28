@@ -16,9 +16,14 @@ type PortPool struct {
 
 // NewPortPool 创建一个新的端口池
 func NewPortPool(minPort, maxPort int) *PortPool {
-	if minPort > maxPort || minPort < 0 || maxPort > 65535 {
-		panic(errors.New("无效的端口范围"))
-		return nil
+	if minPort > maxPort {
+		maxPort, minPort = minPort, maxPort
+	}
+	if minPort < 0 {
+		minPort = 50000
+	}
+	if maxPort > 65535 {
+		maxPort = 60005
 	}
 
 	available := make([]int, maxPort-minPort+1)
