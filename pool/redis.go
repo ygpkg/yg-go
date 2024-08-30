@@ -18,6 +18,9 @@ type RedisPool struct {
 
 // NewRedisPool 创建一个redis资源池
 func NewRedisPool(ctx context.Context, cli *redis.Client, rdsPoolKey string) *RedisPool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return &RedisPool{
 		ctx:        ctx,
 		cli:        cli,
@@ -57,6 +60,21 @@ func (rp *RedisPool) ReleaseEncode(v interface{}) error {
 		return err
 	}
 	return rp.Release(data)
+}
+
+// AcquireString 从资源池中获取一个资源, 返回值为string
+func (rp *RedisPool) AcquireString() (string, error) {
+	rst := rp.cli.LPop(rp.ctx, rp.rdsPoolKey)
+	data, err := rst.Result()
+	if err != nil {
+		return "", err
+	}
+	return data, nil
+}
+
+// ReleaseString 释放一个资源到资源池, v为string
+func (rp *RedisPool) ReleaseString(v string) error {
+	return rp.Release(v)
 }
 
 // Clear 清空资源池

@@ -14,5 +14,14 @@ func TestSvrPool(t *testing.T) {
 		return
 	}
 	p := NewServicePoolWithRedis(nil, rdsCli, "test")
+	p.WithSetting("group", "key", 0)
+	pool := p.Pool()
+	svr, err := pool.AcquireString()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer pool.ReleaseString(svr)
 
+	t.Log(svr)
 }

@@ -6,6 +6,8 @@ type ServiceInfo struct {
 	Name string `yaml:"name"`
 	// Cap 服务容量
 	Cap int `yaml:"cap"`
+	// Labels 服务标签
+	Labels map[string]string `yaml:"labels"`
 }
 
 // ServicePoolConfig 服务池配置

@@ -15,6 +15,10 @@ type Pool interface {
 	AcquireDecode(v interface{}) error
 	// ReleaseEncode 释放一个资源到资源池
 	ReleaseEncode(v interface{}) error
+	// AcquireString 从资源池中获取一个资源
+	AcquireString() (string, error)
+	// ReleaseString 释放一个资源到资源池
+	ReleaseString(string) error
 	// Clear 清空资源池
 	Clear()
 }
@@ -66,6 +70,20 @@ func (gp *GoPool) Release(v interface{}) error {
 
 // ReleaseEncode 释放一个资源到资源池
 func (gp *GoPool) ReleaseEncode(v interface{}) error {
+	return gp.Release(v)
+}
+
+// AcquireString 从资源池中获取一个资源
+func (gp *GoPool) AcquireString() (string, error) {
+	v, err := gp.Acquire()
+	if err != nil {
+		return "", err
+	}
+	return v.(string), nil
+}
+
+// ReleaseString 释放一个资源到资源池
+func (gp *GoPool) ReleaseString(v string) error {
 	return gp.Release(v)
 }
 
