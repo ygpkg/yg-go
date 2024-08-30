@@ -11,6 +11,7 @@ import (
 
 var stdRedis *redis.Client
 
+// InitRedis 初始化redis连接
 func InitRedis(group, key string) error {
 	cfg := &redis.Options{}
 	err := settings.GetYaml(group, key, cfg)
@@ -18,6 +19,7 @@ func InitRedis(group, key string) error {
 		logs.Errorf("[dbutil] load redis config failed, %s", err)
 		return err
 	}
+
 	rds := redis.NewClient(&redis.Options{
 		Addr:     cfg.Addr,
 		Password: cfg.Password, // no password set
@@ -33,6 +35,25 @@ func InitRedis(group, key string) error {
 
 	InitCache(rds)
 	return nil
+}
+
+// InitRedisWithConfig 初始化redis连接
+func InitRedisWithConfig(cfg *redis.Options) (*redis.Client, error) {
+	rds := redis.NewClient(&redis.Options{
+		Addr:     cfg.Addr,
+		Password: cfg.Password, // no password set
+		DB:       cfg.DB,       // use default DB
+	})
+
+	err := rds.Ping(context.Background()).Err()
+	if err != nil {
+		logs.Errorf("[dbutil] ping redis failed, %s", err)
+		return nil, err
+	}
+	stdRedis = rds
+
+	InitCache(rds)
+	return rds, nil
 }
 
 // Redis 获取redis连接
