@@ -37,9 +37,9 @@ func NewRemoteSettingClient(baseURL, ak, sk, group string) *RemoteSettingClient 
 func NewRemoteSettingClientWithEnv() *RemoteSettingClient {
 	return NewRemoteSettingClient(
 		"https://yygu.cn/v2/cook.GetSettingContent",
-		os.Getenv("YGCFGAK"),
-		os.Getenv("YGCFGSK"),
-		os.Getenv("YGCFGGROUP"),
+		os.Getenv("YGCFG_AK"),
+		os.Getenv("YGCFG_SK"),
+		os.Getenv("YGCFG_GROUP"),
 	)
 }
 

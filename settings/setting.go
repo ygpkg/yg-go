@@ -183,7 +183,13 @@ func Updates(sets ...*SettingItem) error {
 		if set.ValueType == ValueSecret {
 			set.Value = EncryptPassword(set.Value)
 		}
-		err := sql.Update("value", set.Value).Error
+		update := map[string]interface{}{
+			"value":      set.Value,
+			"value_type": set.ValueType,
+			"describe":   set.Describe,
+			"name":       set.Name,
+		}
+		err := sql.Updates(update).Error
 		if err != nil {
 			logs.Errorf("[settings] update %s failed, %s", set.Identify(), err)
 			return err

@@ -48,14 +48,31 @@ func LoadCoreConfigFromFile(filepath string) (*CoreConfig, error) {
 }
 
 // LoadCoreConfigFromEnv 通过环境变量获取远程配置
-func LoadCoreConfigFromEnv(key string) (*CoreConfig, error) {
+// YGCFG_AK
+// YGCFG_SK
+// YGCFG_GROUP
+// YGCFG_KEY
+func LoadCoreConfigFromEnv() (*CoreConfig, error) {
+	for _, envKey := range []string{"YGCFG_AK", "YGCFG_SK", "YGCFG_GROUP", "YGCFG_KEY"} {
+		if os.Getenv(envKey) == "" {
+			return nil, fmt.Errorf("%s is empty", envKey)
+		}
+	}
 	cfg := &CoreConfig{}
-	err := remote.GetRemoteYAML(key, cfg)
+	err := remote.GetRemoteYAML(os.Getenv("YGCFG_KEY"), cfg)
 	if err != nil {
 		return nil, err
 	}
 	std = cfg
 	return cfg, nil
+}
+
+// LoadCoreConfig 自动获取配置
+func LoadCoreConfig(configPath ...string) (*CoreConfig, error) {
+	if len(configPath) > 0 && configPath[0] != "" {
+		return LoadCoreConfigFromFile(configPath[0])
+	}
+	return LoadCoreConfigFromEnv()
 }
 
 // LoadYamlLocalFile .
