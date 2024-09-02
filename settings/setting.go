@@ -18,12 +18,13 @@ const (
 type ValueType string
 
 const (
-	ValueSecret ValueType = "secret"
-	ValueText   ValueType = "text"
-	ValueInt64  ValueType = "int64"
-	ValueBool   ValueType = "bool"
-	ValueJSON   ValueType = "json"
-	ValueYaml   ValueType = "yaml"
+	ValueSecret   ValueType = "secret"
+	ValuePassword ValueType = "password"
+	ValueText     ValueType = "text"
+	ValueInt64    ValueType = "int64"
+	ValueBool     ValueType = "bool"
+	ValueJSON     ValueType = "json"
+	ValueYaml     ValueType = "yaml"
 )
 
 // SettingItem 系统配置
