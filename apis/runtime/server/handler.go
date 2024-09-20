@@ -43,6 +43,7 @@ func transAPI(hdr interface{}) gin.HandlerFunc {
 					runtime.BadRequest(ctx, "decode request failed, %s", err)
 					return
 				}
+				// inVal.FieldByName("Version").String()
 			}
 
 			vals := reflect.ValueOf(hdr).Call([]reflect.Value{

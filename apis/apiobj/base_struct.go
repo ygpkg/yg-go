@@ -2,8 +2,9 @@ package apiobj
 
 // BaseRequest base request
 type BaseRequest struct {
-	Cmd string `json:"cmd"`
-	Env string `json:"env,omitempty"`
+	Cmd     string `json:"cmd"`
+	Env     string `json:"env,omitempty"`
+	Version string `json:"version,omitempty"`
 }
 
 // BaseResponse base response
