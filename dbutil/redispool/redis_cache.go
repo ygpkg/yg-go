@@ -126,3 +126,43 @@ func GetLock(key string, expired time.Duration) bool {
 	}
 	return result
 }
+
+// Lock 释放锁 key: 锁的key expired: 锁的超时时间
+func Lock(key string, expired time.Duration) error {
+	for i := 0; i < 100; i++ {
+		if GetLock(key, expired) {
+			return nil
+		}
+		time.Sleep(time.Millisecond * 10)
+	}
+	return fmt.Errorf("lock failed")
+}
+
+// UnLock 释放锁
+func UnLock(key string) error {
+	cache := CacheInstance()
+	_, err := cache.client.Del(context.Background(), key).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call UnLock failed,err=%v", err)
+		return err
+	}
+	return nil
+}
+
+// LockWithTimeout 获取锁
+// key: 锁的key
+// expired: 锁的超时时间
+// interval: 获取锁的间隔时间
+// timeout: 获取锁的超时时间
+func LockWithTimeout(key string, expired, interval, timeout time.Duration) bool {
+	start := time.Now()
+	for {
+		if GetLock(key, expired) {
+			return true
+		}
+		if time.Since(start) > timeout {
+			return false
+		}
+		time.Sleep(interval)
+	}
+}
