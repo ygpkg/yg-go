@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    # Publish `$default-branch` as Docker `latest` image.
+    branches:
+      - main
+      - dev/*
+      - release-*
+
+
+jobs:
+  # Run tests.
+  # See also https://docs.docker.com/docker-hub/builds/automated-testing/
+  roc-apiserver:
+    runs-on: ubuntu-latest
+    env:
+      APP: roc
+    steps:
+      - uses: actions/checkout@v2
+      - name: Print Env
+        run: env
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.20"
+      - name: Run Tests
+        run: go test -v ./...
+
