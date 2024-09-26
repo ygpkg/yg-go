@@ -62,9 +62,118 @@ func (c *Cache) SetEx(key, data string, expired time.Duration) error {
 	return c.client.SetEx(context.Background(), key, data, expired).Err()
 }
 
+func (c *Cache) SetNX(key, data string, expired time.Duration) (bool, error) {
+	return c.client.SetNX(context.Background(), key, data, expired).Result()
+}
+
 func (c *Cache) Del(key string) error {
 	return c.client.Del(context.Background(), key).Err()
 }
+
+func (c *Cache) LPush(key string, values ...string) error {
+	return c.client.LPush(context.Background(), key, values).Err()
+}
+
+func (c *Cache) RPop(key string) (string, error) {
+	result, err := c.client.RPop(context.Background(), key).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call RPop failed,err=%v", err)
+		return "", err
+	}
+	return result, nil
+}
+
+func (c *Cache) RPopLPush(src, dst string) (string, error) {
+	result, err := c.client.RPopLPush(context.Background(), src, dst).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call RPopLPush failed,err=%v", err)
+		return "", err
+	}
+	return result, nil
+}
+
+func (c *Cache) LRem(key string, count int64, value string) (int64, error) {
+	result, err := c.client.LRem(context.Background(), key, count, value).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call RPopLPush failed,err=%v", err)
+		return 0, err
+	}
+	return result, nil
+}
+
+func (c *Cache) ZAdd(key string, members ...redis.Z) (int64, error) {
+	result, err := c.client.ZAdd(context.Background(), key, members...).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call ZAdd failed,err=%v", err)
+		return 0, err
+	}
+	return result, nil
+}
+
+func (c *Cache) ZCount(key string, min, max string) (int64, error) {
+	result, err := c.client.ZCount(context.Background(), key, min, max).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call ZCount failed,err=%v", err)
+		return 0, err
+	}
+	return result, nil
+}
+
+func (c *Cache) ZIncrBy(key string, increment float64, member string) (float64, error) {
+	result, err := c.client.ZIncrBy(context.Background(), key, increment, member).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call ZIncrBy failed,err=%v", err)
+		return 0, err
+	}
+	return result, nil
+}
+
+func (c *Cache) ZRangeWithScores(key string, start,stop int64) ([]redis.Z, error) {
+	result, err := c.client.ZRangeWithScores(context.Background(), key, start,stop).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call ZRangeWithScores failed,err=%v", err)
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *Cache) ZRange(key string, start,stop int64) ([]string, error) {
+	result, err := c.client.ZRange(context.Background(), key, start,stop).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call ZRange failed,err=%v", err)
+		return []string, err
+	}
+	return result, nil
+}
+
+
+func (c *Cache) ZRangeByScore(key string, by *redis.ZRangeBy) ([]string, error) {
+	result, err := c.client.ZRangeByScore(context.Background(), key, by).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call ZRangeByScore failed,err=%v", err)
+		return []string, err
+	}
+	return result, nil
+}
+
+func (c *Cache) ZRangeByScoreWithScores(key string, by *redis.ZRangeBy) ([]redis.Z, error) {
+	result, err := c.client.ZRangeByScoreWithScores(context.Background(), key, by).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call ZRangeByScoreWithScores failed,err=%v", err)
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *Cache) ZRem(key string,member ...interface{}) (int64, error) {
+	result, err := c.client.ZRem(context.Background(), key, member...).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call ZRangeByScoreWithScores failed,err=%v", err)
+		return 0, err
+	}
+	return result, nil
+}
+
 
 func SetString(key, value string, timeout time.Duration) error {
 	cache := CacheInstance()
@@ -114,6 +223,74 @@ func GetJSON(key string, v interface{}) error {
 		return err
 	}
 	return json.Unmarshal([]byte(data), v)
+}
+
+func LPush(key string, values ...string) error {
+	cache := CacheInstance()
+	return cache.LPush(key, values...)
+}
+
+// RPop if key not exist in redis,return redis.Nil error
+func RPop(key string) (string, error) {
+	cache := CacheInstance()
+	return cache.RPop(key)
+}
+
+// RPopLPush if key not exist in redis,return redis.Nil error
+func RPopLPush(src, dst string) (string, error) {
+	cache := CacheInstance()
+	return cache.RPopLPush(src, dst)
+}
+
+// LRem ... 删除列表指定数量的value，返回删除的数量，为0则该值不存在
+func LRem(key string, count int64, value string) (int64, error) {
+	cache := CacheInstance()
+	return cache.LRem(key, count, value)
+}
+
+func SetNX(key, data string, expired time.Duration) (bool, error) {
+	cache := CacheInstance()
+	return cache.SetNX(key, data, expired)
+}
+
+func ZAdd(key string, members ...redis.Z) (int64, error) {
+	cache := CacheInstance()
+	return cache.ZAdd(key,members...)
+}
+
+func ZCount(key string, min, max string) (int64, error) {
+	cache := CacheInstance()
+	return cache.ZCount(key,min, max)
+}
+
+func ZIncrBy(key string, increment float64, member string) (float64, error) {
+	cache := CacheInstance()
+	return cache.ZIncrBy(key,increment,member)
+}
+
+func ZRangeWithScores(key string, start,stop int64) ([]redis.Z, error) {
+	cache := CacheInstance()
+	return cache.ZRangeWithScores(key,start,stop )
+}
+
+func ZRange(key string, start,stop int64) ([]string, error) {
+	cache := CacheInstance()
+	return cache.ZRange(key,start,stop)
+}
+
+func ZRangeByScore(key string, by *redis.ZRangeBy) ([]string, error) {
+	cache := CacheInstance()
+	return cache.ZRangeByScore(key,by)
+}
+
+func ZRangeByScoreWithScores(key string, by *redis.ZRangeBy) ([]redis.Z, error) {
+	cache := CacheInstance()
+	return cache.ZRangeByScoreWithScores(key,by)
+}
+
+func ZRem(key string,member ...interface{}) (int64, error) {
+	cache := CacheInstance()
+	return cache.ZRem(key)
 }
 
 // GetLock 获取锁
