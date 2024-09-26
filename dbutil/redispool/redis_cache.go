@@ -128,8 +128,8 @@ func (c *Cache) ZIncrBy(key string, increment float64, member string) (float64, 
 	return result, nil
 }
 
-func (c *Cache) ZRangeWithScores(key string, start,stop int64) ([]redis.Z, error) {
-	result, err := c.client.ZRangeWithScores(context.Background(), key, start,stop).Result()
+func (c *Cache) ZRangeWithScores(key string, start, stop int64) ([]redis.Z, error) {
+	result, err := c.client.ZRangeWithScores(context.Background(), key, start, stop).Result()
 	if err != nil {
 		logs.Errorf("redis_cache call ZRangeWithScores failed,err=%v", err)
 		return nil, err
@@ -137,21 +137,20 @@ func (c *Cache) ZRangeWithScores(key string, start,stop int64) ([]redis.Z, error
 	return result, nil
 }
 
-func (c *Cache) ZRange(key string, start,stop int64) ([]string, error) {
-	result, err := c.client.ZRange(context.Background(), key, start,stop).Result()
+func (c *Cache) ZRange(key string, start, stop int64) ([]string, error) {
+	result, err := c.client.ZRange(context.Background(), key, start, stop).Result()
 	if err != nil {
 		logs.Errorf("redis_cache call ZRange failed,err=%v", err)
-		return []string, err
+		return []string{}, err
 	}
 	return result, nil
 }
-
 
 func (c *Cache) ZRangeByScore(key string, by *redis.ZRangeBy) ([]string, error) {
 	result, err := c.client.ZRangeByScore(context.Background(), key, by).Result()
 	if err != nil {
 		logs.Errorf("redis_cache call ZRangeByScore failed,err=%v", err)
-		return []string, err
+		return []string{}, err
 	}
 	return result, nil
 }
@@ -165,7 +164,7 @@ func (c *Cache) ZRangeByScoreWithScores(key string, by *redis.ZRangeBy) ([]redis
 	return result, nil
 }
 
-func (c *Cache) ZRem(key string,member ...interface{}) (int64, error) {
+func (c *Cache) ZRem(key string, member ...interface{}) (int64, error) {
 	result, err := c.client.ZRem(context.Background(), key, member...).Result()
 	if err != nil {
 		logs.Errorf("redis_cache call ZRangeByScoreWithScores failed,err=%v", err)
@@ -173,7 +172,6 @@ func (c *Cache) ZRem(key string,member ...interface{}) (int64, error) {
 	}
 	return result, nil
 }
-
 
 func SetString(key, value string, timeout time.Duration) error {
 	cache := CacheInstance()
@@ -255,40 +253,40 @@ func SetNX(key, data string, expired time.Duration) (bool, error) {
 
 func ZAdd(key string, members ...redis.Z) (int64, error) {
 	cache := CacheInstance()
-	return cache.ZAdd(key,members...)
+	return cache.ZAdd(key, members...)
 }
 
 func ZCount(key string, min, max string) (int64, error) {
 	cache := CacheInstance()
-	return cache.ZCount(key,min, max)
+	return cache.ZCount(key, min, max)
 }
 
 func ZIncrBy(key string, increment float64, member string) (float64, error) {
 	cache := CacheInstance()
-	return cache.ZIncrBy(key,increment,member)
+	return cache.ZIncrBy(key, increment, member)
 }
 
-func ZRangeWithScores(key string, start,stop int64) ([]redis.Z, error) {
+func ZRangeWithScores(key string, start, stop int64) ([]redis.Z, error) {
 	cache := CacheInstance()
-	return cache.ZRangeWithScores(key,start,stop )
+	return cache.ZRangeWithScores(key, start, stop)
 }
 
-func ZRange(key string, start,stop int64) ([]string, error) {
+func ZRange(key string, start, stop int64) ([]string, error) {
 	cache := CacheInstance()
-	return cache.ZRange(key,start,stop)
+	return cache.ZRange(key, start, stop)
 }
 
 func ZRangeByScore(key string, by *redis.ZRangeBy) ([]string, error) {
 	cache := CacheInstance()
-	return cache.ZRangeByScore(key,by)
+	return cache.ZRangeByScore(key, by)
 }
 
 func ZRangeByScoreWithScores(key string, by *redis.ZRangeBy) ([]redis.Z, error) {
 	cache := CacheInstance()
-	return cache.ZRangeByScoreWithScores(key,by)
+	return cache.ZRangeByScoreWithScores(key, by)
 }
 
-func ZRem(key string,member ...interface{}) (int64, error) {
+func ZRem(key string, member ...interface{}) (int64, error) {
 	cache := CacheInstance()
 	return cache.ZRem(key)
 }
