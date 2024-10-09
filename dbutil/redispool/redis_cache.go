@@ -173,6 +173,63 @@ func (c *Cache) ZRem(key string, member ...interface{}) (int64, error) {
 	return result, nil
 }
 
+func (c *Cache) HDel(key string, fields ...string) (int64, error) {
+	result, err := c.client.HDel(context.Background(), key, fields...).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call HDel failed,err=%v", err)
+		return 0, err
+	}
+	return result, nil
+}
+
+func (c *Cache) HExists(key string, field string) (bool, error) {
+	result, err := c.client.HExists(context.Background(), key, field).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call HExists failed,err=%v", err)
+		return false, err
+	}
+	return result, nil
+}
+
+// HGet 返回给定字段的值。如果给定的字段或 key 不存在时，返回 nil
+func (c *Cache) HGet(key string, field string) (string, error) {
+	result, err := c.client.HGet(context.Background(), key, field).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call HGet failed,err=%v", err)
+		return "", err
+	}
+	return result, nil
+}
+
+func (c *Cache) HSet(key string, field, value string) (int64, error) {
+	result, err := c.client.HSet(context.Background(), key, field, value).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call HSet failed,err=%v", err)
+		return 0, err
+	}
+	return result, nil
+}
+
+// HMSet 设置多个值，values 按照field1,value1,field2,value2 ...的顺序进行赋值
+func (c *Cache) HMSet(key string, values ...string) (int64, error) {
+	result, err := c.client.HSet(context.Background(), key, values).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call HMSet failed,err=%v", err)
+		return 0, err
+	}
+	return result, nil
+}
+
+// HSetNX Redis HSETNX 命令用于为哈希表中不存在的字段赋值 。如果字段已经存在于哈希表中，操作无效。
+func (c *Cache) HSetNX(key string, field, value string) (bool, error) {
+	result, err := c.client.HSetNX(context.Background(), key, field, value).Result()
+	if err != nil {
+		logs.Errorf("redis_cache call HSetNX failed,err=%v", err)
+		return false, err
+	}
+	return result, nil
+}
+
 func SetString(key, value string, timeout time.Duration) error {
 	cache := CacheInstance()
 	return cache.SetEx(key, value, timeout)
