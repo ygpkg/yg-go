@@ -1,0 +1,29 @@
+name: Go Lint Check
+
+on:
+  pull_request:
+    branches:
+      - main  # 或者你的默认分支
+      - master
+
+jobs:
+  build:
+    name: Analyze Go Code
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.21'  # 指定Go的版本
+
+    - name: Lint with golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: latest
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        only-new-issues: true
+        args: --issues-exit-code=0 --out-format=github-actions --config=.golangci.yml --timeout=20m

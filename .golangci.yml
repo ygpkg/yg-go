@@ -1,0 +1,115 @@
+# .golangci.yml
+linters:
+  enable:
+    - errcheck # Errcheck 是一个用于检查 Go 代码中未检查错误的程序。在某些情况下，这些未检查的错误可能是严重错误。
+    - gosec
+    - gosimple # 专门用于简化代码的 Linter for Go 源代码。
+    - govet # Go 语言的静态分析工具，用于检查代码中的常见错误。
+    - ineffassign # 用于检测未使用的赋值语句的 linter。
+    - staticcheck # 用于检查代码中的错误的 linter。
+    - unused # 用于检测未使用的代码的 linter。
+    - asasalint #检查 pass []any as any in variadic func（...any） 的 S S
+    - asciicheck # 检查所有代码标识符的名称中是否不包含非 ASCII 符号
+    - bidichk # 检查危险的 Unicode 字符序列。
+    - bodyclose # 检查 HTTP 响应体是否关闭成功。
+    - canonicalheader # Canonical标头检查 net/http.Header 使用规范 Header。
+    - containedctx # Containedctx 是检测 struct contained context 的 linter。Context 字段。
+    - contextcheck # 检查函数是否使用非继承上下文。
+    # - copyloopvar # Copyloopvar 是一个 Linter，用于检测复制循环变量的位置。
+    - cyclop # 检查函数和封装圈复杂度
+    - decorder # 检查类型、常量、变量和函数的声明顺序和计数
+    - depguard # 检查导入的包是否被使用
+    - dogsled # 检查具有太多空白标识符的赋值（例如 x、、、_、：= f（））
+    - dupl # 代码克隆检测工具。
+    - dupword # 检查源代码中的重复单词
+    - durationcheck # 检查是否使用 time.Duration 的正确方式。
+    - err113 # Go linter 检查处理表达式的错误。
+    - errchkjson # 检查传递给 json 编码函数的类型。报告不支持的类型，并报告可以省略对返回错误的检查的情况。
+    - errname # 检查 sentinel 错误是否以 为前缀，错误类型是否以 .ErrError
+    - errorlint # 是一个用于检查 Go 代码中错误处理的 linter
+    - exhaustive # 检查 enum switch 语句的穷举性。
+    - exhaustruct # 检查是否初始化了所有结构字段。
+    - fatcontext # 检测循环和函数文本中的嵌套上下文。
+    - forbidigo # 禁止标识符。
+    - forcetypeassert # 检查类型断言是否是必需的。
+    - funlen # 检查函数的长度。
+    - gci #Gci 控制 Go 包的导入顺序，并使其始终具有确定性。
+    - ginkgolinter # 强制实施使用 ginkgo 和 gomega 的标准
+    - gocheckcompilerdirectives # 检查 go 编译器指令注释 （//go：） 是否有效。
+    - gochecknoglobals # 检查不存在全局变量。
+    - gochecknoinits # 检查是否存在 init 函数。
+    - gochecksumtype # 对 Go “sum types” 运行穷举性检查。
+    - gocognit # 计算和检查函数的认知复杂性。
+    - goconst # 查找可替换为常量的重复字符串。
+    - gocritic # 提供检查错误、性能和样式问题的诊断。可通过动态规则进行扩展，无需重新编译。动态规则是使用 AST 模式、过滤器、报告消息和可选建议以声明方式编写的。
+    - gocyclo # 计算并检查函数的圈复杂度。
+    - godot # 检查评论是否以句点结尾。
+    - godox # 用于检测 FIXME、TODO 和其他注释关键字的工具
+    - gofmt # Gofmt 检查代码是否经过 gofmt 编辑。默认情况下，此工具使用 -s 选项运行以检查代码简化。
+    - gofumpt # Gofumpt 检查代码是否经过 gofumpt 编辑。
+    - goheader # 检查文件头是否与 pattern 匹配。
+    - goimports # 检查 import 语句是否根据 'goimport' 命令进行格式化。在自动修复模式下重新格式化导入
+    - gomoddirectives # 检查 go.mod 文件中的指令是否有效。
+    - gomodguard # 允许和阻止列表 linter 用于直接 Go 模块依赖项。这与 depguard 不同，depguard 有不同的块类型，例如版本限制和模块建议。
+    - goprintffuncname # 检查类似 printf 的函数是否在末尾命名。
+    - gosec # 检查源代码是否存在安全问题。
+    - gosmopolitan # 在您的 Go 代码库中报告某些 i18n/l10n 反模式。
+    - grouper # 分析表达式组。
+    - iface # 检测接口使用错误，帮助开发者避免接口污染。
+    - importas # 强制实施一致的导入别名。
+    - inamedparam # Reports 具有未命名方法参数的接口。
+    - interfacebloat # 一个检查接口内方法数量的 Linter。
+    # - intrange # Intrange 是一个 Linter，用于查找 for 循环可以使用整数范围的位置。
+    # - ireturn # 接受接口，返回具体类型。
+    - lll # 报告长队。
+    - loggercheck # 检查常见 Logger 库（kitlog、klog、logr、zap）的键值对。
+    # - maintidx # Maintidx 衡量每个功能的可维护性指数。
+    - makezero # 查找初始长度为非零的切片声明。
+    - misspell # 查找经常拼写错误的英语单词。
+    - mnd # 用于检测幻数的分析器。
+    - musttag # 在 （未） 封送的结构中强制实施字段标记。
+    - nakedret # 检查具有裸返回值的函数是否不超过最大大小（可以为零）。
+    - nestif # 报告深度嵌套的 if 语句。
+    - nilerr # 查找返回 nil 的代码，即使它检查错误不是 nil
+    - nilnil # 检查是否没有同时返回错误和无效值。
+    - nlreturn # Nlreturn 在 return 和 branch 语句之前检查新行以提高代码清晰度
+    - noctx # 查找不带上下文的发送 http 请求。上下文。
+    - nolintlint # 报告格式不正确或不充分的 nolint 指令。
+    - nonamedreturns # 报告所有命名的返回。
+    - nosprintfhostport # 检查是否滥用 Sprintf 来构造 URL 中包含 port 的主机。
+    # - paralleltest # 检测 Go 测试中缺少 t.Parallel（） 方法的使用。
+    - perfsprint # 检查 fmt.Sprintf 可以替换为更快的替代方案。
+    - prealloc # 查找可能预先分配的切片声明。
+    - predeclared # 检查是否使用了预声明的标识符。
+    - promlinter # 通过 promlint 检查 Prometheus 指标命名。
+    - protogetter # 报告在应使用 getter 时直接从 proto 消息字段读取
+    - reassign # 检查是否未重新分配包变量。
+    - recvcheck # 检查接收方类型是否一致
+    - revive # 快速、可配置、可扩展、灵活且美观的 Go Linter。golint 的直接替代品。
+    - rowserrcheck # 检查行的 Rows.Err 是否检查成功。
+    # - sloglint # 确保使用 log/slog 时的代码风格一致
+    - spancheck # 检查 OpenTelemetry/Census 跨度的错误。
+    # - sqlclosecheck # 检查 sql.行、sql。Stmt， sqlx.NamedStmt， pgx.Query 已关闭。
+    # - stylecheck # Stylecheck 是 golint 的替代品。
+    - tagalign # 检查结构标记是否对齐。
+    - tagliatelle # 检查 struct 标记。
+    # - tenv # Tenv 是使用 os 进行检测的分析器。Setenv 而不是 t.Setenv，从 Go1.17 开始。
+    - testableexamples # Linter 检查示例是否可测试（具有预期的输出）。
+    # - testpackage # Linter 的 linter 使您使用单独的 _test 包。
+    # - thelper # Thelper 检测不以 t.Helper（） 方法开头的测试帮助程序
+    # - tparallel  # Tparallel 检测 Go 测试代码中 t.Parallel（） 方法的不当使用。
+    - unconvert # 删除不必要的类型转换。
+    - usestdlibvars # 一个 Linter，用于检测使用 Go 标准库中的变量/常量的可能性。
+    - unparam # 报告未使用的函数参数。
+    - varnamelen # 检查变量名称的长度是否与其范围匹配。
+    - wastedassign # 查找浪费的赋值语句。
+    - whitespace # 空格是一个 linter，用于检查函数开头和结尾的不必要换行符，例如 if、for 等。
+    - wrapcheck # 检查从外部包返回的错误是否已包装。
+    - wsl # 添加或删除空行。
+    - zerologlint # 检测用户忘记使用 或 进行调度的错误用法
+
+issues:
+  exclude-rules:
+    - path: ".*_test.go"
+      linters:
+        - errcheck
