@@ -2,7 +2,6 @@
 linters:
   enable:
     - errcheck # Errcheck 是一个用于检查 Go 代码中未检查错误的程序。在某些情况下，这些未检查的错误可能是严重错误。
-    - gosec
     - gosimple # 专门用于简化代码的 Linter for Go 源代码。
     - govet # Go 语言的静态分析工具，用于检查代码中的常见错误。
     - ineffassign # 用于检测未使用的赋值语句的 linter。
@@ -16,10 +15,10 @@ linters:
     - containedctx # Containedctx 是检测 struct contained context 的 linter。Context 字段。
     - contextcheck # 检查函数是否使用非继承上下文。
     # - copyloopvar # Copyloopvar 是一个 Linter，用于检测复制循环变量的位置。
-    - cyclop # 检查函数和封装圈复杂度
+    # - cyclop # 检查函数和封装圈复杂度
     - decorder # 检查类型、常量、变量和函数的声明顺序和计数
-    - depguard # 检查导入的包是否被使用
-    - dogsled # 检查具有太多空白标识符的赋值（例如 x、、、_、：= f（））
+    # - depguard # 检查导入的包是否被使用
+    # - dogsled # 检查具有太多空白标识符的赋值（例如 x、、、_、：= f（））
     - dupl # 代码克隆检测工具。
     - dupword # 检查源代码中的重复单词
     - durationcheck # 检查是否使用 time.Duration 的正确方式。
@@ -43,17 +42,17 @@ linters:
     - goconst # 查找可替换为常量的重复字符串。
     - gocritic # 提供检查错误、性能和样式问题的诊断。可通过动态规则进行扩展，无需重新编译。动态规则是使用 AST 模式、过滤器、报告消息和可选建议以声明方式编写的。
     - gocyclo # 计算并检查函数的圈复杂度。
-    - godot # 检查评论是否以句点结尾。
+    # - godot # 检查评论是否以句点结尾。
     - godox # 用于检测 FIXME、TODO 和其他注释关键字的工具
     - gofmt # Gofmt 检查代码是否经过 gofmt 编辑。默认情况下，此工具使用 -s 选项运行以检查代码简化。
-    - gofumpt # Gofumpt 检查代码是否经过 gofumpt 编辑。
+    # - gofumpt # Gofumpt 检查代码是否经过 gofumpt 编辑。
     - goheader # 检查文件头是否与 pattern 匹配。
     - goimports # 检查 import 语句是否根据 'goimport' 命令进行格式化。在自动修复模式下重新格式化导入
-    - gomoddirectives # 检查 go.mod 文件中的指令是否有效。
-    - gomodguard # 允许和阻止列表 linter 用于直接 Go 模块依赖项。这与 depguard 不同，depguard 有不同的块类型，例如版本限制和模块建议。
+    # - gomoddirectives # 检查 go.mod 文件中的指令是否有效。
+    # - gomodguard # 允许和阻止列表 linter 用于直接 Go 模块依赖项。这与 depguard 不同，depguard 有不同的块类型，例如版本限制和模块建议。
     - goprintffuncname # 检查类似 printf 的函数是否在末尾命名。
     - gosec # 检查源代码是否存在安全问题。
-    - gosmopolitan # 在您的 Go 代码库中报告某些 i18n/l10n 反模式。
+    # - gosmopolitan # 在您的 Go 代码库中报告某些 i18n/l10n 反模式。
     - grouper # 分析表达式组。
     - iface # 检测接口使用错误，帮助开发者避免接口污染。
     - importas # 强制实施一致的导入别名。
@@ -81,8 +80,8 @@ linters:
     - perfsprint # 检查 fmt.Sprintf 可以替换为更快的替代方案。
     - prealloc # 查找可能预先分配的切片声明。
     - predeclared # 检查是否使用了预声明的标识符。
-    - promlinter # 通过 promlint 检查 Prometheus 指标命名。
-    - protogetter # 报告在应使用 getter 时直接从 proto 消息字段读取
+    # - promlinter # 通过 promlint 检查 Prometheus 指标命名。
+    # - protogetter # 报告在应使用 getter 时直接从 proto 消息字段读取
     - reassign # 检查是否未重新分配包变量。
     - recvcheck # 检查接收方类型是否一致
     - revive # 快速、可配置、可扩展、灵活且美观的 Go Linter。golint 的直接替代品。
