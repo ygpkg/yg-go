@@ -114,11 +114,3 @@ func Std() *gorm.DB {
 func Core() *gorm.DB {
 	return DB("core")
 }
-
-func Account() *gorm.DB {
-	return DB("core")
-}
-
-func Ops() *gorm.DB {
-	return DB("core")
-}
