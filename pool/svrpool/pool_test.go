@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/ygpkg/yg-go/dbutil/redispool"
+	"github.com/ygpkg/yg-go/dbtools/redispool"
 )
 
 func TestSvrPool(t *testing.T) {
