@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ygpkg/yg-go/config"
-	"github.com/ygpkg/yg-go/dbutil"
+	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/settings"
 	"gorm.io/gorm"
@@ -26,7 +26,7 @@ func (SmsSend) TableName() string {
 }
 
 func InitDB() error {
-	return dbutil.Core().AutoMigrate(&SmsSend{})
+	return dbtools.Core().AutoMigrate(&SmsSend{})
 }
 
 // SendVerifyCode 发送验证码
@@ -56,7 +56,7 @@ func SendVerifyCode(group, key, phone, code, outid string) error {
 	if err != nil {
 		sms.ErrMsg = err.Error()
 	}
-	dbutil.Core().Create(sms)
+	dbtools.Core().Create(sms)
 
 	return err
 }

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ygpkg/yg-go/dbutil"
+	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/logs"
 	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
@@ -58,13 +58,13 @@ func (item *SettingItem) PasswordValue() string {
 
 // InitDB .
 func InitDB() error {
-	return dbutil.InitModel(dbutil.Core(), &SettingItem{})
+	return dbtools.InitModel(dbtools.Core(), &SettingItem{})
 }
 
 // GetByID .
 func GetByID(id uint) (*SettingItem, error) {
 	ret := &SettingItem{}
-	err := dbutil.Core().Table(TableNameSettings).
+	err := dbtools.Core().Table(TableNameSettings).
 		Where("id = ?", id).
 		Find(ret).Error
 	if err != nil {
@@ -105,7 +105,7 @@ func SetYaml(group, key string, value interface{}) error {
 
 // updateSettings or update the trade calendar of a stock.
 func updateSettings(v *SettingItem) error {
-	return dbutil.Core().Table(TableNameSettings).
+	return dbtools.Core().Table(TableNameSettings).
 		Clauses(clause.OnConflict{
 			DoUpdates: clause.AssignmentColumns([]string{"name", "describe", "value", "value_type", "default"}),
 		}).Create(v).Error
@@ -114,7 +114,7 @@ func updateSettings(v *SettingItem) error {
 // Get .
 func Get(group, key string) (*SettingItem, error) {
 	ret := &SettingItem{}
-	err := dbutil.Core().Table(TableNameSettings).
+	err := dbtools.Core().Table(TableNameSettings).
 		Where("`group` = ? AND `key` = ?", group, key).
 		First(ret).Error
 	if err != nil {
@@ -162,7 +162,7 @@ func GetJSON(group, key string, value interface{}) error {
 // List 配置列表
 func List(group string, keys ...string) ([]*SettingItem, error) {
 	ret := []*SettingItem{}
-	err := dbutil.Core().Table(TableNameSettings).
+	err := dbtools.Core().Table(TableNameSettings).
 		Where("`group` = ? AND `key` IN (?)", group, keys).
 		Find(&ret).Error
 	if err != nil {
@@ -174,7 +174,7 @@ func List(group string, keys ...string) ([]*SettingItem, error) {
 // Updates 更新settings值
 func Updates(sets ...*SettingItem) error {
 	for _, set := range sets {
-		sql := dbutil.Core().Table(TableNameSettings)
+		sql := dbtools.Core().Table(TableNameSettings)
 		if set.ID != 0 {
 			sql = sql.Where("id = ?", set.ID)
 		} else {
