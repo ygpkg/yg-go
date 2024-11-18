@@ -107,6 +107,32 @@ linters:
     - wsl # 添加或删除空行。
     - zerologlint # 检测用户忘记使用 或 进行调度的错误用法
 
+linters-settings:
+  tagliatelle:
+    case:
+      # 使用结构体字段名称来检查结构体标签的名称。
+      # 默认值: false
+      use-field-name: true
+      # `camel` 用于 `json` 和 `yaml`，`header` 用于 `header`（可以被覆盖）
+      # 默认值: {}
+      rules:
+        # 任何结构体标签类型都可以使用。
+        # 支持的字符串大小写: `camel`, `pascal`, `kebab`, `snake`, `upperSnake`, `goCamel`, `goPascal`, `goKebab`, `goSnake`, `upper`, `lower`, `header`
+        json: snake
+        yaml: camel
+        # xml: camel
+        # toml: camel
+        # bson: camel
+        # avro: snake
+        # mapstructure: kebab
+        # env: upperSnake
+        # envconfig: upperSnake
+  revive:
+    # 设置 revive 的规则
+    rules:
+      - name: exported
+        severity: warning  # 或使用 error 来强制执行
+
 issues:
   exclude-rules:
     - path: ".*_test.go"
