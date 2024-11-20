@@ -1,23 +1,10 @@
 package config
 
-type FilePurpose string
+import "time"
 
-const (
-	FilePurposeUnknown FilePurpose = "unknown"
-	// FilePurposeAvatar 用户头像
-	FilePurposeAvatar FilePurpose = "avatar"
-	// FilePurposeFlightVideo 飞行视频
-	FilePurposeFlightVideo FilePurpose = "flight_video"
+type FilePurpose = string
 
-	// FilePurposeOcrForm 用户端健康记录ocr单据
-	FilePurposeOcrForm FilePurpose = "ocr_form"
-	// FilePurposeForm 用户端健康记录上手上传单据文件
-	FilePurposeForm FilePurpose = "form"
-
-	// FilePurposeGeneral 通用的存储
-	FilePurposeGeneral FilePurpose = "general"
-)
-
+// StorageConfig 对象存储配置
 type StorageConfig struct {
 	StorageOption `yaml:",inline"`
 
@@ -27,8 +14,14 @@ type StorageConfig struct {
 	Tencent *TencentCOSConfig   `yaml:"tencent,omitempty"`
 }
 
+// StorageOption 对象存储通用配置选项
 type StorageOption struct {
+	// Purpose 是文件的用途,按业务分类
 	Purpose FilePurpose `yaml:"purpose"`
+	// PresignedTimeout 预签名超时时间
+	PresignedTimeout time.Duration `yaml:"presigned_timeout"`
+	// StorageDB 存储数据库
+	StorageDB string `yaml:"storage_db"`
 }
 
 // LocalStorageConfig 。

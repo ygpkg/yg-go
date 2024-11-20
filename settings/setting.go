@@ -15,6 +15,10 @@ const (
 	TableNameSettings = "core_settings"
 )
 
+const (
+	SettingGroupCore = "core"
+)
+
 type ValueType string
 
 const (

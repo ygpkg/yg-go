@@ -9,6 +9,7 @@ const (
 	ErrCode_InternalError = http.StatusInternalServerError
 	ErrCode_NotFound      = http.StatusNotFound
 	ErrCode_Unauthorized  = http.StatusUnauthorized
+	ErrCode_NoPermission  = http.StatusForbidden
 
 	ErrCode_WrongUsernameOrPassword        = 10001
 	ErrCode_UserStatusNotNormal            = 10002
