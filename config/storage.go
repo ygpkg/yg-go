@@ -20,8 +20,6 @@ type StorageOption struct {
 	Purpose FilePurpose `yaml:"purpose"`
 	// PresignedTimeout 预签名超时时间
 	PresignedTimeout time.Duration `yaml:"presigned_timeout"`
-	// StorageDB 存储数据库
-	StorageDB string `yaml:"storage_db"`
 }
 
 // LocalStorageConfig 。

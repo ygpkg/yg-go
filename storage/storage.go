@@ -20,12 +20,8 @@ const (
 )
 
 const (
-	AnnotationsIsEmptyDir = "is-empty-dir"
-	AnnotationsContentMD5 = "content-md5"
-	AnnotationsImgType    = "img-type"
-	AnnotationsImgHeight  = "img-height"
-	AnnotationsImgWidth   = "img-width"
-	AnnotationsImgFrames  = "img-frames"
+	// SettingPrefix 配置前缀
+	SettingPrefix = "cos-"
 )
 
 // Storager .
@@ -71,7 +67,7 @@ func NewStorage(purpose string) (Storager, error) {
 		cfg config.StorageConfig
 		s   Storager
 		err error
-		key = "cos-" + purpose
+		key = SettingPrefix + purpose
 	)
 	err = settings.GetYaml(settings.SettingGroupCore, key, &cfg)
 	if err != nil {

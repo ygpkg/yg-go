@@ -17,8 +17,9 @@ var (
 )
 
 type InitModelFunc func() error
+type InitModelWithDBFunc func(db *gorm.DB) error
 
-// 工具类，自动生成表结构，gorm中的AutoMIGRATE
+// InitModel 工具类，自动生成表结构，gorm中的AutoMIGRATE
 func InitModel(db *gorm.DB, models ...interface{}) error {
 	for _, v := range models {
 		if err := db.AutoMigrate(v); err != nil {
@@ -29,9 +30,21 @@ func InitModel(db *gorm.DB, models ...interface{}) error {
 	return nil
 }
 
+// DoInitModels 使用默认db初始化模型
 func DoInitModels(imfs ...InitModelFunc) error {
 	for _, imf := range imfs {
 		if err := imf(); err != nil {
+			logs.Errorf("[init-db] do %T failed, %s", imf, err)
+			return err
+		}
+	}
+	return nil
+}
+
+// DoInitModelsWithDB 使用db参数初始化模型
+func DoInitModelsWithDB(db *gorm.DB, imfs ...InitModelWithDBFunc) error {
+	for _, imf := range imfs {
+		if err := imf(db); err != nil {
 			logs.Errorf("[init-db] do %T failed, %s", imf, err)
 			return err
 		}
