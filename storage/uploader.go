@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ygpkg/yg-go/config"
-	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/httptools"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/random"
@@ -170,7 +169,7 @@ func (u *Uploader) UploadPart(partNumber int, data io.Reader, size int64) error 
 }
 
 // CompleteUpload 合并分片
-func (u *Uploader) CompleteUpload() (*FileInfo, error) {
+func (u *Uploader) CompleteUpload(db *gorm.DB) (*FileInfo, error) {
 	err := u.updr.CompleteUploadTask(u.ctx, u.tempFile)
 	if err != nil {
 		u.logger.Errorf("complete upload error: %v", err)
@@ -192,7 +191,7 @@ func (u *Uploader) CompleteUpload() (*FileInfo, error) {
 		Status:      FileStatusNormal,
 	}
 	fi.PublicURL = u.updr.GetPublicURL(fi.StoragePath, false)
-	err = dbtools.Core().Transaction(func(tx *gorm.DB) error {
+	err = db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(fi).Error; err != nil {
 			u.logger.Errorf("create file info error: %v", err)
 			return err

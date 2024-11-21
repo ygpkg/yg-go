@@ -10,6 +10,7 @@ import (
 	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/settings"
+	"gorm.io/gorm"
 )
 
 var storagerMap = new(sync.Map)
@@ -34,8 +35,8 @@ type Storager interface {
 }
 
 // InitDB .
-func InitDB() error {
-	return dbtools.InitModel(dbtools.Core(), &FileInfo{}, &TempFile{})
+func InitDB(db *gorm.DB) error {
+	return dbtools.InitModel(db, &FileInfo{}, &TempFile{})
 }
 
 // UploadFile 上传文件

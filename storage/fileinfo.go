@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/ygpkg/yg-go/config"
-	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/random"
 	"gorm.io/gorm"
@@ -76,9 +75,9 @@ type FileInfo struct {
 func (*FileInfo) TableName() string { return TableNameFileInfo }
 
 // GetFileByChunkHash 通过hash获取文件信息
-func GetFileByChunkHash(hashstr string, size int64) (*FileInfo, error) {
+func GetFileByChunkHash(db *gorm.DB, hashstr string, size int64) (*FileInfo, error) {
 	fi := &FileInfo{}
-	sql := dbtools.Core().Model(fi).
+	sql := db.Model(fi).
 		Where("size = ?", size).
 		Where("chunk_hash = ?", hashstr)
 
@@ -96,9 +95,9 @@ func GetFileByChunkHash(hashstr string, size int64) (*FileInfo, error) {
 }
 
 // GetFileByHash 通过hash获取文件信息
-func GetFileByHash(hashstr string) (*FileInfo, error) {
+func GetFileByHash(db *gorm.DB, hashstr string) (*FileInfo, error) {
 	fi := &FileInfo{}
-	sql := dbtools.Core().Model(fi).
+	sql := db.Model(fi).
 		Where("hash = ?", hashstr)
 
 	err := sql.First(fi).Error
@@ -115,9 +114,9 @@ func GetFileByHash(hashstr string) (*FileInfo, error) {
 }
 
 // GetFileByPublicURL 通过publicURL获取文件信息
-func GetFileByPublicURL(publicURL string) (*FileInfo, error) {
+func GetFileByPublicURL(db *gorm.DB, publicURL string) (*FileInfo, error) {
 	fi := &FileInfo{}
-	sql := dbtools.Core().Model(fi).
+	sql := db.Model(fi).
 		Where("public_url = ?", publicURL)
 
 	err := sql.First(fi).Error
@@ -134,8 +133,8 @@ func GetFileByPublicURL(publicURL string) (*FileInfo, error) {
 }
 
 // SaveCopyFile 保存文件副本
-func SaveCopyFile(fi *FileInfo) error {
-	tErr := dbtools.Core().Transaction(func(tx *gorm.DB) error {
+func SaveCopyFile(db *gorm.DB, fi *FileInfo) error {
+	tErr := db.Transaction(func(tx *gorm.DB) error {
 		err := tx.Create(fi).Error
 		if err != nil {
 			logs.Errorf("create file info failed, %v", err)
@@ -158,12 +157,12 @@ func SaveCopyFile(fi *FileInfo) error {
 }
 
 // GetCompanyFileByID 通过id获取文件信息
-func GetCompanyFileByID(companyID, id uint) (*FileInfo, error) {
+func GetCompanyFileByID(db *gorm.DB, companyID, id uint) (*FileInfo, error) {
 	if id == 0 {
 		return nil, gorm.ErrRecordNotFound
 	}
 	fi := &FileInfo{}
-	sql := dbtools.Core().Model(fi).
+	sql := db.Model(fi).
 		Where("company_id = ?", companyID).
 		Where("id = ?", id)
 	err := sql.First(fi).Error
@@ -178,12 +177,12 @@ func GetCompanyFileByID(companyID, id uint) (*FileInfo, error) {
 }
 
 // GetFileByID 通过id获取文件信息
-func GetFileByID(id uint) (*FileInfo, error) {
+func GetFileByID(db *gorm.DB, id uint) (*FileInfo, error) {
 	if id == 0 {
 		return nil, gorm.ErrRecordNotFound
 	}
 	fi := &FileInfo{}
-	sql := dbtools.Core().Model(fi).
+	sql := db.Model(fi).
 		Where("id = ?", id)
 	err := sql.First(fi).Error
 	if err != nil {
