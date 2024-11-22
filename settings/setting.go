@@ -3,7 +3,9 @@ package settings
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
+	"github.com/ygpkg/yg-go/cache"
 	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/logs"
 	"gopkg.in/yaml.v3"
@@ -118,12 +120,22 @@ func updateSettings(v *SettingItem) error {
 // Get .
 func Get(group, key string) (*SettingItem, error) {
 	ret := &SettingItem{}
-	err := dbtools.Core().Table(TableNameSettings).
+
+	rdsKey := fmt.Sprintf("core_setting::%s::%s", group, key)
+	err := cache.Std().Get(rdsKey, ret)
+	if err == nil {
+		return ret, nil
+	}
+
+	err = dbtools.Core().Table(TableNameSettings).
 		Where("`group` = ? AND `key` = ?", group, key).
 		First(ret).Error
 	if err != nil {
 		return nil, err
 	}
+
+	cache.Std().Set(rdsKey, ret, time.Minute*5)
+
 	return ret, nil
 }
 

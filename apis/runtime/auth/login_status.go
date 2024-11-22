@@ -15,9 +15,10 @@ type State int
 const (
 	StateNil State = iota
 	StateSucc
-	StateParseFailed
-	StateInvalidToken
-	StateInvalidUser
+	StateFailed
+	// StateParseFailed
+	// StateInvalidToken
+	// StateInvalidUser
 )
 
 type Role int
@@ -32,9 +33,10 @@ const (
 	RoleCustomer
 )
 
-// LoginStatus
+// LoginStatus 登录状态
 type LoginStatus struct {
 	Token string
+	Claim *UserClaims
 	Err   error
 	Role  Role
 	State State
@@ -42,6 +44,7 @@ type LoginStatus struct {
 	idmap map[string]uint
 }
 
+// SetID 设置ID
 func (ls *LoginStatus) SetID(idname string, id uint) {
 	if ls.idmap == nil {
 		ls.idmap = map[string]uint{}
@@ -49,6 +52,7 @@ func (ls *LoginStatus) SetID(idname string, id uint) {
 	ls.idmap[idname] = id
 }
 
+// GetID 获取ID
 func (ls *LoginStatus) GetID(idname string) uint {
 	return ls.idmap[idname]
 }

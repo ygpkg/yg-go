@@ -60,7 +60,7 @@ func NewRouter(apiPrefix string) *Router {
 
 	svr.router()
 
-	svr.pgr = svr.eng.Group(apiPrefix, svr.Inject)
+	svr.pgr = svr.eng.Group(apiPrefix)
 
 	return svr
 }
@@ -88,6 +88,7 @@ func (svr *Router) router() {
 	svr.eng.Use(gin.Recovery())
 	svr.eng.Use(middleware.CustomerHeader())
 	svr.eng.Use(middleware.Logger())
+	svr.eng.Use(middleware.LoginStatus(), svr.Inject)
 
 	svr.eng.NoRoute(func(c *gin.Context) {
 		c.String(http.StatusNotFound, "The incorrect API route.")
