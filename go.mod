@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.726
+	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
 	github.com/mr-tron/base58 v1.2.0
