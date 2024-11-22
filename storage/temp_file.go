@@ -16,7 +16,7 @@ type TempFile struct {
 	CustomerID uint `gorm:"column:customer_id" json:"customer_id"`
 	EmployeeID uint `gorm:"column:employee_id" json:"employee_id"`
 	// Purpose is the purpose of the file.
-	Purpose config.FilePurpose `gorm:"column:purpose;type:varchar(16)" json:"purpose"`
+	Purpose config.FilePurpose `gorm:"column:purpose;type:varchar(32)" json:"purpose"`
 
 	Filename string `gorm:"column:filename;type:varchar(128)" json:"filename"`
 	// FileExt is the extension of the file.

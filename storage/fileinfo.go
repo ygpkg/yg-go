@@ -45,7 +45,7 @@ type FileInfo struct {
 	AccountID uint `gorm:"column:account_id" json:"account_id"`
 
 	// Purpose 用途分类
-	Purpose config.FilePurpose `gorm:"column:purpose;type:varchar(16)" json:"purpose"`
+	Purpose config.FilePurpose `gorm:"column:purpose;type:varchar(32)" json:"purpose"`
 	// Filename 原始文件名
 	Filename string `gorm:"column:filename;type:varchar(128)" json:"filename"`
 	// FileExt 文件扩展名
