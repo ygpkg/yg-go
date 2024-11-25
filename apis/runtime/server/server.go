@@ -88,7 +88,8 @@ func (svr *Router) router() {
 	svr.eng.Use(gin.Recovery())
 	svr.eng.Use(middleware.CustomerHeader())
 	svr.eng.Use(middleware.Logger())
-	svr.eng.Use(middleware.LoginStatus(), svr.Inject)
+	svr.eng.Use(middleware.LoginStatus())
+	svr.eng.Use(svr.Inject)
 
 	svr.eng.NoRoute(func(c *gin.Context) {
 		c.String(http.StatusNotFound, "The incorrect API route.")
