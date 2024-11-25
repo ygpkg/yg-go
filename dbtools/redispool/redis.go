@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/settings"
 )
@@ -13,7 +14,7 @@ var stdRedis *redis.Client
 
 // InitRedis 初始化redis连接
 func InitRedis(group, key string) error {
-	cfg := &redis.Options{}
+	cfg := &config.RedisConfig{}
 	err := settings.GetYaml(group, key, cfg)
 	if err != nil {
 		logs.Errorf("[dbutil] load redis config failed, %s", err)
