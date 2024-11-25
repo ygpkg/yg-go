@@ -37,7 +37,7 @@ func LoginStatus() gin.HandlerFunc {
 			if token.Claims == nil {
 				return nil, fmt.Errorf("token claims is nil")
 			}
-			c, ok := token.Claims.(auth.UserClaims)
+			c, ok := token.Claims.(*auth.UserClaims)
 			if !ok {
 				return nil, fmt.Errorf("token claims is not UserClaims")
 			}
