@@ -22,7 +22,7 @@ func LoginStatus() gin.HandlerFunc {
 		)
 		defer func() {
 			ctx.Set(constants.CtxKeyLoginStatus, ls)
-			logs.Debugf("login status: %+v", ls)
+			// logs.Debugf("login status: %+v", ls)
 		}()
 		if authstr == "" {
 			return
