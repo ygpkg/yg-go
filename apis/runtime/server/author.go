@@ -36,13 +36,11 @@ func (ai *authInjectors) Inject(ctx *gin.Context) {
 
 	if injector, ok := ai.injectors[ls.Claim.Issuer]; ok {
 		ls.Err = injector(ctx, ls)
-		ls.State = auth.StateFailed
-		return
-	}
-
-	if ai.defaultInjector != nil {
+	} else if ai.defaultInjector != nil {
 		ls.Err = ai.defaultInjector(ctx, ls)
 	}
-
-	return
+	if ls.Err != nil {
+		logs.Warnf("[auth][%s] auth failed, %s", ls.Claim.Uin, ls.Err)
+		ls.State = auth.StateFailed
+	}
 }

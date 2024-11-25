@@ -18,12 +18,12 @@ func LoginStatus() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var (
 			authstr = ctx.Request.Header.Get("Authorization")
-			ls      = &auth.LoginStatus{
-				State: auth.StateFailed,
-				Role:  auth.RoleNil,
-			}
+			ls      = &auth.LoginStatus{}
 		)
-		defer ctx.Set(constants.CtxKeyLoginStatus, ls)
+		defer func() {
+			ctx.Set(constants.CtxKeyLoginStatus, ls)
+			logs.Debugf("login status: %+v", ls)
+		}()
 		if authstr == "" {
 			return
 		}
@@ -51,8 +51,8 @@ func LoginStatus() gin.HandlerFunc {
 			ls.State = auth.StateFailed
 			return
 		}
-		ls.Claim = claims
 		ls.State = auth.StateSucc
+		ls.Claim = claims
 	}
 }
 

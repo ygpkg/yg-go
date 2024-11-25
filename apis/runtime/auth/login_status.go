@@ -13,9 +13,9 @@ type InjectorFunc func(ctx *gin.Context, ls *LoginStatus) (err error)
 type State int
 
 const (
-	StateNil State = iota
-	StateSucc
-	StateFailed
+	StateNil    State = 0
+	StateSucc   State = 1
+	StateFailed State = 2
 	// StateParseFailed
 	// StateInvalidToken
 	// StateInvalidUser
