@@ -30,6 +30,9 @@ func (ai *authInjectors) Default(injector auth.InjectorFunc) {
 
 func (ai *authInjectors) Inject(ctx *gin.Context) {
 	ls := runtime.LoginStatus(ctx)
+	if ls.State != auth.StateSucc {
+		return
+	}
 
 	if injector, ok := ai.injectors[ls.Claim.Issuer]; ok {
 		ls.Err = injector(ctx, ls)
