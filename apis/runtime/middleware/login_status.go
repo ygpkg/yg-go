@@ -57,13 +57,13 @@ func LoginStatus() gin.HandlerFunc {
 }
 
 // getJwtSetting 获取jwt配置
-func getJwtSetting(issuer string) (string, error) {
+func getJwtSetting(issuer string) ([]byte, error) {
 	jset := &config.JwtConfig{}
 	err := settings.GetYaml("core", "jwt-"+issuer, jset)
 	if err != nil {
 		logs.Warnw("[manager_auth] get jwt setting failed.",
 			"error", err, "issuer", issuer)
-		return "", err
+		return []byte(""), err
 	}
-	return jset.Secret, nil
+	return []byte(jset.Secret), nil
 }
