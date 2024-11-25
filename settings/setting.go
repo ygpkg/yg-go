@@ -123,7 +123,7 @@ func Get(group, key string) (*SettingItem, error) {
 
 	rdsKey := fmt.Sprintf("core_setting::%s::%s", group, key)
 	err := cache.Std().Get(rdsKey, ret)
-	if err == nil {
+	if err == nil && ret.Value != "" {
 		return ret, nil
 	}
 
@@ -131,10 +131,13 @@ func Get(group, key string) (*SettingItem, error) {
 		Where("`group` = ? AND `key` = ?", group, key).
 		First(ret).Error
 	if err != nil {
+		logs.Errorf("[settings] get %s failed, %s", group+"/"+key, err)
 		return nil, err
 	}
 
-	cache.Std().Set(rdsKey, ret, time.Minute*5)
+	if ret.Value != "" {
+		cache.Std().Set(rdsKey, ret, time.Minute*5)
+	}
 
 	return ret, nil
 }
