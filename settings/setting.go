@@ -111,6 +111,8 @@ func SetYaml(group, key string, value interface{}) error {
 
 // updateSettings or update the trade calendar of a stock.
 func updateSettings(v *SettingItem) error {
+	rdsKey := redisCacheKey(v.Group, v.Key)
+	cache.Std().Delete(rdsKey)
 	return dbtools.Core().Table(TableNameSettings).
 		Clauses(clause.OnConflict{
 			DoUpdates: clause.AssignmentColumns([]string{"name", "describe", "value", "value_type", "default"}),
@@ -121,7 +123,7 @@ func updateSettings(v *SettingItem) error {
 func Get(group, key string) (*SettingItem, error) {
 	ret := &SettingItem{}
 
-	rdsKey := fmt.Sprintf("core_setting::%s::%s", group, key)
+	rdsKey := redisCacheKey(group, key)
 	err := cache.Std().Get(rdsKey, ret)
 	if err == nil && ret.Value != "" {
 		return ret, nil
@@ -213,6 +215,12 @@ func Updates(sets ...*SettingItem) error {
 			logs.Errorf("[settings] update %s failed, %s", set.Identify(), err)
 			return err
 		}
+		rdsKey := redisCacheKey(set.Group, set.Key)
+		cache.Std().Delete(rdsKey)
 	}
 	return nil
+}
+
+func redisCacheKey(group, key string) string {
+	return fmt.Sprintf("core_setting::%s::%s", group, key)
 }
