@@ -32,6 +32,7 @@ type Storager interface {
 	GetPresignedURL(storagePath string) (string, error)
 	ReadFile(fi *FileInfo) (io.Reader, error)
 	// Stat(name string) (*FileInfo, error)
+	DeleteFile(fi *FileInfo) error
 }
 
 // InitDB .

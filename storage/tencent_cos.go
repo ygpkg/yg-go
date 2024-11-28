@@ -216,7 +216,25 @@ func (tc *TencentCos) ReadFile(fi *FileInfo) (io.Reader, error) {
 		logs.Errorf("tencent cos get object error: %v", err)
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	// 返回文件内容的 Reader
 	return resp.Body, nil
+}
+
+// DeleteFile 删除文件
+func (tc *TencentCos) DeleteFile(fi *FileInfo) error {
+	if fi.StoragePath == "" {
+		return fmt.Errorf("storage path is empty")
+	}
+
+	// 删除文件
+	resp, err := tc.client.Object.Delete(context.Background(), fi.StoragePath)
+	if err != nil {
+		logs.Errorf("tencent cos delete object error: %v", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
 }

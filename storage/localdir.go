@@ -66,11 +66,12 @@ func (ls *LocalStorage) GetPresignedURL(storagePath string) (string, error) {
 
 // ReadFile 获取文件内容
 func (ls *LocalStorage) ReadFile(fi *FileInfo) (io.Reader, error) {
+	fi.Filename = filepath.Clean(fi.Filename)
 	// 构建文件路径
 	fpath := filepath.Join(ls.Dir, fi.Filename)
 
 	// 检查文件是否存在
-	if _, err := os.Stat(fpath); os.IsNotExist(err) {
+	if _, err := os.Stat(fpath); err != nil {
 		logs.Errorf("[local_storage] file %s does not exist", fpath)
 		return nil, err
 	}
@@ -83,4 +84,24 @@ func (ls *LocalStorage) ReadFile(fi *FileInfo) (io.Reader, error) {
 
 	// 返回文件的 Reader
 	return file, nil
+}
+
+// DeleteFile 删除文件
+func (ls *LocalStorage) DeleteFile(fi *FileInfo) error {
+	fi.Filename = filepath.Clean(fi.Filename)
+	// 构建文件的完整路径
+	fpath := filepath.Join(ls.Dir, fi.Filename)
+	// 检查文件是否存在
+	if _, err := os.Stat(fpath); err != nil {
+		logs.Errorf("[local_storage] file %s does not exist", fpath)
+		return err
+	}
+	// 删除文件
+	err := os.Remove(fpath)
+	if err != nil {
+		logs.Errorf("[local_storage] delete file %s failed, %s", fpath, err)
+		return err
+	}
+
+	return nil
 }
