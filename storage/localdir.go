@@ -31,8 +31,8 @@ func NewLocalStorage(cfg config.LocalStorageConfig) (*LocalStorage, error) {
 }
 
 func (ls *LocalStorage) Save(ctx context.Context, fi *FileInfo, r io.Reader) error {
-	fi.Filename = filepath.Clean(fi.Filename)
-	fpath := filepath.Join(ls.Dir, fi.Filename)
+	fi.StoragePath = filepath.Clean(fi.StoragePath)
+	fpath := filepath.Join(ls.Dir, fi.StoragePath)
 	dir := filepath.Dir(fpath)
 
 	if _, err := os.Stat(dir); err != nil {
