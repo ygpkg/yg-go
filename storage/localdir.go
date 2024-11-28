@@ -55,6 +55,7 @@ func (ls *LocalStorage) Save(ctx context.Context, fi *FileInfo, r io.Reader) err
 	}
 	return nil
 }
+
 func (ls *LocalStorage) GetPublicURL(storagePath string, _ bool) string {
 	// TODO: support custom domain
 	return storagePath
@@ -65,10 +66,10 @@ func (ls *LocalStorage) GetPresignedURL(storagePath string) (string, error) {
 }
 
 // ReadFile 获取文件内容
-func (ls *LocalStorage) ReadFile(fi *FileInfo) (io.Reader, error) {
-	fi.Filename = filepath.Clean(fi.Filename)
+func (ls *LocalStorage) ReadFile(storagePath string) (io.Reader, error) {
+	storagePath = filepath.Clean(storagePath)
 	// 构建文件路径
-	fpath := filepath.Join(ls.Dir, fi.Filename)
+	fpath := filepath.Join(ls.Dir, storagePath)
 
 	// 检查文件是否存在
 	if _, err := os.Stat(fpath); err != nil {
@@ -87,10 +88,10 @@ func (ls *LocalStorage) ReadFile(fi *FileInfo) (io.Reader, error) {
 }
 
 // DeleteFile 删除文件
-func (ls *LocalStorage) DeleteFile(fi *FileInfo) error {
-	fi.Filename = filepath.Clean(fi.Filename)
+func (ls *LocalStorage) DeleteFile(storagePath string) error {
+	storagePath = filepath.Clean(storagePath)
 	// 构建文件的完整路径
-	fpath := filepath.Join(ls.Dir, fi.Filename)
+	fpath := filepath.Join(ls.Dir, storagePath)
 	// 检查文件是否存在
 	if _, err := os.Stat(fpath); err != nil {
 		logs.Errorf("[local_storage] file %s does not exist", fpath)

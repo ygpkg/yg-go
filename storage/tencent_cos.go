@@ -205,13 +205,13 @@ func (tc *TencentCos) CompleteUploadTask(ctx context.Context, tempFile *TempFile
 }
 
 // ReadFile 获取文件内容
-func (tc *TencentCos) ReadFile(fi *FileInfo) (io.Reader, error) {
-	if fi.StoragePath == "" {
+func (tc *TencentCos) ReadFile(storagePath string) (io.Reader, error) {
+	if storagePath == "" {
 		return nil, fmt.Errorf("storage path is empty")
 	}
 
 	// 获取文件内容
-	resp, err := tc.client.Object.Get(context.Background(), fi.StoragePath, nil)
+	resp, err := tc.client.Object.Get(context.Background(), storagePath, nil)
 	if err != nil {
 		logs.Errorf("tencent cos get object error: %v", err)
 		return nil, err
@@ -223,13 +223,13 @@ func (tc *TencentCos) ReadFile(fi *FileInfo) (io.Reader, error) {
 }
 
 // DeleteFile 删除文件
-func (tc *TencentCos) DeleteFile(fi *FileInfo) error {
-	if fi.StoragePath == "" {
+func (tc *TencentCos) DeleteFile(storagePath string) error {
+	if storagePath == "" {
 		return fmt.Errorf("storage path is empty")
 	}
 
 	// 删除文件
-	resp, err := tc.client.Object.Delete(context.Background(), fi.StoragePath)
+	resp, err := tc.client.Object.Delete(context.Background(), storagePath)
 	if err != nil {
 		logs.Errorf("tencent cos delete object error: %v", err)
 		return err
