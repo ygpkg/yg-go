@@ -16,7 +16,7 @@ import (
 
 var _ iUploader = (*TencentCos)(nil)
 
-// TencentCos .
+// TencentCos ..
 type TencentCos struct {
 	opt    config.StorageOption
 	cosCfg config.TencentCOSConfig
