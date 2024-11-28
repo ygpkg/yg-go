@@ -62,3 +62,12 @@ type TencentCOSConfig struct {
 	TencentConfig `yaml:",inline"`
 	Bucket        string `yaml:"bucket"`
 }
+
+// MinossConfig Minoss存储配置
+type MinossConfig struct {
+	EndPoint        string `yaml:"end_point"`
+	AccessKeyID     string `yaml:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key"`
+	UseSSL          bool   `yaml:"use_ssl"`
+	Bucket          string `yaml:"bucket"`
+}
