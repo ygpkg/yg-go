@@ -63,3 +63,24 @@ func (ls *LocalStorage) GetPublicURL(storagePath string, _ bool) string {
 func (ls *LocalStorage) GetPresignedURL(storagePath string) (string, error) {
 	return "", nil
 }
+
+// ReadFile 获取文件内容
+func (ls *LocalStorage) ReadFile(fi *FileInfo) (io.Reader, error) {
+	// 构建文件路径
+	fpath := filepath.Join(ls.Dir, fi.Filename)
+
+	// 检查文件是否存在
+	if _, err := os.Stat(fpath); os.IsNotExist(err) {
+		logs.Errorf("[local_storage] file %s does not exist", fpath)
+		return nil, err
+	}
+	// 打开文件
+	file, err := os.Open(fpath)
+	if err != nil {
+		logs.Errorf("[local_storage] open file %s failed, %s", fpath, err)
+		return nil, err
+	}
+
+	// 返回文件的 Reader
+	return file, nil
+}

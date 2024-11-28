@@ -30,7 +30,7 @@ type Storager interface {
 	Save(ctx context.Context, fi *FileInfo, data io.Reader) error
 	GetPublicURL(storagePath string, temp bool) string
 	GetPresignedURL(storagePath string) (string, error)
-	// ReadFile(name string) (io.Reader, error)
+	ReadFile(fi *FileInfo) (io.Reader, error)
 	// Stat(name string) (*FileInfo, error)
 }
 

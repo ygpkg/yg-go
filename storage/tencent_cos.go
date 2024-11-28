@@ -203,3 +203,20 @@ func (tc *TencentCos) CompleteUploadTask(ctx context.Context, tempFile *TempFile
 	logs.Infof("tencent cos complete multipart upload result: %v", compRst)
 	return nil
 }
+
+// ReadFile 获取文件内容
+func (tc *TencentCos) ReadFile(fi *FileInfo) (io.Reader, error) {
+	if fi.StoragePath == "" {
+		return nil, fmt.Errorf("storage path is empty")
+	}
+
+	// 获取文件内容
+	resp, err := tc.client.Object.Get(context.Background(), fi.StoragePath, nil)
+	if err != nil {
+		logs.Errorf("tencent cos get object error: %v", err)
+		return nil, err
+	}
+
+	// 返回文件内容的 Reader
+	return resp.Body, nil
+}
