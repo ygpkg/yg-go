@@ -12,6 +12,7 @@ type StorageConfig struct {
 	AliOSS  *AliOSSConfig       `yaml:"alioss,omitempty"`
 	UpYun   *UpYunConfig        `yaml:"upyun,omitempty"`
 	Tencent *TencentCOSConfig   `yaml:"tencent,omitempty"`
+	Minoss  *MinossConfig       `yaml:"minoss,omitempty"`
 }
 
 // StorageOption 对象存储通用配置选项

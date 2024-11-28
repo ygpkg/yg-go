@@ -81,6 +81,8 @@ func NewStorage(purpose string) (Storager, error) {
 		s, err = NewLocalStorage(*cfg.Local)
 	} else if cfg.Tencent != nil {
 		s, err = NewTencentCos(*cfg.Tencent, cfg.StorageOption)
+	} else if cfg.Minoss != nil {
+		s, err = NewMinFs(*cfg.Minoss, cfg.StorageOption)
 	} else {
 		return nil, fmt.Errorf("not found useful remote storage config")
 	}
