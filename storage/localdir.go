@@ -66,7 +66,7 @@ func (ls *LocalStorage) GetPresignedURL(storagePath string) (string, error) {
 }
 
 // ReadFile 获取文件内容
-func (ls *LocalStorage) ReadFile(storagePath string) (io.Reader, error) {
+func (ls *LocalStorage) ReadFile(storagePath string) (io.ReadCloser, error) {
 	storagePath = filepath.Clean(storagePath)
 	// 构建文件路径
 	fpath := filepath.Join(ls.Dir, storagePath)

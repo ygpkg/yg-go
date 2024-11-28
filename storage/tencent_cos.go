@@ -205,7 +205,7 @@ func (tc *TencentCos) CompleteUploadTask(ctx context.Context, tempFile *TempFile
 }
 
 // ReadFile 获取文件内容
-func (tc *TencentCos) ReadFile(storagePath string) (io.Reader, error) {
+func (tc *TencentCos) ReadFile(storagePath string) (io.ReadCloser, error) {
 	if storagePath == "" {
 		return nil, fmt.Errorf("storage path is empty")
 	}
@@ -216,7 +216,6 @@ func (tc *TencentCos) ReadFile(storagePath string) (io.Reader, error) {
 		logs.Errorf("tencent cos get object error: %v", err)
 		return nil, err
 	}
-	defer resp.Body.Close()
 
 	// 返回文件内容的 Reader
 	return resp.Body, nil
