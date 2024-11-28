@@ -16,7 +16,7 @@ import (
 
 var _ iUploader = (*TencentCos)(nil)
 
-// TencentCos .
+// TencentCos ..
 type TencentCos struct {
 	opt    config.StorageOption
 	cosCfg config.TencentCOSConfig
@@ -201,5 +201,39 @@ func (tc *TencentCos) CompleteUploadTask(ctx context.Context, tempFile *TempFile
 	}
 
 	logs.Infof("tencent cos complete multipart upload result: %v", compRst)
+	return nil
+}
+
+// ReadFile 获取文件内容
+func (tc *TencentCos) ReadFile(storagePath string) (io.ReadCloser, error) {
+	if storagePath == "" {
+		return nil, fmt.Errorf("storage path is empty")
+	}
+
+	// 获取文件内容
+	resp, err := tc.client.Object.Get(context.Background(), storagePath, nil)
+	if err != nil {
+		logs.Errorf("tencent cos get object error: %v", err)
+		return nil, err
+	}
+
+	// 返回文件内容的 Reader
+	return resp.Body, nil
+}
+
+// DeleteFile 删除文件
+func (tc *TencentCos) DeleteFile(storagePath string) error {
+	if storagePath == "" {
+		return fmt.Errorf("storage path is empty")
+	}
+
+	// 删除文件
+	resp, err := tc.client.Object.Delete(context.Background(), storagePath)
+	if err != nil {
+		logs.Errorf("tencent cos delete object error: %v", err)
+		return err
+	}
+	defer resp.Body.Close()
+
 	return nil
 }
