@@ -35,8 +35,8 @@ func NewMinFs(cfg config.MinossConfig, opt config.StorageOption) (*MinFs, error)
 		ctx:    context.Background(),
 	}
 	mc.client, err = minio.New(cfg.EndPoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
-		Secure: cfg.UseSSL,
+		Creds: credentials.NewStaticV4(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
+		// Secure: cfg.UseSSL,
 	})
 	if err != nil {
 		return nil, err

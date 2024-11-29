@@ -253,7 +253,7 @@ The full API Reference is available here.
 
 * [setbucketencryption.go](https://github.com/minio/minio-go/blob/master/examples/s3/setbucketencryption.go)
 * [getbucketencryption.go](https://github.com/minio/minio-go/blob/master/examples/s3/getbucketencryption.go)
-* [removebucketencryption.go](https://github.com/minio/minio-go/blob/master/examples/s3/removebucketencryption.go)
+* [deletebucketencryption.go](https://github.com/minio/minio-go/blob/master/examples/s3/deletebucketencryption.go)
 
 ### Full Examples : Bucket replication Operations
 

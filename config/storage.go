@@ -69,6 +69,6 @@ type MinossConfig struct {
 	EndPoint        string `yaml:"end_point"`
 	AccessKeyID     string `yaml:"access_key_id"`
 	SecretAccessKey string `yaml:"secret_access_key"`
-	UseSSL          bool   `yaml:"use_ssl"`
-	Bucket          string `yaml:"bucket"`
+	// UseSSL          bool   `yaml:"use_ssl"`
+	Bucket string `yaml:"bucket"`
 }

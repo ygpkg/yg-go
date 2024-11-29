@@ -207,8 +207,8 @@ github.com/mattn/go-sqlite3
 # github.com/minio/md5-simd v1.1.2
 ## explicit; go 1.14
 github.com/minio/md5-simd
-# github.com/minio/minio-go/v7 v7.0.81
-## explicit; go 1.22
+# github.com/minio/minio-go/v7 v7.0.76
+## explicit; go 1.21
 github.com/minio/minio-go/v7
 github.com/minio/minio-go/v7/pkg/cors
 github.com/minio/minio-go/v7/pkg/credentials
