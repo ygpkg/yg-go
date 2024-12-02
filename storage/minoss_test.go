@@ -19,6 +19,10 @@ func TestNewMinBucketClient(t *testing.T) {
 		SecretAccessKey: os.Getenv("SECRET_ACCESS_KEY_ID"),
 		Bucket:          "default-bucket",
 	}
+	if defaultCfg.EndPoint == "" || defaultCfg.AccessKeyID == "" || defaultCfg.SecretAccessKey == "" {
+		t.Skip("skip test, no minoss config")
+		return
+	}
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
 		fmt.Println(err)
@@ -35,6 +39,10 @@ func TestMinBucketClient_UploadFile(t *testing.T) {
 		AccessKeyID:     os.Getenv("ACCESS_KEY_ID"),
 		SecretAccessKey: os.Getenv("SECRET_ACCESS_KEY_ID"),
 		Bucket:          "default-bucket",
+	}
+	if defaultCfg.EndPoint == "" || defaultCfg.AccessKeyID == "" || defaultCfg.SecretAccessKey == "" {
+		t.Skip("skip test, no minoss config")
+		return
 	}
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
@@ -53,6 +61,10 @@ func TestMinBucketClient_GetPresignedURL(t *testing.T) {
 		AccessKeyID:     os.Getenv("ACCESS_KEY_ID"),
 		SecretAccessKey: os.Getenv("SECRET_ACCESS_KEY_ID"),
 		Bucket:          "default-bucket",
+	}
+	if defaultCfg.EndPoint == "" || defaultCfg.AccessKeyID == "" || defaultCfg.SecretAccessKey == "" {
+		t.Skip("skip test, no minoss config")
+		return
 	}
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
@@ -73,6 +85,10 @@ func TestMinBucketClient_ReadFile(t *testing.T) {
 		SecretAccessKey: os.Getenv("SECRET_ACCESS_KEY_ID"),
 		Bucket:          "default-bucket",
 	}
+	if defaultCfg.EndPoint == "" || defaultCfg.AccessKeyID == "" || defaultCfg.SecretAccessKey == "" {
+		t.Skip("skip test, no minoss config")
+		return
+	}
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
 		t.Logf(err.Error())
@@ -92,6 +108,10 @@ func TestMinBucketClient_DeleteFile(t *testing.T) {
 		AccessKeyID:     os.Getenv("ACCESS_KEY_ID"),
 		SecretAccessKey: os.Getenv("SECRET_ACCESS_KEY_ID"),
 		Bucket:          "default-bucket",
+	}
+	if defaultCfg.EndPoint == "" || defaultCfg.AccessKeyID == "" || defaultCfg.SecretAccessKey == "" {
+		t.Skip("skip test, no minoss config")
+		return
 	}
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
