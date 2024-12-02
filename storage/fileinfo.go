@@ -197,7 +197,7 @@ func GetFileByID(db *gorm.DB, id uint) (*FileInfo, error) {
 
 // GenerateFileStoragePath 生成文件存储路径
 func GenerateFileStoragePath(purpose string, owner uint, fileExt string) string {
-	storagePath := fmt.Sprintf("%s/%s/%d-%s.%s",
+	storagePath := fmt.Sprintf("%s/%s/%d-%s%s",
 		purpose, time.Now().Format("20060102"), owner, random.String(9), fileExt)
 	return storagePath
 }
