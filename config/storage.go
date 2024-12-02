@@ -12,6 +12,7 @@ type StorageConfig struct {
 	AliOSS  *AliOSSConfig       `yaml:"alioss,omitempty"`
 	UpYun   *UpYunConfig        `yaml:"upyun,omitempty"`
 	Tencent *TencentCOSConfig   `yaml:"tencent,omitempty"`
+	Minoss  *MinossConfig       `yaml:"minoss,omitempty"`
 }
 
 // StorageOption 对象存储通用配置选项
@@ -61,4 +62,13 @@ type TencentConfig struct {
 type TencentCOSConfig struct {
 	TencentConfig `yaml:",inline"`
 	Bucket        string `yaml:"bucket"`
+}
+
+// MinossConfig Minoss存储配置
+type MinossConfig struct {
+	EndPoint        string `yaml:"end_point"`
+	AccessKeyID     string `yaml:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key"`
+	// UseSSL          bool   `yaml:"use_ssl"`
+	Bucket string `yaml:"bucket"`
 }
