@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"sort"
 	"strings"
 
@@ -234,6 +235,83 @@ func (tc *TencentCos) DeleteFile(storagePath string) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	return nil
+}
+
+// CopyFile 复制文件或文件夹
+func (tc *TencentCos) CopyFile(storagePath, dest string) error {
+	if storagePath == "" {
+		return fmt.Errorf("source storage path is empty")
+	}
+	if dest == "" {
+		return fmt.Errorf("destination storage path is empty")
+	}
+
+	// 检查源路径是文件还是文件夹
+	isDir, err := tc.isDirectory(storagePath)
+	if err != nil {
+		logs.Errorf("tencent cos check source path error: %v", err)
+		return err
+	}
+
+	if isDir {
+		// 复制文件夹
+		return tc.copyDirectory(storagePath, dest)
+	} else {
+		// 复制文件
+		return tc.copyObject(storagePath, dest)
+	}
+}
+
+// 检查路径是否为文件夹
+func (tc *TencentCos) isDirectory(storagePath string) (bool, error) {
+	// 尝试获取对象信息
+	_, err := tc.client.Object.Head(context.Background(), storagePath, nil)
+	if err != nil {
+		if cos.IsNotFoundError(err) {
+			// 如果路径不存在，则认为是文件夹
+			return true, nil
+		}
+		return false, err
+	}
+	return false, nil
+}
+
+// 复制文件
+func (tc *TencentCos) copyObject(storagePath, dest string) error {
+	_, _, err := tc.client.Object.Copy(context.Background(), dest, storagePath, nil)
+	if err != nil {
+		logs.Errorf("tencent cos copy object error: %v", err)
+		return err
+	}
+	return nil
+}
+
+// 复制文件夹
+func (tc *TencentCos) copyDirectory(storagePath, dest string) error {
+	// 列出源文件夹中的所有对象
+	opt := &cos.BucketGetOptions{
+		Prefix:    storagePath,
+		Delimiter: "/",
+	}
+	res, _, err := tc.client.Bucket.Get(context.Background(), opt)
+	if err != nil {
+		logs.Errorf("tencent cos list objects error: %v", err)
+		return err
+	}
+
+	for _, obj := range res.Contents {
+		// 计算目标路径
+		relativePath := strings.TrimPrefix(obj.Key, storagePath)
+		targetPath := path.Join(dest, relativePath)
+
+		// 复制对象
+		err := tc.copyObject(obj.Key, targetPath)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
