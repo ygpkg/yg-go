@@ -75,7 +75,7 @@ func (tc *TencentCos) Save(ctx context.Context, fi *FileInfo, r io.Reader) error
 
 // GetPublicURL .
 func (tc *TencentCos) GetPublicURL(storagePath string, temp bool) string {
-	host := fmt.Sprintf("https://%s.cos.%s.myqcloud.com", tc.cosCfg.Bucket, tc.cosCfg.Region)
+	host := fmt.Sprintf("https://%s.cos.%s.myqcloud.com/", tc.cosCfg.Bucket, tc.cosCfg.Region)
 	baseURI := host + storagePath
 	if !temp {
 		return baseURI
@@ -104,7 +104,7 @@ func (tc *TencentCos) GetPublicURL(storagePath string, temp bool) string {
 
 // GetPresignedURL 获取预签名URL
 func (tc *TencentCos) GetPresignedURL(storagePath string) (string, error) {
-	host := fmt.Sprintf("https://%s.cos.%s.myqcloud.com", tc.cosCfg.Bucket, tc.cosCfg.Region)
+	host := fmt.Sprintf("https://%s.cos.%s.myqcloud.com/", tc.cosCfg.Bucket, tc.cosCfg.Region)
 	u, _ := url.Parse(host)
 	b := &cos.BaseURL{BucketURL: u}
 	client := cos.NewClient(b, &http.Client{
@@ -280,7 +280,9 @@ func (tc *TencentCos) isDirectory(storagePath string) (bool, error) {
 
 // copyObject 复制文件
 func (tc *TencentCos) copyObject(storagePath, dest string) error {
-	_, _, err := tc.client.Object.Copy(context.Background(), dest, storagePath, nil)
+	// 去除https://，否则会报错
+	srcurl := strings.TrimPrefix(tc.GetPublicURL(storagePath, false), "https://")
+	_, _, err := tc.client.Object.Copy(context.Background(), dest, srcurl, nil)
 	if err != nil {
 		logs.Errorf("tencent cos copy object error: %v", err)
 		return err
@@ -300,7 +302,7 @@ func (tc *TencentCos) copyDirectory(storagePath, dest string) error {
 		logs.Errorf("tencent cos list objects error: %v", err)
 		return err
 	}
-
+	// 处理文件夹中的所有对象
 	for _, obj := range res.Contents {
 		// 计算目标路径
 		relativePath := strings.TrimPrefix(obj.Key, storagePath)
@@ -308,6 +310,19 @@ func (tc *TencentCos) copyDirectory(storagePath, dest string) error {
 
 		// 复制对象
 		err := tc.copyObject(obj.Key, targetPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 处理文件夹中的子文件夹
+	for _, prefix := range res.CommonPrefixes {
+		// 计算子文件夹的目标路径
+		subFolderPath := strings.TrimPrefix(prefix, storagePath)
+		subFolderTargetPath := path.Join(dest, subFolderPath)
+
+		// 递归复制子文件夹
+		err := tc.copyDirectory(prefix, subFolderTargetPath)
 		if err != nil {
 			return err
 		}
