@@ -40,7 +40,7 @@ func (ai *authInjectors) Inject(ctx *gin.Context) {
 		ls.Err = ai.defaultInjector(ctx, ls)
 	}
 	if ls.Err != nil {
-		logs.Warnf("[auth][%s] auth failed, %s", ls.Claim.Uin, ls.Err)
+		logs.Warnf("[auth][%v] auth failed, %s", ls.Claim.Uin, ls.Err)
 		ls.State = auth.StateFailed
 	}
 }
