@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -58,7 +59,7 @@ func (ls *LocalStorage) Save(ctx context.Context, fi *FileInfo, r io.Reader) err
 
 func (ls *LocalStorage) GetPublicURL(storagePath string, _ bool) string {
 	// TODO: support custom domain
-	return storagePath
+	return fmt.Sprintf("%s/public.src?p=%s", ls.cfg.PublicPrefix, storagePath)
 }
 
 func (ls *LocalStorage) GetPresignedURL(storagePath string) (string, error) {
@@ -102,6 +103,103 @@ func (ls *LocalStorage) DeleteFile(storagePath string) error {
 	if err != nil {
 		logs.Errorf("[local_storage] delete file %s failed, %s", fpath, err)
 		return err
+	}
+
+	return nil
+}
+
+// CopyDir 复制文件或文件夹
+func (ls *LocalStorage) CopyDir(storagePath, dest string) error {
+	storagePath = filepath.Clean(storagePath)
+	dest = filepath.Clean(dest)
+
+	// 构建源路径的完整路径
+	srcPath := filepath.Join(ls.Dir, storagePath)
+
+	// 检查源路径是否存在
+	srcInfo, err := os.Stat(srcPath)
+	if err != nil {
+		logs.Errorf("[local_storage] source path %s does not exist", srcPath)
+		return err
+	}
+
+	// 构建目标路径的完整路径
+	destPath := filepath.Join(ls.Dir, dest)
+
+	// 如果源路径是文件夹，则递归复制文件夹
+	if srcInfo.IsDir() {
+		return ls.copyDirectory(srcPath, destPath)
+	}
+
+	// 如果源路径是文件，则复制文件
+	return ls.copyFile(srcPath, destPath)
+}
+
+// copyFile 复制文件
+func (ls *LocalStorage) copyFile(srcPath, destPath string) error {
+	// 创建目标文件的目录
+	destDir := filepath.Dir(destPath)
+	if err := os.MkdirAll(destDir, os.ModePerm); err != nil {
+		logs.Errorf("[local_storage] create destination directory %s failed, %s", destDir, err)
+		return err
+	}
+
+	// 打开源文件
+	srcFile, err := os.Open(srcPath)
+	if err != nil {
+		logs.Errorf("[local_storage] open source file %s failed, %s", srcPath, err)
+		return err
+	}
+	defer srcFile.Close()
+
+	// 创建目标文件
+	destFile, err := os.Create(destPath)
+	if err != nil {
+		logs.Errorf("[local_storage] create destination file %s failed, %s", destPath, err)
+		return err
+	}
+	defer destFile.Close()
+
+	// 复制文件内容
+	_, err = io.Copy(destFile, srcFile)
+	if err != nil {
+		logs.Errorf("[local_storage] copy file %s to %s failed, %s", srcPath, destPath, err)
+		return err
+	}
+
+	return nil
+}
+
+// copyDirectory 复制文件夹
+func (ls *LocalStorage) copyDirectory(srcPath, destPath string) error {
+	// 创建目标文件夹
+	if err := os.MkdirAll(destPath, os.ModePerm); err != nil {
+		logs.Errorf("[local_storage] create destination directory %s failed, %s", destPath, err)
+		return err
+	}
+
+	// 遍历源文件夹中的所有文件和子文件夹
+	entries, err := os.ReadDir(srcPath)
+	if err != nil {
+		logs.Errorf("[local_storage] read source directory %s failed, %s", srcPath, err)
+		return err
+	}
+
+	for _, entry := range entries {
+		srcEntryPath := filepath.Join(srcPath, entry.Name())
+		destEntryPath := filepath.Join(destPath, entry.Name())
+
+		if entry.IsDir() {
+			// 递归复制子文件夹
+			if err := ls.copyDirectory(srcEntryPath, destEntryPath); err != nil {
+				return err
+			}
+		} else {
+			// 复制文件
+			if err := ls.copyFile(srcEntryPath, destEntryPath); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

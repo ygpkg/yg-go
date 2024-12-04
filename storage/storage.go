@@ -33,6 +33,7 @@ type Storager interface {
 	ReadFile(storagePath string) (io.ReadCloser, error)
 	// Stat(name string) (*FileInfo, error)
 	DeleteFile(storagePath string) error
+	CopyDir(storagePath, dest string) error
 }
 
 // InitDB .

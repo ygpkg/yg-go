@@ -123,3 +123,25 @@ func TestMinBucketClient_DeleteFile(t *testing.T) {
 		t.Logf(err.Error())
 	}
 }
+
+func TestMinBucketClient_CopyDir(t *testing.T) {
+	var defaultCfg = config.MinossConfig{
+		EndPoint:        os.Getenv("END_POINT"),
+		AccessKeyID:     os.Getenv("ACCESS_KEY_ID"),
+		SecretAccessKey: os.Getenv("SECRET_ACCESS_KEY_ID"),
+		Bucket:          "default-bucket",
+	}
+	if defaultCfg.EndPoint == "" || defaultCfg.AccessKeyID == "" || defaultCfg.SecretAccessKey == "" {
+		t.Skip("skip test, no minoss config")
+		return
+	}
+	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
+	if err != nil {
+		t.Logf(err.Error())
+	}
+	path := "test/a"
+	err = mc.CopyDir(path, "test/b")
+	if err != nil {
+		t.Logf(err.Error())
+	}
+}

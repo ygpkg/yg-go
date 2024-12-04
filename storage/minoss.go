@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"path"
+	"strings"
 	"time"
 
 	minio "github.com/minio/minio-go/v7"
@@ -117,4 +119,91 @@ func (mfs *MinFs) DeleteFile(storagePath string) error {
 		logs.Errorf("minoss delete object error: %v", err)
 	}
 	return err
+}
+
+// CopyDir 复制文件或文件夹
+func (mfs *MinFs) CopyDir(storagePath, dest string) error {
+	if storagePath == "" {
+		return fmt.Errorf("source storage path is empty")
+	}
+	if dest == "" {
+		return fmt.Errorf("destination storage path is empty")
+	}
+
+	// 检查源路径是文件还是文件夹
+	isDir, err := mfs.isDirectory(storagePath)
+	if err != nil {
+		logs.Errorf("minio check source path error: %v", err)
+		return err
+	}
+
+	if isDir {
+		// 复制文件夹
+		return mfs.copyDirectory(storagePath, dest)
+	} else {
+		// 复制文件
+		return mfs.copyObject(storagePath, dest)
+	}
+}
+
+// isDirectory 检查路径是否为文件夹
+func (mfs *MinFs) isDirectory(storagePath string) (bool, error) {
+	opts := minio.StatObjectOptions{}
+	_, err := mfs.client.StatObject(mfs.ctx, mfs.mfsCfg.Bucket, storagePath, opts)
+	if err != nil {
+		if minio.ToErrorResponse(err).Code == "NoSuchKey" {
+			// 如果路径不存在，则认为是文件夹
+			return true, nil
+		}
+		return false, err
+	}
+	return false, nil
+}
+
+// copyObject 复制文件
+func (mfs *MinFs) copyObject(storagePath, dest string) error {
+	src := minio.CopySrcOptions{
+		Bucket: mfs.mfsCfg.Bucket,
+		Object: storagePath,
+	}
+	dst := minio.CopyDestOptions{
+		Bucket: mfs.mfsCfg.Bucket,
+		Object: dest,
+	}
+
+	_, err := mfs.client.CopyObject(mfs.ctx, dst, src)
+	if err != nil {
+		logs.Errorf("minio copy object error: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// copyDirectory 复制文件夹
+func (mfs *MinFs) copyDirectory(storagePath, dest string) error {
+	// 列出源文件夹中的所有对象
+	objectsCh := mfs.client.ListObjects(mfs.ctx, mfs.mfsCfg.Bucket, minio.ListObjectsOptions{
+		Prefix:    storagePath,
+		Recursive: true,
+	})
+
+	for obj := range objectsCh {
+		if obj.Err != nil {
+			logs.Errorf("minio list objects error: %v", obj.Err)
+			return obj.Err
+		}
+
+		// 计算目标路径
+		relativePath := strings.TrimPrefix(obj.Key, storagePath)
+		targetPath := path.Join(dest, relativePath)
+
+		// 复制对象
+		err := mfs.copyObject(obj.Key, targetPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"sort"
 	"strings"
 
@@ -74,7 +75,7 @@ func (tc *TencentCos) Save(ctx context.Context, fi *FileInfo, r io.Reader) error
 
 // GetPublicURL .
 func (tc *TencentCos) GetPublicURL(storagePath string, temp bool) string {
-	host := fmt.Sprintf("https://%s.cos.%s.myqcloud.com", tc.cosCfg.Bucket, tc.cosCfg.Region)
+	host := fmt.Sprintf("https://%s.cos.%s.myqcloud.com/", tc.cosCfg.Bucket, tc.cosCfg.Region)
 	baseURI := host + storagePath
 	if !temp {
 		return baseURI
@@ -103,7 +104,7 @@ func (tc *TencentCos) GetPublicURL(storagePath string, temp bool) string {
 
 // GetPresignedURL 获取预签名URL
 func (tc *TencentCos) GetPresignedURL(storagePath string) (string, error) {
-	host := fmt.Sprintf("https://%s.cos.%s.myqcloud.com", tc.cosCfg.Bucket, tc.cosCfg.Region)
+	host := fmt.Sprintf("https://%s.cos.%s.myqcloud.com/", tc.cosCfg.Bucket, tc.cosCfg.Region)
 	u, _ := url.Parse(host)
 	b := &cos.BaseURL{BucketURL: u}
 	client := cos.NewClient(b, &http.Client{
@@ -234,6 +235,98 @@ func (tc *TencentCos) DeleteFile(storagePath string) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	return nil
+}
+
+// CopyDir 复制文件或文件夹
+func (tc *TencentCos) CopyDir(storagePath, dest string) error {
+	if storagePath == "" {
+		return fmt.Errorf("source storage path is empty")
+	}
+	if dest == "" {
+		return fmt.Errorf("destination storage path is empty")
+	}
+
+	// 检查源路径是文件还是文件夹
+	isDir, err := tc.isDirectory(storagePath)
+	if err != nil {
+		logs.Errorf("tencent cos check source path error: %v", err)
+		return err
+	}
+
+	if isDir {
+		// 复制文件夹
+		return tc.copyDirectory(storagePath, dest)
+	} else {
+		// 复制文件
+		return tc.copyObject(storagePath, dest)
+	}
+}
+
+// isDirectory 检查路径是否为文件夹
+func (tc *TencentCos) isDirectory(storagePath string) (bool, error) {
+	// 尝试获取对象信息
+	_, err := tc.client.Object.Head(context.Background(), storagePath, nil)
+	if err != nil {
+		if cos.IsNotFoundError(err) {
+			// 如果路径不存在，则认为是文件夹
+			return true, nil
+		}
+		return false, err
+	}
+	return false, nil
+}
+
+// copyObject 复制文件
+func (tc *TencentCos) copyObject(storagePath, dest string) error {
+	// 去除https://，否则会报错
+	srcurl := strings.TrimPrefix(tc.GetPublicURL(storagePath, false), "https://")
+	_, _, err := tc.client.Object.Copy(context.Background(), dest, srcurl, nil)
+	if err != nil {
+		logs.Errorf("tencent cos copy object error: %v", err)
+		return err
+	}
+	return nil
+}
+
+// copyDirectory 复制文件夹
+func (tc *TencentCos) copyDirectory(storagePath, dest string) error {
+	// 列出源文件夹中的所有对象
+	opt := &cos.BucketGetOptions{
+		Prefix:    storagePath,
+		Delimiter: "/",
+	}
+	res, _, err := tc.client.Bucket.Get(context.Background(), opt)
+	if err != nil {
+		logs.Errorf("tencent cos list objects error: %v", err)
+		return err
+	}
+	// 处理文件夹中的所有对象
+	for _, obj := range res.Contents {
+		// 计算目标路径
+		relativePath := strings.TrimPrefix(obj.Key, storagePath)
+		targetPath := path.Join(dest, relativePath)
+
+		// 复制对象
+		err := tc.copyObject(obj.Key, targetPath)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 处理文件夹中的子文件夹
+	for _, prefix := range res.CommonPrefixes {
+		// 计算子文件夹的目标路径
+		subFolderPath := strings.TrimPrefix(prefix, storagePath)
+		subFolderTargetPath := path.Join(dest, subFolderPath)
+
+		// 递归复制子文件夹
+		err := tc.copyDirectory(prefix, subFolderTargetPath)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

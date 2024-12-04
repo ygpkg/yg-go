@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"strconv"
 	"testing"
@@ -131,4 +132,31 @@ func TestGetPresignedURL(t *testing.T) {
 
 	u := tcos.GetPublicURL("/test/test1.jpg", true)
 	t.Logf("url: %s", u)
+}
+
+func TestCopyDirURL(t *testing.T) {
+	cosCfg := config.TencentCOSConfig{
+		Bucket: "test-ccnerf-1251908240",
+		TencentConfig: config.TencentConfig{
+			SecretID:  os.Getenv("TCOS_SECRET_ID"),
+			SecretKey: os.Getenv("TCOS_SECRET_KEY"),
+			Region:    "ap-beijing",
+		},
+	}
+	if cosCfg.SecretID == "" || cosCfg.SecretKey == "" {
+		t.Skip("skip test, no tencent cos config")
+		return
+	}
+
+	tcos, err := NewTencentCos(cosCfg, config.StorageOption{PresignedTimeout: time.Second * 30})
+	if err != nil {
+		fmt.Println(err)
+		t.Fatal(err)
+	}
+
+	err = tcos.CopyDir("login-bgd/", "test/111/")
+	if err != nil {
+		fmt.Println(err)
+		t.Fatal(err)
+	}
 }
