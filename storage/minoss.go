@@ -121,8 +121,8 @@ func (mfs *MinFs) DeleteFile(storagePath string) error {
 	return err
 }
 
-// CopyFile 复制文件或文件夹
-func (mfs *MinFs) CopyFile(storagePath, dest string) error {
+// CopyDir 复制文件或文件夹
+func (mfs *MinFs) CopyDir(storagePath, dest string) error {
 	if storagePath == "" {
 		return fmt.Errorf("source storage path is empty")
 	}

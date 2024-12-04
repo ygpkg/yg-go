@@ -108,8 +108,8 @@ func (ls *LocalStorage) DeleteFile(storagePath string) error {
 	return nil
 }
 
-// CopyFile 复制文件或文件夹
-func (ls *LocalStorage) CopyFile(storagePath, dest string) error {
+// CopyDir 复制文件或文件夹
+func (ls *LocalStorage) CopyDir(storagePath, dest string) error {
 	storagePath = filepath.Clean(storagePath)
 	dest = filepath.Clean(dest)
 
@@ -135,7 +135,7 @@ func (ls *LocalStorage) CopyFile(storagePath, dest string) error {
 	return ls.copyFile(srcPath, destPath)
 }
 
-// 复制文件
+// copyFile 复制文件
 func (ls *LocalStorage) copyFile(srcPath, destPath string) error {
 	// 创建目标文件的目录
 	destDir := filepath.Dir(destPath)
@@ -170,7 +170,7 @@ func (ls *LocalStorage) copyFile(srcPath, destPath string) error {
 	return nil
 }
 
-// 复制文件夹
+// copyDirectory 复制文件夹
 func (ls *LocalStorage) copyDirectory(srcPath, destPath string) error {
 	// 创建目标文件夹
 	if err := os.MkdirAll(destPath, os.ModePerm); err != nil {

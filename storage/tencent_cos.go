@@ -239,8 +239,8 @@ func (tc *TencentCos) DeleteFile(storagePath string) error {
 	return nil
 }
 
-// CopyFile 复制文件或文件夹
-func (tc *TencentCos) CopyFile(storagePath, dest string) error {
+// CopyDir 复制文件或文件夹
+func (tc *TencentCos) CopyDir(storagePath, dest string) error {
 	if storagePath == "" {
 		return fmt.Errorf("source storage path is empty")
 	}
@@ -264,7 +264,7 @@ func (tc *TencentCos) CopyFile(storagePath, dest string) error {
 	}
 }
 
-// 检查路径是否为文件夹
+// isDirectory 检查路径是否为文件夹
 func (tc *TencentCos) isDirectory(storagePath string) (bool, error) {
 	// 尝试获取对象信息
 	_, err := tc.client.Object.Head(context.Background(), storagePath, nil)
@@ -278,7 +278,7 @@ func (tc *TencentCos) isDirectory(storagePath string) (bool, error) {
 	return false, nil
 }
 
-// 复制文件
+// copyObject 复制文件
 func (tc *TencentCos) copyObject(storagePath, dest string) error {
 	_, _, err := tc.client.Object.Copy(context.Background(), dest, storagePath, nil)
 	if err != nil {
@@ -288,7 +288,7 @@ func (tc *TencentCos) copyObject(storagePath, dest string) error {
 	return nil
 }
 
-// 复制文件夹
+// copyDirectory 复制文件夹
 func (tc *TencentCos) copyDirectory(storagePath, dest string) error {
 	// 列出源文件夹中的所有对象
 	opt := &cos.BucketGetOptions{
