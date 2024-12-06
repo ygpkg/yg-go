@@ -63,7 +63,7 @@ func (s *ServicePool) refreshSetting() {
 		// 相等直接返回
 		return
 	}
-	err = s.pool.RefreshConfigs(conf)
+	err = s.pool.RefreshConfig(conf)
 	if err != nil {
 		logs.Warnw("refresh setting error", "key", s.key, "err", err)
 	}
