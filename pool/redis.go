@@ -17,14 +17,14 @@ var _ Pool = (*RedisPool)(nil)
 
 // RedisPool 实现 Pool 接口
 type RedisPool struct {
-	cli  *redis.Client
-	ctx  context.Context
-	key  string                   // 服务名
-	conf config.ServicePoolConfig //服务配置
+	cli    *redis.Client
+	ctx    context.Context
+	rdsKey string                   // 服务名
+	conf   config.ServicePoolConfig //服务配置
 }
 
 // NewRedisPool 创建一个新的 服务池 每次新建一个服务池时，会清空原有服务池
-func NewRedisPool(ctx context.Context, cli *redis.Client, key string, conf config.ServicePoolConfig) *RedisPool {
+func NewRedisPool(ctx context.Context, cli *redis.Client, rdsKey string, conf config.ServicePoolConfig) *RedisPool {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -42,7 +42,7 @@ func NewRedisPool(ctx context.Context, cli *redis.Client, key string, conf confi
 	}
 
 	// 将成员添加到 ZSET
-	err := cli.ZAdd(ctx, key, zsetMembers...).Err()
+	err := cli.ZAdd(ctx, rdsKey, zsetMembers...).Err()
 	if err != nil {
 		logs.Errorf("zadd error", err)
 		panic(err)
@@ -50,10 +50,10 @@ func NewRedisPool(ctx context.Context, cli *redis.Client, key string, conf confi
 	logs.Infof("new redis pool success")
 
 	return &RedisPool{
-		ctx:  ctx,
-		cli:  cli,
-		key:  key,
-		conf: conf,
+		ctx:    ctx,
+		cli:    cli,
+		rdsKey: rdsKey,
+		conf:   conf,
 	}
 }
 
@@ -66,30 +66,30 @@ func (rp *RedisPool) Acquire() (interface{}, error) {
 	nowNano := float64(now.UnixNano())
 	futureNano := float64(futureTime.UnixNano())
 	// 拿一个最小的
-	members, err := rp.cli.ZPopMin(rp.ctx, rp.key, 1).Result()
+	members, err := rp.cli.ZPopMin(rp.ctx, rp.rdsKey, 1).Result()
 	if err != nil {
-		logs.Warnf("no service member %s", err.Error())
+		logs.Errorf("found service member failed, %s", err.Error())
 		return nil, err
 	}
 
 	if len(members) == 0 {
-		logs.Warnf("no service member %s", rp.key)
-		return nil, fmt.Errorf("no service %s", rp.key)
+		logs.Errorf("no service member %s", rp.rdsKey)
+		return nil, fmt.Errorf("no service %s", rp.rdsKey)
 	}
 
 	minScore := members[0].Score
 	if minScore > nowNano {
 		// 没有空闲的放回去
-		err = rp.cli.ZAdd(rp.ctx, rp.key, members[0]).Err()
+		err = rp.cli.ZAdd(rp.ctx, rp.rdsKey, members[0]).Err()
 		if err != nil {
 			return nil, err
 		}
-		logs.Warnf("no service member %s", rp.key)
-		return "", fmt.Errorf("no service %s", rp.key)
+		logs.Errorf("acquire member %s failed, error %s", members[0], err)
+		return "", fmt.Errorf("no service %s", rp.rdsKey)
 	}
 	members[0].Score = futureNano
 	// 后延时间
-	err = rp.cli.ZAdd(rp.ctx, rp.key, members[0]).Err()
+	err = rp.cli.ZAdd(rp.ctx, rp.rdsKey, members[0]).Err()
 	if err != nil {
 		return nil, err
 	}
@@ -104,12 +104,12 @@ func (rp *RedisPool) Release(v interface{}) error {
 	for {
 		err := rp.cli.Watch(rp.ctx, func(tx *redis.Tx) error {
 			// 获取成员的分数
-			score, err := tx.ZScore(rp.ctx, rp.key, rz.Member.(string)).Result()
+			score, err := tx.ZScore(rp.ctx, rp.rdsKey, rz.Member.(string)).Result()
 			if err == redis.Nil {
-				logs.Warnf("member does not exist.%s", err.Error())
+				logs.Errorf("member does not exist.%s", err.Error())
 				return fmt.Errorf("member does not exist.%s", err.Error())
 			} else if err != nil {
-				logs.Warnf("ZScore error.%s", err.Error())
+				logs.Errorf("ZScore error.%s", err.Error())
 				return err
 			}
 
@@ -120,7 +120,7 @@ func (rp *RedisPool) Release(v interface{}) error {
 				_, err := tx.Pipelined(rp.ctx, func(pipe redis.Pipeliner) error {
 					// 归还，设置默认值
 					rz.Score = 0
-					return pipe.ZAdd(rp.ctx, rp.key, rz).Err()
+					return pipe.ZAdd(rp.ctx, rp.rdsKey, rz).Err()
 				})
 				if err != nil {
 					return err
@@ -133,9 +133,9 @@ func (rp *RedisPool) Release(v interface{}) error {
 				return nil
 			}
 
-		}, rp.key)
+		}, rp.rdsKey)
 		if err == redis.TxFailedErr {
-			logs.Warnf("Someone modified the data and tried again: %s", err.Error())
+			logs.Errorf("Someone modified the data and tried again: %s", err.Error())
 			// 有人修改数据重试
 			continue
 		}
@@ -202,7 +202,7 @@ func (rp *RedisPool) ReleaseString(v string) error {
 
 // Clear 清空资源池
 func (rp *RedisPool) Clear() {
-	rp.cli.ZRemRangeByRank(rp.ctx, rp.key, 0, -1)
+	rp.cli.ZRemRangeByRank(rp.ctx, rp.rdsKey, 0, -1)
 }
 
 // RefreshConfigs 重新加载配置, oldConf为旧配置, newConf为新配置
@@ -232,7 +232,7 @@ func (rp *RedisPool) RefreshConfigs(newConf config.ServicePoolConfig) error {
 							Member: member,
 						})
 					}
-					err := tx.ZAdd(rp.ctx, rp.key, zsetMembers...).Err()
+					err := tx.ZAdd(rp.ctx, rp.rdsKey, zsetMembers...).Err()
 					if err != nil {
 						return err
 					}
@@ -244,7 +244,7 @@ func (rp *RedisPool) RefreshConfigs(newConf config.ServicePoolConfig) error {
 				if _, exists := newServices[name]; !exists {
 					// removed = append(removed, delService)
 					for i := 1; i <= delService.Cap; i++ {
-						err := tx.ZRem(rp.ctx, rp.key, strconv.Itoa(i)+"_"+delService.Name).Err()
+						err := tx.ZRem(rp.ctx, rp.rdsKey, strconv.Itoa(i)+"_"+delService.Name).Err()
 						if err != nil {
 							return err
 						}
@@ -262,7 +262,7 @@ func (rp *RedisPool) RefreshConfigs(newConf config.ServicePoolConfig) error {
 							// 增加服务
 							for i := oldService.Cap + 1; i <= newService.Cap; i++ {
 								member := strconv.Itoa(i) + "_" + newService.Name
-								err := tx.ZAdd(rp.ctx, rp.key, redis.Z{
+								err := tx.ZAdd(rp.ctx, rp.rdsKey, redis.Z{
 									Score:  0, // 默认分数
 									Member: member,
 								}).Err()
@@ -273,7 +273,7 @@ func (rp *RedisPool) RefreshConfigs(newConf config.ServicePoolConfig) error {
 						} else {
 							// 减少服务
 							for i := newService.Cap + 1; i <= oldService.Cap; i++ {
-								err := tx.ZRem(rp.ctx, rp.key, strconv.Itoa(i)+"_"+newService.Name).Err()
+								err := tx.ZRem(rp.ctx, rp.rdsKey, strconv.Itoa(i)+"_"+newService.Name).Err()
 								if err != nil {
 									return err
 								}
@@ -283,7 +283,7 @@ func (rp *RedisPool) RefreshConfigs(newConf config.ServicePoolConfig) error {
 				}
 			}
 			return nil
-		}, rp.key)
+		}, rp.rdsKey)
 		if err == redis.TxFailedErr {
 			// 有人修改数据重试
 			continue

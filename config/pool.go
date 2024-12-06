@@ -18,4 +18,6 @@ type ServicePoolConfig struct {
 	Services []ServiceInfo `yaml:"services"`
 	// Expire 服务过期时间
 	Expire time.Duration `yaml:"expire"`
+	// Version 服务版本
+	Version string `yaml:"version"`
 }
