@@ -3,14 +3,13 @@ package pool
 import (
 	"container/list"
 	"sync"
+
+	"github.com/ygpkg/yg-go/config"
 )
 
 // Pool 资源池接口
 type Pool interface {
-	// Acquire 从资源池中获取一个资源
-	Acquire() (interface{}, error)
-	// Release 释放一个资源到资源池
-	Release(interface{}) error
+
 	// AcquireDecode 从资源池中获取一个资源
 	AcquireDecode(v interface{}) error
 	// ReleaseEncode 释放一个资源到资源池
@@ -21,6 +20,8 @@ type Pool interface {
 	ReleaseString(string) error
 	// Clear 清空资源池
 	Clear()
+	// RefreshConfigs 刷新配置
+	RefreshConfigs(config.ServicePoolConfig) error
 }
 
 var _ Pool = (*GoPool)(nil)
@@ -92,4 +93,9 @@ func (gp *GoPool) Clear() {
 	gp.Lock()
 	defer gp.Unlock()
 	gp.p.Init()
+}
+
+// RefreshConfigs 刷新配置
+func (gp *GoPool) RefreshConfigs(config.ServicePoolConfig) error {
+	return nil
 }
