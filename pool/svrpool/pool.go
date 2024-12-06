@@ -2,62 +2,114 @@ package svrpool
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/config"
+	"github.com/ygpkg/yg-go/dbtools/redispool"
+	"github.com/ygpkg/yg-go/lifecycle"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/pool"
 	"github.com/ygpkg/yg-go/settings"
 )
 
+// PoolManager 服务池管理器
+type PoolManager struct {
+	sync.RWMutex
+	ctx  context.Context
+	svrs map[string]*ServicePool
+}
+
+// RegistryServicePool 注册服务
+func (pm *PoolManager) RegistryServicePool(group, key string) {
+	pm.Lock()
+	defer pm.Unlock()
+	if pm.svrs == nil {
+		pm.ctx = lifecycle.Std().Context()
+		pm.svrs = make(map[string]*ServicePool)
+	}
+	if _, ok := pm.svrs[key]; ok {
+		logs.Errorw("RegistryServicePool error", "key", key, "err", "key already exists")
+		return
+	}
+
+	pm.svrs[key] = NewServicePool(context.Background(), group, key)
+	logs.Infof("RegistryServicePool %s success", key)
+}
+
+// AcquireService 获取服务
+func (pm *PoolManager) AcquireService(key string, interval time.Duration, retryTimes int) (string, error) {
+	var svr string
+	err := lifecycle.Retry(interval, retryTimes, func() (retry bool, err error) {
+		pm.RLock()
+		defer pm.RUnlock()
+		if pm.svrs == nil {
+			return true, fmt.Errorf("svrpool not init")
+		}
+		sp, ok := pm.svrs[key]
+		if ok {
+			return true, fmt.Errorf("svr %s not registered", key)
+		}
+		svr, err = sp.pool.AcquireString()
+		if err != nil {
+			return true, err
+		}
+		return false, nil
+	})
+	return svr, err
+}
+
+// ReleaseService 释放服务
+func (pm *PoolManager) ReleaseService(key string, value string) {
+	pm.RLock()
+	defer pm.RUnlock()
+	if pm.svrs == nil {
+		return
+	}
+	sp, ok := pm.svrs[key]
+	if ok {
+		sp.pool.ReleaseString(value)
+	}
+}
+
 // ServicePool 服务池
 type ServicePool struct {
 	ctx  context.Context
 	pool pool.Pool
-	// group 配置信息组名
-	group string
-	// 服务名 同时用来取配置信息
-	key string
+	// settingGroup 配置信息组名
+	settingGroup string
+	// settingKey 服务名 同时用来取配置信息
+	settingKey string
 	//服务配置
 	conf config.ServicePoolConfig
 }
 
 // NewServicePool 创建服务池
-func NewServicePool(ctx context.Context, pool pool.Pool, group, key string, conf config.ServicePoolConfig) *ServicePool {
+func NewServicePool(ctx context.Context, group, key string) *ServicePool {
+	var conf config.ServicePoolConfig
+	if err := settings.GetYaml(group, key, &conf); err != nil {
+		logs.Errorw("NewServicePool error", "key", key, "err", err)
+		return nil
+	}
+	rdsKey := svrPoolRdsKey(key)
+	rdsPool := pool.NewRedisPool(ctx, redispool.Std(), rdsKey, conf)
 	return &ServicePool{
-		ctx:   ctx,
-		pool:  pool,
-		key:   key,
-		group: group,
-		conf:  conf,
+		ctx:          ctx,
+		pool:         rdsPool,
+		settingKey:   key,
+		settingGroup: group,
+		conf:         conf,
 	}
-}
-
-// NewServicePoolWithRedis 创建服务池
-func NewServicePoolWithRedis(ctx context.Context, rdscli *redis.Client, group, key string) *ServicePool {
-	setting, err := loadSetting(group, key)
-	if err != nil {
-		panic(err)
-	}
-	pool := pool.NewRedisPool(ctx, rdscli, key, setting)
-	sp := NewServicePool(ctx, pool, group, key, setting)
-	go func() {
-		for {
-			time.Sleep(time.Minute * 2)
-			sp.refreshSetting()
-		}
-	}()
-	logs.Infof("loadSetting success")
-	return sp
 }
 
 // refreshSetting 定时刷新服务配置
 func (s *ServicePool) refreshSetting() {
-	conf, err := loadSetting(s.group, s.key)
+	conf, err := loadSetting(s.settingGroup, s.settingKey)
 	if err != nil {
-		logs.Warnw("loadSetting error", "key", s.key, "err", err)
+		logs.Errorw("loadSetting error", "key", s.settingKey, "err", err)
+		return
 	}
 	if reflect.DeepEqual(conf, s.conf) {
 		// 相等直接返回
@@ -65,7 +117,7 @@ func (s *ServicePool) refreshSetting() {
 	}
 	err = s.pool.RefreshConfig(conf)
 	if err != nil {
-		logs.Warnw("refresh setting error", "key", s.key, "err", err)
+		logs.Errorw("refresh setting error", "key", s.settingKey, "err", err)
 	}
 	logs.Infof("refresh residpool setting success")
 }
@@ -79,4 +131,8 @@ func loadSetting(group, key string) (config.ServicePoolConfig, error) {
 		return conf, err
 	}
 	return conf, nil
+}
+
+func svrPoolRdsKey(key string) string {
+	return "svrpool:" + key
 }

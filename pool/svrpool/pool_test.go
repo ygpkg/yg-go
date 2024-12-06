@@ -14,7 +14,7 @@ import (
 )
 
 func TestSvrPool(t *testing.T) {
-	rdsCli, err := redispool.InitRedisWithConfig(&redis.Options{
+	_, err := redispool.InitRedisWithConfig(&redis.Options{
 		Addr:     "127.0.0.1:6379",
 		Password: "skf021120",
 		DB:       1,
@@ -24,7 +24,8 @@ func TestSvrPool(t *testing.T) {
 		return
 	}
 	db()
-	rp := NewServicePoolWithRedis(context.Background(), rdsCli, "core", "test:now")
+
+	rp := NewServicePool(context.Background(), "core", "test:now")
 	var v map[string]interface{}
 	rp.pool.AcquireDecode(&v)
 	fmt.Println("111111111111111111111111", v)
