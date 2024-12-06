@@ -24,13 +24,19 @@ func TestHashPool(t *testing.T) {
 		Name: "chatgpt.com",
 		Cap:  2,
 	}
-	servers := config.ServicePoolConfig{}
+	servers := config.ServicePoolConfig{Expire: 10 * time.Second}
 	servers.Services = append(servers.Services, a, b)
-	duration := 1 * time.Hour
-	rsh := NewRedisHashPool(context.Background(), client, duration, "knownow", "know", servers)
-	aa, _ := rsh.AcquireKeyIndex("deepseek.com")
-	bb, _ := rsh.AcquireKeyIndex("chatgpt.com")
-	fmt.Println(aa, bb)
-	time.Sleep(2 * time.Minute)
-	rsh.ReleaseKeyIndex("1_deepseek.com")
+	rsh := NewRedisPool(context.Background(), client, "knownow:konw", servers)
+
+	f, err := rsh.Acquire()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(f)
+	bb, _ := rsh.Acquire()
+	fmt.Println(bb)
+	time.Sleep(1 * time.Minute)
+	rsh.Release(f)
+	aa, _ := rsh.Acquire()
+	fmt.Println(aa)
 }

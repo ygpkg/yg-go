@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 // ServiceInfo 服务信息
 type ServiceInfo struct {
 	// Name 服务名称, 用于标识服务, 例如: mysql, redis
@@ -14,4 +16,6 @@ type ServiceInfo struct {
 type ServicePoolConfig struct {
 	// Services 服务配置
 	Services []ServiceInfo `yaml:"services"`
+	// Expire 服务过期时间
+	Expire time.Duration `yaml:"expire"`
 }

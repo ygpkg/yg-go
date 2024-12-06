@@ -1,27 +1,50 @@
 package svrpool
 
 import (
+	"context"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/ygpkg/yg-go/config"
+	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/dbtools/redispool"
+	"github.com/ygpkg/yg-go/logs"
 )
 
 func TestSvrPool(t *testing.T) {
-	rdsCli, err := redispool.InitRedisWithConfig(&redis.Options{})
+	rdsCli, err := redispool.InitRedisWithConfig(&redis.Options{
+		Addr:     "127.0.0.1:6379",
+		Password: "",
+		DB:       1,
+	})
 	if err != nil {
 		t.Skip(err)
 		return
 	}
-	p := NewServicePoolWithRedis(nil, rdsCli, "test")
-	p.WithSetting("group", "key", 0)
-	pool := p.Pool()
-	svr, err := pool.AcquireString()
+	db()
+	rp := NewServicePoolWithRedis(context.Background(), rdsCli, "core", "test:now")
+	var v map[string]interface{}
+	rp.pool.AcquireDecode(&v)
+	fmt.Println("111111111111111111111111", v)
+	time.Sleep(time.Minute * 3)
+	rp.pool.ReleaseEncode(v)
+	time.Sleep(time.Minute * 10)
+}
+
+func db() {
+	cfg, err := config.LoadCoreConfigFromFile("path/to/config")
 	if err != nil {
-		t.Error(err)
+		fmt.Println(err)
 		return
 	}
-	defer pool.ReleaseString(svr)
+	err = dbtools.InitMutilMySQL(cfg.MainConf.MysqlConns)
+	if err != nil {
+		logs.Errorf("[main] connect mysql failed, %s", err)
+		return
+	}
+	db := dbtools.Core()
+	db.Logger = logs.GetGorm("gorm")
 
-	t.Log(svr)
 }
