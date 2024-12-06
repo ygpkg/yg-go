@@ -3,15 +3,15 @@ package lifecycle
 import "time"
 
 // Retry 重試
-func Retry(attempts int, sleep int, fn func() (error, bool)) (err error) {
+func Retry(interval time.Duration, retryTimes int, fn func() (needRetry bool, err error)) (err error) {
 	var needContinue bool
-	for i := 0; i < attempts; i++ {
-		err, needContinue = fn()
+	for i := 0; i < retryTimes; i++ {
+		needContinue, err = fn()
 		if !needContinue {
 			return err
 		}
-		if sleep > 0 {
-			time.Sleep(time.Duration(sleep) * time.Second)
+		if interval > 0 {
+			time.Sleep(interval)
 		}
 	}
 	return

@@ -2,6 +2,7 @@ package svrpool
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"sync"
 	"time"
@@ -39,17 +40,25 @@ func (pm *PoolManager) RegistryServicePool(group, key string) {
 }
 
 // AcquireService 获取服务
-func (pm *PoolManager) AcquireService(key string, ttl time.Duration, retryTimes int64) (string, error) {
-	pm.RLock()
-	defer pm.RUnlock()
-	if pm.svrs == nil {
-		return "", nil
-	}
-	sp, ok := pm.svrs[key]
-	if ok {
-		return "", nil
-	}
-	return sp.pool.AcquireString()
+func (pm *PoolManager) AcquireService(key string, interval time.Duration, retryTimes int) (string, error) {
+	var svr string
+	err := lifecycle.Retry(interval, retryTimes, func() (retry bool, err error) {
+		pm.RLock()
+		defer pm.RUnlock()
+		if pm.svrs == nil {
+			return true, fmt.Errorf("svrpool not init")
+		}
+		sp, ok := pm.svrs[key]
+		if ok {
+			return true, fmt.Errorf("svr %s not registered", key)
+		}
+		svr, err = sp.pool.AcquireString()
+		if err != nil {
+			return true, err
+		}
+		return false, nil
+	})
+	return svr, err
 }
 
 // ReleaseService 释放服务
