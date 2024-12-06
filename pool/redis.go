@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strconv"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/config"
+	"github.com/ygpkg/yg-go/dbtools/redispool"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -29,32 +29,17 @@ func NewRedisPool(ctx context.Context, cli *redis.Client, rdsKey string, conf co
 		ctx = context.Background()
 	}
 
-	// 添加成员到 ZSET
-	zsetMembers := []redis.Z{}
-	for _, v := range conf.Services {
-		for i := 1; i <= v.Cap; i++ {
-			member := strconv.Itoa(i) + "_" + v.Name
-			zsetMembers = append(zsetMembers, redis.Z{
-				Score:  0, // 默认分数
-				Member: member,
-			})
-		}
-	}
-
-	// 将成员添加到 ZSET
-	err := cli.ZAdd(ctx, rdsKey, zsetMembers...).Err()
-	if err != nil {
-		logs.Errorf("zadd error", err)
-		panic(err)
-	}
-	logs.Infof("new redis pool success")
-
-	return &RedisPool{
+	rp := &RedisPool{
 		ctx:    ctx,
 		cli:    cli,
 		rdsKey: rdsKey,
-		conf:   conf,
+		conf:   config.ServicePoolConfig{},
 	}
+	err := rp.RefreshConfig(conf)
+	if err != nil {
+		panic(err)
+	}
+	return rp
 }
 
 // Acquire 从资源池中获取一个资源, 返回值为redis.z
@@ -205,94 +190,74 @@ func (rp *RedisPool) Clear() {
 	rp.cli.ZRemRangeByRank(rp.ctx, rp.rdsKey, 0, -1)
 }
 
-// RefreshConfigs 重新加载配置, oldConf为旧配置, newConf为新配置
-func (rp *RedisPool) RefreshConfigs(newConf config.ServicePoolConfig) error {
-	// 比较服务列表
-	oldServices := make(map[string]config.ServiceInfo)
-	newServices := make(map[string]config.ServiceInfo)
+// RefreshConfig 刷新配置
+func (rp *RedisPool) RefreshConfig(newConf config.ServicePoolConfig) error {
+	// 获取旧配置和新配置的所有成员
+	oldMembers := generateMembers(rp.conf.Services)
+	newMembers := generateMembers(newConf.Services)
 
-	for _, service := range rp.conf.Services {
-		oldServices[service.Name] = service
+	// 找出新增的和被删除的成员
+	membersToAdd := diff(newMembers, oldMembers)
+	membersToRemove := diff(oldMembers, newMembers)
+
+	// 锁 如果不存在时加锁会报错
+	err := redispool.Lock(redisLock(rp.rdsKey), 5*time.Second)
+	if err != nil {
+		logs.Errorf("refreshConfig failed to lock")
+		return err
 	}
+	defer redispool.UnLock(redisLock(rp.rdsKey))
 
-	for _, service := range newConf.Services {
-		newServices[service.Name] = service
-	}
-	for {
-		err := rp.cli.Watch(rp.ctx, func(tx *redis.Tx) error {
-			// 找出新增的服务
-			for name, newService := range newServices {
-				if _, exists := oldServices[name]; !exists {
-					// added = append(added, newService)
-					zsetMembers := []redis.Z{}
-					for i := 1; i <= newService.Cap; i++ {
-						member := strconv.Itoa(i) + "_" + newService.Name
-						zsetMembers = append(zsetMembers, redis.Z{
-							Score:  0, // 默认分数
-							Member: member,
-						})
-					}
-					err := tx.ZAdd(rp.ctx, rp.rdsKey, zsetMembers...).Err()
-					if err != nil {
-						return err
-					}
-				}
-			}
-
-			// 找出被删除的服务
-			for name, delService := range oldServices {
-				if _, exists := newServices[name]; !exists {
-					// removed = append(removed, delService)
-					for i := 1; i <= delService.Cap; i++ {
-						err := tx.ZRem(rp.ctx, rp.rdsKey, strconv.Itoa(i)+"_"+delService.Name).Err()
-						if err != nil {
-							return err
-						}
-					}
-				}
-			}
-
-			// 找出配置发生变化的服务
-			for name, newService := range newServices {
-				if oldService, exists := oldServices[name]; exists {
-					if !reflect.DeepEqual(oldService, newService) {
-						// fmt.Printf("Service %s config changed from %+v to %+v\n", name, oldService, newService)
-						// changed = append(changed, newService)
-						if newService.Cap > oldService.Cap {
-							// 增加服务
-							for i := oldService.Cap + 1; i <= newService.Cap; i++ {
-								member := strconv.Itoa(i) + "_" + newService.Name
-								err := tx.ZAdd(rp.ctx, rp.rdsKey, redis.Z{
-									Score:  0, // 默认分数
-									Member: member,
-								}).Err()
-								if err != nil {
-									return err
-								}
-							}
-						} else {
-							// 减少服务
-							for i := newService.Cap + 1; i <= oldService.Cap; i++ {
-								err := tx.ZRem(rp.ctx, rp.rdsKey, strconv.Itoa(i)+"_"+newService.Name).Err()
-								if err != nil {
-									return err
-								}
-							}
-						}
-					}
-				}
-			}
-			return nil
-		}, rp.rdsKey)
-		if err == redis.TxFailedErr {
-			// 有人修改数据重试
-			continue
+	// 批量添加和删除
+	if len(membersToAdd) > 0 {
+		zAddOps := make([]redis.Z, 0, len(membersToAdd))
+		for _, member := range membersToAdd {
+			zAddOps = append(zAddOps, redis.Z{Score: 0, Member: member})
 		}
-		if err != nil {
-			return err
+		if err := rp.cli.ZAdd(rp.ctx, rp.rdsKey, zAddOps...).Err(); err != nil {
+			logs.Errorf("failed to add members: %w", err)
+			return fmt.Errorf("failed to add members: %w", err)
 		}
-		// 更换成功，更新配置
-		rp.conf = newConf
-		return nil
 	}
+	if len(membersToRemove) > 0 {
+		// 将 []string 转为 []interface{}
+		membersToRemoveInterface := make([]interface{}, len(membersToRemove))
+		for i, member := range membersToRemove {
+			membersToRemoveInterface[i] = member
+		}
+		if err := rp.cli.ZRem(rp.ctx, rp.rdsKey, membersToRemoveInterface...).Err(); err != nil {
+			logs.Errorf("failed to remove members: %w", err)
+			return fmt.Errorf("failed to remove members: %w", err)
+		}
+	}
+	redispool.UnLock(redisLock(rp.rdsKey))
+	rp.conf = newConf
+	return nil
+}
+
+// generateMembers 生成服务对应的所有成员
+func generateMembers(services []config.ServiceInfo) map[string]struct{} {
+	members := make(map[string]struct{})
+	for _, service := range services {
+		for i := 1; i <= service.Cap; i++ {
+			member := strconv.Itoa(i) + "_" + service.Name
+			members[member] = struct{}{}
+		}
+	}
+	return members
+}
+
+// diff 返回在 source 中存在，但在 target 中不存在的元素
+func diff(source, target map[string]struct{}) []string {
+	result := []string{}
+	for member := range source {
+		if _, exists := target[member]; !exists {
+			result = append(result, member)
+		}
+	}
+	return result
+}
+
+func redisLock(key string) string {
+	return key + "_lock"
 }

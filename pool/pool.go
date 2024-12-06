@@ -21,7 +21,7 @@ type Pool interface {
 	// Clear 清空资源池
 	Clear()
 	// RefreshConfigs 刷新配置
-	RefreshConfigs(config.ServicePoolConfig) error
+	RefreshConfig(config.ServicePoolConfig) error
 }
 
 var _ Pool = (*GoPool)(nil)
@@ -96,6 +96,6 @@ func (gp *GoPool) Clear() {
 }
 
 // RefreshConfigs 刷新配置
-func (gp *GoPool) RefreshConfigs(config.ServicePoolConfig) error {
+func (gp *GoPool) RefreshConfig(config.ServicePoolConfig) error {
 	return nil
 }
