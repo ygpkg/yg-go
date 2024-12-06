@@ -29,32 +29,17 @@ func NewRedisPool(ctx context.Context, cli *redis.Client, rdsKey string, conf co
 		ctx = context.Background()
 	}
 
-	// 添加成员到 ZSET
-	zsetMembers := []redis.Z{}
-	for _, v := range conf.Services {
-		for i := 1; i <= v.Cap; i++ {
-			member := strconv.Itoa(i) + "_" + v.Name
-			zsetMembers = append(zsetMembers, redis.Z{
-				Score:  0, // 默认分数
-				Member: member,
-			})
-		}
-	}
-
-	// 将成员添加到 ZSET
-	err := cli.ZAdd(ctx, rdsKey, zsetMembers...).Err()
-	if err != nil {
-		logs.Errorf("zadd error", err)
-		panic(err)
-	}
-	logs.Infof("new redis pool success")
-
-	return &RedisPool{
+	rp := &RedisPool{
 		ctx:    ctx,
 		cli:    cli,
 		rdsKey: rdsKey,
-		conf:   conf,
+		conf:   config.ServicePoolConfig{},
 	}
+	err := rp.RefreshConfig(conf)
+	if err != nil {
+		panic(err)
+	}
+	return rp
 }
 
 // Acquire 从资源池中获取一个资源, 返回值为redis.z
@@ -215,13 +200,13 @@ func (rp *RedisPool) RefreshConfig(newConf config.ServicePoolConfig) error {
 	membersToAdd := diff(newMembers, oldMembers)
 	membersToRemove := diff(oldMembers, newMembers)
 
-	// 锁
-	err := redispool.Lock(rp.key, 5*time.Second)
+	// 锁 如果不存在时加锁会报错
+	err := redispool.Lock(redisLock(rp.rdsKey), 5*time.Second)
 	if err != nil {
 		logs.Errorf("refreshConfig failed to lock")
 		return err
 	}
-	defer redispool.UnLock(rp.key)
+	defer redispool.UnLock(redisLock(rp.rdsKey))
 
 	// 批量添加和删除
 	if len(membersToAdd) > 0 {
@@ -229,7 +214,7 @@ func (rp *RedisPool) RefreshConfig(newConf config.ServicePoolConfig) error {
 		for _, member := range membersToAdd {
 			zAddOps = append(zAddOps, redis.Z{Score: 0, Member: member})
 		}
-		if err := rp.cli.ZAdd(rp.ctx, rp.key, zAddOps...).Err(); err != nil {
+		if err := rp.cli.ZAdd(rp.ctx, rp.rdsKey, zAddOps...).Err(); err != nil {
 			logs.Errorf("failed to add members: %w", err)
 			return fmt.Errorf("failed to add members: %w", err)
 		}
@@ -240,12 +225,13 @@ func (rp *RedisPool) RefreshConfig(newConf config.ServicePoolConfig) error {
 		for i, member := range membersToRemove {
 			membersToRemoveInterface[i] = member
 		}
-		if err := rp.cli.ZRem(rp.ctx, rp.key, membersToRemoveInterface...).Err(); err != nil {
+		if err := rp.cli.ZRem(rp.ctx, rp.rdsKey, membersToRemoveInterface...).Err(); err != nil {
 			logs.Errorf("failed to remove members: %w", err)
 			return fmt.Errorf("failed to remove members: %w", err)
 		}
 	}
-	redispool.UnLock(rp.key)
+	redispool.UnLock(redisLock(rp.rdsKey))
+	rp.conf = newConf
 	return nil
 }
 
@@ -270,4 +256,8 @@ func diff(source, target map[string]struct{}) []string {
 		}
 	}
 	return result
+}
+
+func redisLock(key string) string {
+	return key + "_lock"
 }

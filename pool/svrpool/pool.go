@@ -36,6 +36,13 @@ func (pm *PoolManager) RegistryServicePool(group, key string) {
 	}
 
 	pm.svrs[key] = NewServicePool(context.Background(), group, key)
+	go func() {
+		for {
+			//五分钟刷新
+			time.Sleep(time.Minute * 5)
+			pm.svrs[key].refreshSetting()
+		}
+	}()
 	logs.Infof("RegistryServicePool %s success", key)
 }
 
@@ -95,6 +102,7 @@ func NewServicePool(ctx context.Context, group, key string) *ServicePool {
 	}
 	rdsKey := svrPoolRdsKey(key)
 	rdsPool := pool.NewRedisPool(ctx, redispool.Std(), rdsKey, conf)
+
 	return &ServicePool{
 		ctx:          ctx,
 		pool:         rdsPool,
@@ -119,6 +127,7 @@ func (s *ServicePool) refreshSetting() {
 	if err != nil {
 		logs.Errorw("refresh setting error", "key", s.settingKey, "err", err)
 	}
+	s.conf = conf
 	logs.Infof("refresh residpool setting success")
 }
 
