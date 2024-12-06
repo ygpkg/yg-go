@@ -16,7 +16,7 @@ import (
 func TestSvrPool(t *testing.T) {
 	rdsCli, err := redispool.InitRedisWithConfig(&redis.Options{
 		Addr:     "127.0.0.1:6379",
-		Password: "",
+		Password: "skf021120",
 		DB:       1,
 	})
 	if err != nil {
@@ -34,7 +34,7 @@ func TestSvrPool(t *testing.T) {
 }
 
 func db() {
-	cfg, err := config.LoadCoreConfigFromFile("path/to/config")
+	cfg, err := config.LoadCoreConfigFromFile("D:\\GoProject\\src\\roc\\apps\\llm\\conf\\test\\config.yaml")
 	if err != nil {
 		fmt.Println(err)
 		return

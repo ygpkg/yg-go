@@ -143,6 +143,7 @@ func (rp *RedisPool) Release(v interface{}) error {
 			logs.Errorf("watch error %s", err.Error())
 			return err
 		}
+		logs.Infof("release success %s", rz.Member.(string))
 		return nil
 	}
 }
