@@ -13,13 +13,13 @@ type authInjectors struct {
 	defaultInjector auth.InjectorFunc
 }
 
-func (ai *authInjectors) AuthInject(name string, injector auth.InjectorFunc) {
-	if _, ok := ai.injectors[name]; ok {
-		panic("injector name is already exists")
+func (ai *authInjectors) AuthInject(issuer string, injector auth.InjectorFunc) {
+	if _, ok := ai.injectors[issuer]; ok {
+		panic("injector issuer is already exists")
 	}
-	logs.Infof("register auth injector: %s", name)
-	ai.injectors[name] = injector
-	if name == "" {
+	logs.Infof("register auth injector: %s", issuer)
+	ai.injectors[issuer] = injector
+	if issuer == "" {
 		ai.defaultInjector = injector
 	}
 }

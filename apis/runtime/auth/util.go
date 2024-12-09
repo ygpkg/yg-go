@@ -1,5 +1,7 @@
 package auth
 
+import "errors"
+
 type LoginWay uint8 // 登录方式
 
 const (
@@ -18,4 +20,11 @@ const (
 	LoginWayGithub LoginWay = 6
 	// LoginWayWorkWechat 企业微信
 	LoginWayWorkWechat LoginWay = 7
+)
+
+var (
+	// ErrInvalidAudience 无效的audience
+	ErrInvalidAudience = errors.New("invalid audience")
+	// ErrInvalidLoginWay 无效的登录方式
+	ErrInvalidLoginWay = errors.New("invalid login way")
 )
