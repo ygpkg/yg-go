@@ -26,11 +26,11 @@ func TestSvrPool(t *testing.T) {
 	db()
 
 	rp := NewServicePool(context.Background(), "core", "test:now")
-	var v map[string]interface{}
-	rp.pool.AcquireDecode(&v)
+
+	id, v, err := rp.pool.AcquireString()
 	fmt.Println("111111111111111111111111", v)
 	time.Sleep(time.Minute * 3)
-	rp.pool.ReleaseEncode(v)
+	rp.pool.ReleaseString(id)
 	time.Sleep(time.Minute * 10)
 }
 

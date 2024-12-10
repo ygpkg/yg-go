@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/pool"
 )
 
 var std *PoolManager
@@ -18,16 +19,16 @@ func RegistryServicePool(group, key string) {
 }
 
 // AcquireService 获取服务
-func AcquireService(key string, interval time.Duration, retryTimes int) (string, error) {
+func AcquireService(key string, interval time.Duration, retryTimes int) (pool.ResourceID, string, error) {
 	if std == nil {
 		logs.Errorf("svrpool not init")
-		return "", fmt.Errorf("svrpool not init")
+		return "", "", fmt.Errorf("svrpool not init")
 	}
 	return std.AcquireService(key, interval, retryTimes)
 }
 
 // ReleaseService 释放服务
-func ReleaseService(key string, value string) {
+func ReleaseService(key string, value pool.ResourceID) {
 	if std == nil {
 		logs.Errorf("svrpool not init")
 		return

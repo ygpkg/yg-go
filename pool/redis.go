@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -133,52 +134,27 @@ func (rp *RedisPool) Release(v interface{}) error {
 	}
 }
 
-// AcquireDecode 从资源池中获取一个资源, 并json解析到v
-func (rp *RedisPool) AcquireDecode(v interface{}) error {
-	rz, err := rp.Acquire()
-	if err != nil {
-		return err
-	}
-	// 将字典转换为 JSON 字符串
-	jsonData, err := json.Marshal(rz)
-	if err != nil {
-		return fmt.Errorf("JSON encoding failed:" + err.Error())
-	}
-	return json.Unmarshal(jsonData, &v)
-}
-
-// ReleaseEncode 释放一个资源到资源池, 并json编码
-func (rp *RedisPool) ReleaseEncode(v interface{}) error {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-	var rz redis.Z
-	err = json.Unmarshal(data, &rz)
-	if err != nil {
-		return err
-	}
-	rp.Release(rz)
-	return nil
-}
-
 // AcquireString 从资源池中获取一个资源, 返回值为string
-func (rp *RedisPool) AcquireString() (string, error) {
+func (rp *RedisPool) AcquireString() (ResourceID, string, error) {
 	rz, err := rp.Acquire()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	data, err := json.Marshal(rz)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	return string(data), nil
+	sli := strings.SplitN(string(data), "_", 2)
+	if len(sli) == 2 {
+		return string(data), sli[1], nil
+	}
+	return "", "", fmt.Errorf("split key encoding failed: %s", data)
 }
 
 // ReleaseString 释放一个资源到资源池, v为string
-func (rp *RedisPool) ReleaseString(v string) error {
+func (rp *RedisPool) ReleaseString(id ResourceID) error {
 	var rz redis.Z
-	err := json.Unmarshal([]byte(v), &rz)
+	err := json.Unmarshal([]byte(id), &rz)
 	if err != nil {
 		return err
 	}

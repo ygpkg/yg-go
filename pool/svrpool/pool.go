@@ -47,8 +47,11 @@ func (pm *PoolManager) RegistryServicePool(group, key string) {
 }
 
 // AcquireService 获取服务
-func (pm *PoolManager) AcquireService(key string, interval time.Duration, retryTimes int) (string, error) {
-	var svr string
+func (pm *PoolManager) AcquireService(key string, interval time.Duration, retryTimes int) (pool.ResourceID, string, error) {
+	var (
+		id  pool.ResourceID
+		svr string
+	)
 	err := lifecycle.Retry(interval, retryTimes, func() (retry bool, err error) {
 		pm.RLock()
 		defer pm.RUnlock()
@@ -59,17 +62,17 @@ func (pm *PoolManager) AcquireService(key string, interval time.Duration, retryT
 		if !ok {
 			return true, fmt.Errorf("svr %s not registered", key)
 		}
-		svr, err = sp.pool.AcquireString()
+		id, svr, err = sp.pool.AcquireString()
 		if err != nil {
 			return true, err
 		}
 		return false, nil
 	})
-	return svr, err
+	return id, svr, err
 }
 
 // ReleaseService 释放服务
-func (pm *PoolManager) ReleaseService(key string, value string) {
+func (pm *PoolManager) ReleaseService(key string, id pool.ResourceID) {
 	pm.RLock()
 	defer pm.RUnlock()
 	if pm.svrs == nil {
@@ -77,7 +80,7 @@ func (pm *PoolManager) ReleaseService(key string, value string) {
 	}
 	sp, ok := pm.svrs[key]
 	if ok {
-		sp.pool.ReleaseString(value)
+		sp.pool.ReleaseString(id)
 	}
 }
 
