@@ -56,7 +56,7 @@ func (pm *PoolManager) AcquireService(key string, interval time.Duration, retryT
 			return true, fmt.Errorf("svrpool not init")
 		}
 		sp, ok := pm.svrs[key]
-		if ok {
+		if !ok {
 			return true, fmt.Errorf("svr %s not registered", key)
 		}
 		svr, err = sp.pool.AcquireString()
