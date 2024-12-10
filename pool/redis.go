@@ -45,7 +45,7 @@ func NewRedisPool(ctx context.Context, cli *redis.Client, rdsKey string, conf co
 
 // Acquire 从资源池中获取一个资源, 返回值为redis.z
 // 不需要key
-func (rp *RedisPool) Acquire() (interface{}, error) {
+func (rp *RedisPool) Acquire() (*redis.Z, error) {
 	// 获取时间变量
 	now := time.Now()
 	futureTime := now.Add(rp.conf.Expire)
@@ -71,21 +71,21 @@ func (rp *RedisPool) Acquire() (interface{}, error) {
 			return nil, err
 		}
 		logs.Errorf("acquire member %s failed, error %s", members[0], err)
-		return "", fmt.Errorf("no service %s", rp.rdsKey)
+		return nil, fmt.Errorf("no service %s", rp.rdsKey)
 	}
-	members[0].Score = futureNano
+	ret := members[0]
+	ret.Score = futureNano
 	// 后延时间
-	err = rp.cli.ZAdd(rp.ctx, rp.rdsKey, members[0]).Err()
+	err = rp.cli.ZAdd(rp.ctx, rp.rdsKey, ret).Err()
 	if err != nil {
 		return nil, err
 	}
-	logs.Infof("acquire success %s", members[0].Member.(string))
-	return members[0], nil
+	logs.Infof("acquire success %s", ret.Member.(string))
+	return &ret, nil
 }
 
 // Release 释放一个资源到资源池, v为redis.z
-func (rp *RedisPool) Release(v interface{}) error {
-	rz := v.(redis.Z)
+func (rp *RedisPool) Release(rz *redis.Z) error {
 	// 使用 WATCH 来监视键
 	for {
 		err := rp.cli.Watch(rp.ctx, func(tx *redis.Tx) error {
@@ -106,18 +106,17 @@ func (rp *RedisPool) Release(v interface{}) error {
 				_, err := tx.Pipelined(rp.ctx, func(pipe redis.Pipeliner) error {
 					// 归还，设置默认值
 					rz.Score = 0
-					return pipe.ZAdd(rp.ctx, rp.rdsKey, rz).Err()
+					return pipe.ZAdd(rp.ctx, rp.rdsKey, *rz).Err()
 				})
 				if err != nil {
 					return err
 				}
 				return nil
-			} else {
-				// 不相等没有归还，但是也相当于归还成功
-				// return fmt.Errorf("score not match")
-				// 日志
-				return nil
 			}
+			// 不相等没有归还，但是也相当于归还成功
+			// return fmt.Errorf("score not match")
+			// 日志
+			return nil
 
 		}, rp.rdsKey)
 		if err == redis.TxFailedErr {
@@ -140,25 +139,24 @@ func (rp *RedisPool) AcquireString() (ResourceID, string, error) {
 	if err != nil {
 		return "", "", err
 	}
-	data, err := json.Marshal(rz)
-	if err != nil {
-		return "", "", err
-	}
-	sli := strings.SplitN(string(data), "_", 2)
+	data := rz.Member.(string)
+	sli := strings.SplitN(data, "_", 2)
 	if len(sli) == 2 {
-		return string(data), sli[1], nil
+		return data, sli[1], nil
 	}
 	return "", "", fmt.Errorf("split key encoding failed: %s", data)
 }
 
 // ReleaseString 释放一个资源到资源池, v为string
-func (rp *RedisPool) ReleaseString(id ResourceID) error {
-	var rz redis.Z
+func (rp *RedisPool) ReleaseString(id string) error {
+	rz := redis.Z{
+		Member: id,
+	}
 	err := json.Unmarshal([]byte(id), &rz)
 	if err != nil {
 		return err
 	}
-	return rp.Release(rz)
+	return rp.Release(&rz)
 }
 
 // Clear 清空资源池
