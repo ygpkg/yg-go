@@ -138,3 +138,23 @@ func IsNearbyTime(t time.Time, intervals ...time.Duration) error {
 	}
 	return nil
 }
+
+// IsDocumentNumber 是否是公开公告号
+func IsDocumentNumber(value string) bool {
+	reg := `^[a-zA-Z]{2}\d+[a-zA-Z]$`
+	rgx := regexp.MustCompile(reg)
+	if rgx.MatchString(value) {
+		return true
+	}
+	return false
+}
+
+// IsApplicationNumber 是否是申请号
+func IsApplicationNumber(value string) bool {
+	reg := `^[a-zA-Z]{2}\d*\.\d$`
+	rgx := regexp.MustCompile(reg)
+	if rgx.MatchString(value) {
+		return true
+	}
+	return false
+}
