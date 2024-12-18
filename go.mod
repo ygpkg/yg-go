@@ -14,7 +14,7 @@ require (
 	github.com/silenceper/wechat/v2 v2.1.6
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
-	github.com/tencentcloud/tencentcloud-cls-sdk-go v1.0.9
+	github.com/tencentcloud/tencentcloud-cls-sdk-go v1.0.11
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.58
 	github.com/xen0n/go-workwx v1.7.0
 	go.uber.org/zap v1.27.0
