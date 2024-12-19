@@ -1,7 +1,6 @@
 package sms
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common"
@@ -36,16 +35,12 @@ func sendVerifyCodeByTencent(cfg *config.SMSConfig, phone string, code string) e
 	request.TemplateParamSet = common.StringPtrs([]string{code})
 	// 手机号 最多50个
 	request.PhoneNumberSet = common.StringPtrs([]string{phone})
-	resp, err := client.SendSms(request)
+	_, err := client.SendSms(request)
 	if _, ok := err.(*errors.TencentCloudSDKError); ok {
 		return fmt.Errorf("an api error has returned: %s", err)
 	}
 	if err != nil {
 		return err
 	}
-	// 测试
-	b, _ := json.Marshal(resp.Response)
-	// 打印返回的json字符串
-	fmt.Printf("%s", b)
 	return nil
 }
