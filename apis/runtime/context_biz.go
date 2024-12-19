@@ -25,3 +25,8 @@ func CustomerID(ctx *gin.Context) uint {
 func AccountID(ctx *gin.Context) uint {
 	return LoginStatus(ctx).GetID(constants.CtxKeyAccountID)
 }
+
+// Uin uin
+func Uin(ctx *gin.Context) uint {
+	return LoginStatus(ctx).GetID(constants.CtxKeyUin)
+}

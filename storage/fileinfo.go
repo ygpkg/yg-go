@@ -37,6 +37,8 @@ type FileInfo struct {
 
 	// CompanyID 公司ID
 	CompanyID uint `gorm:"column:company_id" json:"company_id"`
+	// Uin 用户ID
+	Uin uint `gorm:"column:uin" json:"uin"`
 	// CustomerID 内容所属客户ID
 	CustomerID uint `gorm:"column:customer_id" json:"customer_id"`
 	// EmployeeID 内容所属员工ID
