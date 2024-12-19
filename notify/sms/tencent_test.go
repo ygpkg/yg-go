@@ -18,14 +18,15 @@ func TestSendVerifyCodeByTencent(t *testing.T) {
 			TencentConfig: config.TencentConfig{
 				SecretID:  "",
 				SecretKey: "",
-				Region:    "ap-beijing",
+				Region:    "",
 				Endpoint:  "",
 			},
 		},
+		// 填模板id
 		TemplateCode: "",
 		SignName:     "言古科技",
 	}
-	err := sendVerifyCodeByAliyun(cfg, "", "321456")
+	err := sendVerifyCodeByTencent(cfg, "13333333333", "321456")
 	if err != nil {
 		t.Error(err)
 	}
