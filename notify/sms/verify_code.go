@@ -43,7 +43,10 @@ func SendVerifyCode(group, key, phone, code, outid string) error {
 			logs.Errorf("sendVerifyCodeByAliyun failed ,err %s", err)
 		}
 	} else if cfg.Tencent != nil {
-		// TODO
+		err = sendVerifyCodeByTencent(cfg, phone, code)
+		if err != nil {
+			logs.Errorf("sendVerifyCodeByTencent failed ,err %s", err)
+		}
 	} else {
 		err = fmt.Errorf("sms config is empty")
 	}

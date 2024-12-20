@@ -27,10 +27,16 @@ func (c NotifyConfig) WecomApp(name string) WecomApp {
 
 type SMSConfig struct {
 	// Aliyun 阿里云短信
-	Aliyun       *AliConfig     `yaml:"aliyun"`
-	Tencent      *TencentConfig `yaml:"tencent"`
-	SignName     string         `yaml:"sign_name"`
-	TemplateCode string         `yaml:"template_code"`
+	Aliyun       *AliConfig        `yaml:"aliyun"`
+	Tencent      *TencentSMSConfig `yaml:"tencent"`
+	SignName     string            `yaml:"sign_name"`
+	TemplateCode string            `yaml:"template_code"`
+}
+
+// TencentCOSConfig 腾讯云对象存储配置
+type TencentSMSConfig struct {
+	TencentConfig `yaml:",inline"`
+	SmsSdkAppId   string `yaml:"sms_sdk_app_id"`
 }
 
 var s = ``
