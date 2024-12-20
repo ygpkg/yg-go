@@ -15,6 +15,8 @@ require (
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/tencentcloud/tencentcloud-cls-sdk-go v1.0.11
+	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.1063
+	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms v1.0.1063
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.58
 	github.com/xen0n/go-workwx v1.7.0
 	go.uber.org/zap v1.27.0
@@ -85,8 +87,6 @@ require (
 	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/swaggo/swag v1.8.12 // indirect
-	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.1063 // indirect
-	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms v1.0.1063 // indirect
 	github.com/tidwall/gjson v1.14.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
