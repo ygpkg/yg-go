@@ -40,7 +40,7 @@ func sendVerifyCodeByTencent(cfg *config.SMSConfig, phone string, code string) e
 	request.PhoneNumberSet = common.StringPtrs([]string{phone})
 	resp, err := client.SendSms(request)
 	if _, ok := err.(*errors.TencentCloudSDKError); ok {
-		fmt.Printf("an api error has returned: %s", err)
+		logs.Errorf("an api error has returned: %s", err)
 		return fmt.Errorf("an api error has returned: %s", err)
 	}
 	if err != nil {
