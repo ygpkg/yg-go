@@ -10,8 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// UploadCustomerImage UploadCustomerImage
-func UploadCustomerImage(ctx *gin.Context, db *gorm.DB, purpose string) {
+// UploadUserImage UploadUserImage
+func UploadUserImage(ctx *gin.Context, db *gorm.DB, purpose string) {
 	var (
 		logger    = runtime.Logger(ctx)
 		companyID = runtime.CompanyID(ctx)

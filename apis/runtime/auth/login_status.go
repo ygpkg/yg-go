@@ -29,8 +29,6 @@ const (
 	RoleUser
 	// RoleEmployee 运营用户
 	RoleEmployee
-	// RoleCustomer 客户
-	RoleCustomer
 )
 
 // LoginStatus 登录状态

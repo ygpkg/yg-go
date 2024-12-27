@@ -41,7 +41,6 @@ type PageQuery struct {
 	IsBackend  bool `json:"-"`
 	CompanyID  uint `json:"-"` // CompanyID 大客户企业id
 	EmployeeID uint `json:"-"` // DcEmployeeID 大客户员工id
-	CustomerID uint `json:"-"` // HsID 健康师的客户id
 	Uin        uint `json:"-"` // Uin 用户id
 }
 

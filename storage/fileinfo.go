@@ -39,12 +39,6 @@ type FileInfo struct {
 	CompanyID uint `gorm:"column:company_id" json:"company_id"`
 	// Uin 用户ID
 	Uin uint `gorm:"column:uin" json:"uin"`
-	// CustomerID 内容所属客户ID
-	CustomerID uint `gorm:"column:customer_id" json:"customer_id"`
-	// EmployeeID 内容所属员工ID
-	EmployeeID uint `gorm:"column:employee_id" json:"employee_id"`
-	// AccountID 账户ID 为内容所属客户ID或者员工ID
-	AccountID uint `gorm:"column:account_id" json:"account_id"`
 
 	// Purpose 用途分类
 	Purpose config.FilePurpose `gorm:"column:purpose;type:varchar(32)" json:"purpose"`

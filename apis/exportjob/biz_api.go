@@ -18,7 +18,7 @@ func DetailExportJob(ctx *gin.Context, req *DetailExportJobRequest, resp *Detail
 		return
 	}
 
-	if job.UserID != runtime.AccountID(ctx) {
+	if job.Uin != runtime.Uin(ctx) {
 		resp.Message = "无权访问"
 		resp.Code = errcode.ErrCode_NoPermission
 		return

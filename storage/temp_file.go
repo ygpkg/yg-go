@@ -12,8 +12,8 @@ import (
 type TempFile struct {
 	gorm.Model
 
-	CompanyID  uint `gorm:"column:company_id" json:"company_id"`
-	CustomerID uint `gorm:"column:customer_id" json:"customer_id"`
+	CompanyID  uint `gorm:"column:company_id;index" json:"company_id"`
+	Uin        uint `gorm:"column:uin;index" json:"uin"`
 	EmployeeID uint `gorm:"column:employee_id" json:"employee_id"`
 	// Purpose is the purpose of the file.
 	Purpose config.FilePurpose `gorm:"column:purpose;type:varchar(32)" json:"purpose"`

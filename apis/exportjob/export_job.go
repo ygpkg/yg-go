@@ -24,9 +24,9 @@ const (
 type ExportJob struct {
 	gorm.Model
 	// JobUUID
-	JobUUID string `gorm:"column:job_uuid;type:varchar(36);not null;index"`
-	// UserID 用户ID
-	UserID uint `gorm:"column:user_id;type:int;not null;index"`
+	JobUUID   string `gorm:"column:job_uuid;type:varchar(36);not null;index"`
+	CompanyID uint   `gorm:"column:company_id;type:int;not null;index"`
+	Uin       uint   `gorm:"column:uin;type:int;not null;index"`
 	// Purpose 导出类型,按业务分类，需要和导出文件上传 storage.Storager 的类型一致
 	Purpose config.FilePurpose `gorm:"column:purpose;type:varchar(255);not null;index"`
 	// ExportStatus 导出状态
@@ -47,10 +47,11 @@ func (ExportJob) TableName() string {
 }
 
 // CreateExportJob 新建导出任务
-func CreateExportJob(userID uint, purpose string, timeoutSeconds int) (*ExportJob, error) {
+func CreateExportJob(compid, uin uint, purpose string, timeoutSeconds int) (*ExportJob, error) {
 	job := &ExportJob{
 		JobUUID:        encryptor.GenerateUUID(),
-		UserID:         userID,
+		CompanyID:      compid,
+		Uin:            uin,
 		Purpose:        purpose,
 		ExportStatus:   ExportStatusPending,
 		TimeoutSeconds: timeoutSeconds,

@@ -34,17 +34,3 @@ func AuthMiddleWareEmployee(ctx *gin.Context) {
 	}
 	ctx.Next()
 }
-
-// AuthMiddleWareCustomer .
-func AuthMiddleWareCustomer(ctx *gin.Context) {
-	ls := runtime.LoginStatus(ctx)
-	if ls.State != auth.StateSucc || ls.Role != auth.RoleCustomer {
-		logs.WarnContextf(ctx, "user %s not customer or not login", ls.Claim.Uin)
-		ctx.AbortWithStatusJSON(200, gin.H{
-			"code":    401,
-			"message": "unauthorized",
-		})
-		return
-	}
-	ctx.Next()
-}

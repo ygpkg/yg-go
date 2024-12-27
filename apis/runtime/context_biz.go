@@ -16,16 +16,6 @@ func EmployeeID(ctx *gin.Context) uint {
 	return LoginStatus(ctx).GetID(constants.CtxKeyEmployeeID)
 }
 
-// CustomerID 客户ID
-func CustomerID(ctx *gin.Context) uint {
-	return LoginStatus(ctx).GetID(constants.CtxKeyCustomerID)
-}
-
-// AccountID 账户ID
-func AccountID(ctx *gin.Context) uint {
-	return LoginStatus(ctx).GetID(constants.CtxKeyAccountID)
-}
-
 // Uin uin
 func Uin(ctx *gin.Context) uint {
 	return LoginStatus(ctx).GetID(constants.CtxKeyUin)
