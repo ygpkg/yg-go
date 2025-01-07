@@ -8,7 +8,7 @@ type InitMultipartUploadRequest struct {
 
 	// 仅后台使用
 	CompanyID  uint   `json:"-"`
-	CustomerID uint   `json:"-"`
+	Uin        uint   `json:"-"`
 	EmployeeID uint   `json:"-"`
 	UploadID   string `json:"-"`
 }

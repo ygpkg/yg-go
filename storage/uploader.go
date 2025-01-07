@@ -97,20 +97,20 @@ func GetUploader(ctx context.Context, logger *zap.SugaredLogger, group, key stri
 func newUploader(ctx context.Context, logger *zap.SugaredLogger,
 	cfg *config.StorageConfig, updr iUploader, req InitMultipartUploadRequest) (*Uploader, error) {
 	tempFile := &TempFile{
-		CompanyID:  req.CompanyID,
-		CustomerID: req.CustomerID,
-		Purpose:    cfg.Purpose,
-		Filename:   req.Filename,
-		FileExt:    strings.ToLower(filepath.Ext(req.Filename)),
-		ChunkHash:  req.SHA1,
-		Size:       req.Size,
-		ExpiredAt:  time.Now().Add(time.Hour * 24 * 7),
-		PartSize:   defaultPartSize,
-		PartCount:  GetPartCount(req.Size, defaultPartSize),
+		CompanyID: req.CompanyID,
+		Uin:       req.Uin,
+		Purpose:   cfg.Purpose,
+		Filename:  req.Filename,
+		FileExt:   strings.ToLower(filepath.Ext(req.Filename)),
+		ChunkHash: req.SHA1,
+		Size:      req.Size,
+		ExpiredAt: time.Now().Add(time.Hour * 24 * 7),
+		PartSize:  defaultPartSize,
+		PartCount: GetPartCount(req.Size, defaultPartSize),
 	}
 	tempFile.MIMEType = httptools.TransformExt2ContentType(tempFile.FileExt)
 	tempFile.StoragePath = fmt.Sprintf("/%d/%s/%s-%d-%s%s",
-		tempFile.CompanyID, tempFile.Purpose, time.Now().Format("20060102"), tempFile.CustomerID,
+		tempFile.CompanyID, tempFile.Purpose, time.Now().Format("20060102"), tempFile.Uin,
 		random.String(7), tempFile.FileExt)
 
 	if err := updr.InitUploadTask(ctx, tempFile); err != nil {
@@ -178,8 +178,7 @@ func (u *Uploader) CompleteUpload(db *gorm.DB) (*FileInfo, error) {
 
 	fi := &FileInfo{
 		CompanyID:   u.tempFile.CompanyID,
-		CustomerID:  u.tempFile.CustomerID,
-		EmployeeID:  u.tempFile.EmployeeID,
+		Uin:         u.tempFile.Uin,
 		Purpose:     u.tempFile.Purpose,
 		Filename:    u.tempFile.Filename,
 		FileExt:     u.tempFile.FileExt,

@@ -11,8 +11,6 @@ const (
 )
 
 const (
-	CtxKeyAccountID  = "accountid" // 用户端登录账户
-	CtxKeyCustomerID = "customerid"
 	CtxKeyCompanyID  = "companyid"
 	CtxKeyEmployeeID = "employeeid" // 运营端员工
 	CtxKeyUin        = "uin"

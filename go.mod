@@ -1,12 +1,15 @@
 module github.com/ygpkg/yg-go
 
-go 1.20
+go 1.21
+
+toolchain go1.21.13
 
 require (
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.726
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-gonic/gin v1.10.0
+	github.com/linxGnu/goseaweedfs v0.1.6
 	github.com/minio/minio-go/v7 v7.0.76
 	github.com/mr-tron/base58 v1.2.0
 	github.com/redis/go-redis/v9 v9.5.1
