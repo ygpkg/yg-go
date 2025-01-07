@@ -102,7 +102,7 @@ func ListWeedDirFiles(filer *goseaweedfs.Filer, rootDir string, lastFilename str
 
 // ExistsFile weed 文件是否存在
 func ExistsFile(filerurl, filename string) bool {
-	resp, err := http.Head(filepath.Join(filerurl, filename))
+	resp, err := http.Head(filerurl + filename)
 	if err != nil {
 		logs.Errorf("head file error: %v", err)
 		return false
