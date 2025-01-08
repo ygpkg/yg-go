@@ -11,7 +11,7 @@ import (
 func AuthMiddleWare(ctx *gin.Context) {
 	ls := runtime.LoginStatus(ctx)
 	if ls.State != auth.StateSucc {
-		logs.WarnContextf(ctx, "user %s not login", ls.Claim.Uin)
+		logs.WarnContextf(ctx, "user not login")
 		ctx.AbortWithStatusJSON(200, gin.H{
 			"code":    401,
 			"message": "unauthorized",
@@ -25,7 +25,7 @@ func AuthMiddleWare(ctx *gin.Context) {
 func AuthMiddleWareEmployee(ctx *gin.Context) {
 	ls := runtime.LoginStatus(ctx)
 	if ls.State != auth.StateSucc || ls.Role != auth.RoleEmployee {
-		logs.WarnContextf(ctx, "user %s not employee or not login", ls.Claim.Uin)
+		logs.WarnContextf(ctx, "user not employee or not login")
 		ctx.AbortWithStatusJSON(200, gin.H{
 			"code":    401,
 			"message": "unauthorized",
