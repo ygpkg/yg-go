@@ -8,9 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ygpkg/yg-go/apis/constants"
 	"github.com/ygpkg/yg-go/apis/runtime/auth"
-	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
-	"github.com/ygpkg/yg-go/settings"
 )
 
 // LoginStatus 注入用户登录状态
@@ -42,7 +40,7 @@ func LoginStatus() gin.HandlerFunc {
 				return nil, fmt.Errorf("token claims is not UserClaims")
 			}
 
-			return getJwtSetting(c.Issuer)
+			return auth.GetJwtSecret(c.Issuer)
 		})
 		if err != nil {
 			logs.Warnw("[manager_auth] parse claims failed.",
@@ -54,16 +52,4 @@ func LoginStatus() gin.HandlerFunc {
 		ls.State = auth.StateSucc
 		ls.Claim = claims
 	}
-}
-
-// getJwtSetting 获取jwt配置
-func getJwtSetting(issuer string) ([]byte, error) {
-	jset := &config.JwtConfig{}
-	err := settings.GetYaml("core", "jwt-"+issuer, jset)
-	if err != nil {
-		logs.Warnw("[manager_auth] get jwt setting failed.",
-			"error", err, "issuer", issuer)
-		return []byte(""), err
-	}
-	return []byte(jset.Secret), nil
 }

@@ -11,7 +11,7 @@ import (
 func AuthMiddleWare(ctx *gin.Context) {
 	ls := runtime.LoginStatus(ctx)
 	if ls.State != auth.StateSucc {
-		logs.WarnContextf(ctx, "user not login")
+		logs.WarnContextf(ctx, "user login state invalid")
 		ctx.AbortWithStatusJSON(200, gin.H{
 			"code":    401,
 			"message": "unauthorized",
