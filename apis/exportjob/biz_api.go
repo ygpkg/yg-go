@@ -22,10 +22,6 @@ func DetailExportJob(ctx *gin.Context, req *DetailExportJobRequest, resp *Detail
 		resp.Message = "无权访问"
 		resp.Code = errcode.ErrCode_NoPermission
 		return
-	} else if job.Output == "" {
-		resp.Message = "导出任务为空"
-		resp.Code = errcode.ErrCode_BadRequest
-		return
 	}
 
 	resp.Response.JobID = job.JobUUID
