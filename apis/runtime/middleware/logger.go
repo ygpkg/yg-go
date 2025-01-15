@@ -31,13 +31,24 @@ func Logger() gin.HandlerFunc {
 		ctx.Next()
 		cost := time.Since(start)
 
-		logs.LoggerFromContext(ctx).Infow(fmt.Sprint(ctx.Writer.Status()),
-			"method", ctx.Request.Method,
-			"uri", ctx.Request.RequestURI,
-			"reqsize", ctx.Request.ContentLength,
-			"latency", fmt.Sprintf("%.3f", cost.Seconds()),
-			"clientip", runtime.GetRealIP(ctx.Request),
-			"respsize", ctx.Writer.Size(),
-		)
+		if ctx.Writer.Status() >= 400 && ctx.Writer.Status() != 401 {
+			logs.LoggerFromContext(ctx).Errorw(fmt.Sprint(ctx.Writer.Status()),
+				"method", ctx.Request.Method,
+				"uri", ctx.Request.RequestURI,
+				"reqsize", ctx.Request.ContentLength,
+				"latency", fmt.Sprintf("%.3f", cost.Seconds()),
+				"clientip", runtime.GetRealIP(ctx.Request),
+				"respsize", ctx.Writer.Size(),
+			)
+		} else {
+			logs.LoggerFromContext(ctx).Infow(fmt.Sprint(ctx.Writer.Status()),
+				"method", ctx.Request.Method,
+				"uri", ctx.Request.RequestURI,
+				"reqsize", ctx.Request.ContentLength,
+				"latency", fmt.Sprintf("%.3f", cost.Seconds()),
+				"clientip", runtime.GetRealIP(ctx.Request),
+				"respsize", ctx.Writer.Size(),
+			)
+		}
 	}
 }
