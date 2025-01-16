@@ -81,6 +81,17 @@ func (l *LifeCycle) Exit() {
 	closeCh(l.chExit)
 }
 
+// PreExit 预退出
+func (l *LifeCycle) CancelContext() {
+	if l.cancle != nil {
+		select {
+		case <-l.ctx.Done():
+		default:
+			l.cancle()
+		}
+	}
+}
+
 // WaitExit .
 func (l *LifeCycle) WaitExit() {
 	sigChan := make(chan os.Signal, 1)
