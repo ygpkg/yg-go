@@ -2,24 +2,24 @@ package settings
 
 import "testing"
 
-func TestEncryptPassword(t *testing.T) {
+func TestEncryptSecret(t *testing.T) {
 	password := "5yrKIImWU4u86E6qmcw"
-	encPass := EncryptPassword(password)
+	encPass := EncryptSecret(password)
 	if encPass == password {
 		t.Fatal("is equal")
 	}
 	t.Logf("%s -> %s", password, encPass)
 }
 
-func TestDecryptPassword(t *testing.T) {
+func TestDecryptSecret(t *testing.T) {
 	password := "5yrKIImWU4u86E6qmcw"
-	encPass := EncryptPassword(password)
+	encPass := EncryptSecret(password)
 	if encPass == password {
 		t.Fatal("is equal")
 	}
 	t.Logf("%s -> %s", password, encPass)
 
-	decPass := DecryptPassword(encPass)
+	decPass := DecryptSecret(encPass)
 	if decPass != password {
 		t.Fatal("is not equal")
 	}
