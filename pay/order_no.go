@@ -13,9 +13,9 @@ import (
 
 // rediskey 前缀
 const (
-	OrderKeyPrefix  = "dryang:order_no:%s"
-	TradeKeyPrefix  = "dryang:trade_no:%s"
-	RefundKeyPrefix = "dryang:refund_no:%s"
+	OrderKeyPrefix  = "pay:order_no:%s"
+	TradeKeyPrefix  = "pay:trade_no:%s"
+	RefundKeyPrefix = "pay:refund_no:%s"
 )
 
 const (
