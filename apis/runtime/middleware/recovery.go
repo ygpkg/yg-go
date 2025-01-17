@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	ygruntime "github.com/ygpkg/yg-go/apis/runtime"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -22,7 +22,7 @@ var (
 )
 
 func defaultHandleRecovery(c *gin.Context, _ any) {
-	c.AbortWithStatus(http.StatusInternalServerError)
+	ygruntime.InternalError(c, "网络错误，请稍后重试")
 }
 
 // Recovery panic recover中间件
