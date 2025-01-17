@@ -15,12 +15,12 @@ type PayOrder struct {
 	// CompanyID 公司ID
 	CompanyID uint `gorm:"column:company_id;type:bigint;comment:公司id" json:"company_id"`
 
+	// OrderNo 订单号
+	OrderNo string `gorm:"column:order_no;type:varchar(32);not null;comment:订单号" json:"order_no"`
 	// TotalAmount 总价
 	TotalAmount types.Money `gorm:"column:total_amount;type:float;comment:总价" json:"total_amount"`
 	// ShouldAmount 应支付金额
 	ShouldAmount types.Money `gorm:"column:should_amount;type:float;comment:总价" json:"should_amount"`
-	// OrderNo 订单号
-	OrderNo string `gorm:"column:order_no;type:varchar(32);not null;comment:订单号" json:"order_no"`
 	// PayType 支付类型
 	PayType PayType `gorm:"column:pay_type;type:tinyint;not null;comment:支付类型" json:"pay_type"`
 	// PayStatus 支付状态
@@ -29,6 +29,8 @@ type PayOrder struct {
 	OrderStatus OrderStatus `gorm:"column:order_status;type:tinyint;not null;comment:订单状态" json:"order_status"`
 	// ExpireTime 过期时间
 	ExpireTime time.Time `gorm:"column:expire_time;type:datetime;comment:过期时间" json:"expire_time"`
+	// OrderSnapshot 订单快照
+	OrderSnapshot string `gorm:"column:order_snapshot;type:text;comment:订单快照" json:"order_snapshot"`
 }
 
 // TableName 表名
@@ -40,15 +42,13 @@ func (PayOrder) TableName() string {
 type PayType int
 
 const (
-	PayTypeNull PayType = iota
-	PayTypeWechat
+	// 微信支付
+	PayTypeWechat PayType = 1
 )
 
 // String 返回支付类型名称
 func (p PayType) String() string {
 	switch p {
-	case PayTypeNull:
-		return "暂未选择"
 	case PayTypeWechat:
 		return "微信支付"
 	default:
@@ -60,21 +60,25 @@ func (p PayType) String() string {
 type PayStatus int
 
 const (
-	PayStatusNull          PayStatus = iota
-	PayStatusPending                 // 待支付
-	PayStatusSuccess                 // 支付成功
-	PayStatusCancel                  // 取消支付
-	PayStatusFail                    // 失败
-	PayStatusPendingRefund           // 待退款
-	PayStatusFailRefund              // 退款失败
-	PayStatusSuccessRefund           // 退款成功
+	// 待支付
+	PayStatusPending PayStatus = 1
+	// 支付成功
+	PayStatusSuccess PayStatus = 2
+	// 取消支付
+	PayStatusCancel PayStatus = 3
+	// 失败
+	PayStatusFail PayStatus = 4
+	// 待退款
+	PayStatusPendingRefund PayStatus = 5
+	// 退款失败
+	PayStatusFailRefund PayStatus = 6
+	// 退款成功
+	PayStatusSuccessRefund PayStatus = 7
 )
 
 // String 返回支付状态名称
 func (p PayStatus) String() string {
 	switch p {
-	case PayStatusNull:
-		return "暂未选择"
 	case PayStatusPending:
 		return "待支付"
 	case PayStatusSuccess:
@@ -98,21 +102,25 @@ func (p PayStatus) String() string {
 type OrderStatus int
 
 const (
-	OrderStatusNull          OrderStatus = iota
-	OrderStatusPendingPay                // 待支付
-	OrderStatusPendingSend               // 待发货
-	OrderStatusCancel                    // 订单取消
-	OrderStatusSuccess                   // 已完成
-	OrderStatusPendingRefund             // 待退款
-	OrderStatusFailRefund                // 退款失败
-	OrderStatusSuccessRefund             // 退款成功
+	// 待支付
+	OrderStatusPendingPay OrderStatus = 1
+	// 待发货
+	OrderStatusPendingSend OrderStatus = 2
+	// 订单取消
+	OrderStatusCancel OrderStatus = 3
+	// 已完成
+	OrderStatusSuccess OrderStatus = 4
+	// 待退款
+	OrderStatusPendingRefund OrderStatus = 5
+	// 退款失败
+	OrderStatusFailRefund OrderStatus = 6
+	// 退款成功
+	OrderStatusSuccessRefund OrderStatus = 7
 )
 
 // String 返回订单状态名称
 func (p OrderStatus) String() string {
 	switch p {
-	case OrderStatusNull:
-		return "暂未选择"
 	case OrderStatusPendingPay:
 		return "待支付"
 	case OrderStatusPendingSend:
