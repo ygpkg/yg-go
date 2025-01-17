@@ -54,10 +54,10 @@ func (item SettingItem) Identify() string {
 	return fmt.Sprintf("%s/%s", item.Group, item.Key)
 }
 
-// PasswordValue 密码原文
-func (item *SettingItem) PasswordValue() string {
-	if item.ValueType == ValueSecret {
-		return DecryptPassword(item.Value)
+// SecretValue 密码原文
+func (item *SettingItem) SecretValue() string {
+	if item.ValueType == ValueSecret || item.ValueType == ValuePassword {
+		return DecryptSecret(item.Value)
 	}
 	return item.Value
 }
@@ -94,6 +94,7 @@ func SetText(group, key, value string) error {
 	return updateSettings(si)
 }
 
+// SetYaml 插入yaml配置
 func SetYaml(group, key string, value interface{}) error {
 	vData, err := yaml.Marshal(value)
 	if err != nil {
@@ -119,7 +120,7 @@ func updateSettings(v *SettingItem) error {
 		}).Create(v).Error
 }
 
-// Get .
+// Get 获取数据库或者缓存配置项
 func Get(group, key string) (*SettingItem, error) {
 	ret := &SettingItem{}
 
@@ -144,40 +145,45 @@ func Get(group, key string) (*SettingItem, error) {
 	return ret, nil
 }
 
+// GetValue 获取配置值，如果是加密配置，返回解密后的值
+func GetValue(group, key string) (string, error) {
+	si, err := Get(group, key)
+	if err != nil {
+		return "", err
+	}
+	return si.SecretValue(), nil
+}
+
 // GetYaml 获取yaml配置
 func GetYaml(group, key string, value interface{}) error {
-	si, err := Get(group, key)
+	text, err := GetValue(group, key)
 	if err != nil {
 		return err
 	}
-	return yaml.Unmarshal([]byte(si.Value), value)
+	return yaml.Unmarshal([]byte(text), value)
 }
 
 // GetText 获取文本配置
 func GetText(group, key string) (string, error) {
-	si, err := Get(group, key)
-	if err != nil {
-		return "", err
-	}
-	return si.Value, nil
+	return GetValue(group, key)
 }
 
-// GetPassword 获取密码配置
-func GetPassword(group, key string) (string, error) {
+// GetSecret 获取密码配置
+func GetSecret(group, key string) (string, error) {
 	si, err := Get(group, key)
 	if err != nil {
 		return "", err
 	}
-	return DecryptPassword(si.Value), nil
+	return DecryptSecret(si.Value), nil
 }
 
 // GetJSON 获取json配置
 func GetJSON(group, key string, value interface{}) error {
-	si, err := Get(group, key)
+	text, err := GetValue(group, key)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal([]byte(si.Value), value)
+	return json.Unmarshal([]byte(text), value)
 }
 
 // List 配置列表
@@ -201,8 +207,8 @@ func Updates(sets ...*SettingItem) error {
 		} else {
 			sql = sql.Where("`group` = ? AND `key` = ?", set.Group, set.Key)
 		}
-		if set.ValueType == ValueSecret {
-			set.Value = EncryptPassword(set.Value)
+		if set.ValueType == ValueSecret || set.ValueType == ValuePassword {
+			set.Value = EncryptSecret(set.Value)
 		}
 		update := map[string]interface{}{
 			"value":      set.Value,
