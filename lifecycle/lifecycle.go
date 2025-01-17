@@ -81,7 +81,7 @@ func (l *LifeCycle) Exit() {
 	closeCh(l.chExit)
 }
 
-// PreExit 预退出
+// CancelContext 预退出
 func (l *LifeCycle) CancelContext() {
 	if l.cancle != nil {
 		select {
