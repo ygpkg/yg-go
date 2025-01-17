@@ -1,6 +1,8 @@
 package paytype
 
 import (
+	"time"
+
 	"github.com/ygpkg/yg-go/types"
 	"gorm.io/gorm"
 )
@@ -22,8 +24,11 @@ type PayOrder struct {
 	// PayType 支付类型
 	PayType PayType `gorm:"column:pay_type;type:tinyint;not null;comment:支付类型" json:"pay_type"`
 	// PayStatus 支付状态
-	PayStatus   PayStatus   `gorm:"column:pay_status;type:tinyint;not null;comment:支付状态" json:"pay_status"`
+	PayStatus PayStatus `gorm:"column:pay_status;type:tinyint;not null;comment:支付状态" json:"pay_status"`
+	// OrderStatus 订单状态
 	OrderStatus OrderStatus `gorm:"column:order_status;type:tinyint;not null;comment:订单状态" json:"order_status"`
+	// ExpireTime 过期时间
+	ExpireTime time.Time `gorm:"column:expire_time;type:datetime;comment:过期时间" json:"expire_time"`
 }
 
 // TableName 表名
