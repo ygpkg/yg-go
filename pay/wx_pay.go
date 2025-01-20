@@ -1,4 +1,4 @@
-package wxpay
+package pay
 
 import (
 	"context"
@@ -6,19 +6,12 @@ import (
 
 	"github.com/wechatpay-apiv3/wechatpay-go/core"
 	"github.com/wechatpay-apiv3/wechatpay-go/core/option"
-	"github.com/wechatpay-apiv3/wechatpay-go/services/payments"
 	"github.com/wechatpay-apiv3/wechatpay-go/utils"
 	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/pay/paytype"
 	"github.com/ygpkg/yg-go/settings"
 )
-
-type WxPay interface {
-	Prepay() (string, error)
-	QueryByTradeNo() (*payments.Transaction, error)
-	CloseOrder() error
-}
 
 // initWxPay 初始化微信支付
 func initWxPay(ctx context.Context, cfg *config.WXPayConfig) (*core.Client, error) {
@@ -44,7 +37,7 @@ func initWxPay(ctx context.Context, cfg *config.WXPayConfig) (*core.Client, erro
 }
 
 // NewWxPay 初始化微信支付
-func NewWxPay(payment *paytype.Payment, pay_type string) (WxPay, error) {
+func NewWxPay(payment *paytype.Payment, pay_type string) (Pay, error) {
 	var (
 		ctx = context.Background()
 		cfg = &config.WXPayConfig{}

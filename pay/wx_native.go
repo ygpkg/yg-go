@@ -1,4 +1,4 @@
-package wxpay
+package pay
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/ygpkg/yg-go/pay/paytype"
 )
 
-var _ WxPay = (*Native)(nil)
+var _ Pay = (*Native)(nil)
 
 type Native struct {
 	ctx     context.Context

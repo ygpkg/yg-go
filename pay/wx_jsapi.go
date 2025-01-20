@@ -1,4 +1,4 @@
-package wxpay
+package pay
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"github.com/wechatpay-apiv3/wechatpay-go/services/payments"
 )
 
-var _ WxPay = (*JsApi)(nil)
+var _ Pay = (*JsApi)(nil)
 
 type JsApi struct {
 	// ctx     context.Context
