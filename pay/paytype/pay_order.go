@@ -41,16 +41,20 @@ func (PayOrder) TableName() string {
 }
 
 // PayType 支付类型
-type PayType int
+type PayType string
 
 const (
 	// 微信支付
-	PayTypeWechat PayType = 1
+	PayTypeWechat PayType = "wxpay"
+	// 现金支付
+	PayTypeCash PayType = "cash"
 )
 
 // String 返回支付类型名称
 func (p PayType) String() string {
 	switch p {
+	case PayTypeCash:
+		return "现金支付"
 	case PayTypeWechat:
 		return "微信支付"
 	default:
@@ -59,23 +63,23 @@ func (p PayType) String() string {
 }
 
 // PayStatus 支付状态
-type PayStatus int
+type PayStatus string
 
 const (
 	// 待支付
-	PayStatusPending PayStatus = 1
+	PayStatusPending PayStatus = "pending"
 	// 支付成功
-	PayStatusSuccess PayStatus = 2
+	PayStatusSuccess PayStatus = "success"
 	// 取消支付
-	PayStatusCancel PayStatus = 3
+	PayStatusCancel PayStatus = "cancel"
 	// 失败
-	PayStatusFail PayStatus = 4
+	PayStatusFail PayStatus = "fail"
 	// 待退款
-	PayStatusPendingRefund PayStatus = 5
+	PayStatusPendingRefund PayStatus = "pending_refund"
 	// 退款失败
-	PayStatusFailRefund PayStatus = 6
+	PayStatusFailRefund PayStatus = "fail_refund"
 	// 退款成功
-	PayStatusSuccessRefund PayStatus = 7
+	PayStatusSuccessRefund PayStatus = "success_refund"
 )
 
 // String 返回支付状态名称
@@ -101,23 +105,23 @@ func (p PayStatus) String() string {
 }
 
 // OrderStatus 订单状态
-type OrderStatus int
+type OrderStatus string
 
 const (
 	// 待支付
-	OrderStatusPendingPay OrderStatus = 1
+	OrderStatusPendingPay OrderStatus = "pending_pay"
 	// 待发货
-	OrderStatusPendingSend OrderStatus = 2
+	OrderStatusPendingSend OrderStatus = "pending_send"
 	// 订单取消
-	OrderStatusCancel OrderStatus = 3
+	OrderStatusCancel OrderStatus = "cancel"
 	// 已完成
-	OrderStatusSuccess OrderStatus = 4
+	OrderStatusSuccess OrderStatus = "success"
 	// 待退款
-	OrderStatusPendingRefund OrderStatus = 5
+	OrderStatusPendingRefund OrderStatus = "pending_refund"
 	// 退款失败
-	OrderStatusFailRefund OrderStatus = 6
+	OrderStatusFailRefund OrderStatus = "fail_refund"
 	// 退款成功
-	OrderStatusSuccessRefund OrderStatus = 7
+	OrderStatusSuccessRefund OrderStatus = "success_refund"
 )
 
 // String 返回订单状态名称

@@ -1,19 +1,19 @@
-package wxpay
+package pay
 
 import (
 	"context"
 	"time"
 
 	"github.com/ygpkg/yg-go/logs"
-	"github.com/ygpkg/yg-go/pay"
 	"github.com/ygpkg/yg-go/pay/paytype"
+	"github.com/ygpkg/yg-go/pay/wxpay"
 	"gorm.io/gorm"
 )
 
 // PlaceOrder 下订单
 func PlaceOrder(db *gorm.DB, order *paytype.PayOrder, business int) (string, error) {
 	// 生成订单号
-	orderNo, err := pay.NewOrderNo(context.Background(), business)
+	orderNo, err := NewOrderNo(context.Background(), business)
 	if err != nil {
 		logs.Errorf("NewOrderNo failed,err=%v", err)
 		return "", err
@@ -32,9 +32,9 @@ func PlaceOrder(db *gorm.DB, order *paytype.PayOrder, business int) (string, err
 }
 
 // InitiatePayment 发起支付
-func InitiatePayment(db *gorm.DB, order *paytype.PayOrder, trade_tpye string, expire_time time.Time) (WxPay, string, error) {
+func InitiatePayment(db *gorm.DB, order *paytype.PayOrder, trade_tpye string, expire_time time.Time) (wxpay.WxPay, string, error) {
 	// 生成支付号。
-	tradeNo, err := pay.NewTradeNo(context.Background(), order.OrderNo)
+	tradeNo, err := NewTradeNo(context.Background(), order.OrderNo)
 	if err != nil {
 		logs.Errorf("NewTradeNo failed,err=%v", err)
 		return nil, "", err
@@ -54,7 +54,7 @@ func InitiatePayment(db *gorm.DB, order *paytype.PayOrder, trade_tpye string, ex
 		ExpireTime:  expire_time,
 	}
 	// 发起预支付
-	wx, err := NewWxPay(payment, trade_tpye)
+	wx, err := wxpay.NewWxPay(payment, trade_tpye)
 	if err != nil {
 		logs.Errorf("NewWxPay failed,err=%v", err)
 		return nil, "", err

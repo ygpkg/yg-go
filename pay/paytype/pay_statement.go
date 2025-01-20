@@ -29,12 +29,12 @@ func (PayStatement) TableName() string {
 }
 
 // PayWay 出账还是入账
-type TransactionType int
+type TransactionType string
 
 // 针对运营商为出账入账，针对用户就相反
 const (
 	// PayWayIn 入账
-	TransactionTypeIn TransactionType = 1
+	TransactionTypeIn TransactionType = "in"
 	// PayWayOut 出账
-	TransactionTypeOut TransactionType = 2
+	TransactionTypeOut TransactionType = "out"
 )
