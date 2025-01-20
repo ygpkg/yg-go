@@ -79,3 +79,29 @@ func NewRefundNo(ctx context.Context, order_no string) (string, error) {
 	refundno := fmt.Sprintf(RefundNoPrefix, order_no) + fmt.Sprintf("%04d", increment)
 	return refundno, nil
 }
+
+// DeleteTradeNoKey 删除支付号对应的 Redis 键
+func DeleteTradeNoKey(ctx context.Context, order_no string) error {
+	// 拼接前缀
+	redisKey := fmt.Sprintf(TradeKeyPrefix, order_no)
+	// 删除 Redis 键
+	_, err := redispool.Std().Del(ctx, redisKey).Result()
+	if err != nil {
+		logs.Errorf("redispool call Del failed, err=%v", err)
+		return err
+	}
+	return nil
+}
+
+// DeleteRefundNoKey 删除退款号对应的 Redis 键
+func DeleteRefundNoKey(ctx context.Context, order_no string) error {
+	// 拼接前缀
+	redisKey := fmt.Sprintf(RefundKeyPrefix, order_no)
+	// 删除 Redis 键
+	_, err := redispool.Std().Del(ctx, redisKey).Result()
+	if err != nil {
+		logs.Errorf("redispool call Del failed, err=%v", err)
+		return err
+	}
+	return nil
+}

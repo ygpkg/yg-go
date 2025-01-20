@@ -133,6 +133,15 @@ func QueryByTradeNo(db *gorm.DB, payment *paytype.Payment) (string, error) {
 	}
 	switch resp.TradeState {
 	case "NOTPAY":
+		if time.Now().After(*payment.ExpireTime) {
+			// 超时关闭订单
+			err = CloseOrder(db, payment)
+			if err != nil {
+				logs.Errorf("QueryByTradeNo CloseOrder failed,err=%v", err)
+				return "", err
+			}
+			return "CLOSED", nil
+		}
 		return "NOTPAY", nil
 	case "REFUND":
 		return "REFUND", nil
@@ -157,11 +166,18 @@ func QueryByTradeNo(db *gorm.DB, payment *paytype.Payment) (string, error) {
 		// 成功后订单时代发货状态
 		order.OrderStatus = paytype.OrderStatusPendingSend
 		order.PayStatus = paytype.PayStatusSuccess
-
+		order.PayType = payment.PayType
 		// 事务操作三个表
 		err = db.Transaction(func(tx *gorm.DB) error {
 			// 新增流水
-			err := paytype.CreatePayPayment(tx, payment)
+			err := paytype.CreatePayStatement(tx, &paytype.PayStatement{
+				Uin:             order.Uin,
+				CompanyID:       order.CompanyID,
+				OrderNo:         order.OrderNo,
+				TransactionType: paytype.TransactionTypeIn,
+				SubjectNo:       payment.TradeNo,
+				Amount:          order.ShouldAmount,
+			})
 			if err != nil {
 				logs.Errorf("QueryByTradeNo CreatePayPayment failed,err=%v", err)
 				return err
@@ -182,6 +198,12 @@ func QueryByTradeNo(db *gorm.DB, payment *paytype.Payment) (string, error) {
 		})
 		if err != nil {
 			logs.Errorf("QueryByTradeNo Transaction failed,err=%v", err)
+			return "", err
+		}
+		// 删除支付号key
+		err = DeleteTradeNoKey(context.Background(), order.OrderNo)
+		if err != nil {
+			logs.Errorf("QueryByTradeNo DeleteTradeNoKey failed,err=%v", err)
 			return "", err
 		}
 		return "SUCCESS", nil

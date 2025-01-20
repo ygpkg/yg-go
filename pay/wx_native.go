@@ -69,16 +69,9 @@ func (na *Native) QueryByTradeNo(payment *paytype.Payment) (*QueryResp, error) {
 		logs.Errorf("call QueryOrderByOutTradeNo err:%s", result.Response.Status)
 		return nil, err
 	}
-	// 使用 time.Parse 解析时间字符串
-	parsedTime, err := time.Parse(time.RFC3339, *resp.SuccessTime)
-	if err != nil {
-		logs.Errorf("Failed to parse time: %v", err)
-		return nil, err
-	}
+
 	queryResp := &QueryResp{
-		TransactionId: *resp.TransactionId,
-		TradeState:    *resp.TradeState,
-		SuccessTime:   &parsedTime,
+		TradeState: *resp.TradeState,
 	}
 	if queryResp.TradeState == "SUCCESS" {
 		payment.PrePayResp, err = paytype.JsonString(resp)
@@ -86,6 +79,14 @@ func (na *Native) QueryByTradeNo(payment *paytype.Payment) (*QueryResp, error) {
 			logs.Errorf("call QueryOrderByOutTradeNo err:%s", err)
 			return nil, err
 		}
+		// 使用 time.Parse 解析时间字符串
+		parsedTime, err := time.Parse(time.RFC3339, *resp.SuccessTime)
+		if err != nil {
+			logs.Errorf("Failed to parse time: %v", err)
+			return nil, err
+		}
+		queryResp.SuccessTime = &parsedTime
+		queryResp.TransactionId = *resp.TransactionId
 	}
 	return queryResp, nil
 }
