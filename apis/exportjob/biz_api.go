@@ -27,6 +27,9 @@ func DetailExportJob(ctx *gin.Context, req *DetailExportJobRequest, resp *Detail
 	resp.Response.JobID = job.JobUUID
 	resp.Response.Status = job.ExportStatus
 	resp.Response.ErrMsg = job.ErrorMsg
+	if job.Output == "" || job.ExportStatus != ExportStatusSuccess {
+		return
+	}
 
 	s, err := storage.LoadStorager(job.Purpose)
 	if err != nil {
