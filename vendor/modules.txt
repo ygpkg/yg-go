@@ -416,6 +416,26 @@ github.com/twitchyliquid64/golang-asm/unsafeheader
 # github.com/ugorji/go/codec v1.2.12
 ## explicit; go 1.11
 github.com/ugorji/go/codec
+# github.com/wechatpay-apiv3/wechatpay-go v0.2.20
+## explicit; go 1.16
+github.com/wechatpay-apiv3/wechatpay-go/core
+github.com/wechatpay-apiv3/wechatpay-go/core/auth
+github.com/wechatpay-apiv3/wechatpay-go/core/auth/credentials
+github.com/wechatpay-apiv3/wechatpay-go/core/auth/signers
+github.com/wechatpay-apiv3/wechatpay-go/core/auth/validators
+github.com/wechatpay-apiv3/wechatpay-go/core/auth/verifiers
+github.com/wechatpay-apiv3/wechatpay-go/core/cipher
+github.com/wechatpay-apiv3/wechatpay-go/core/cipher/ciphers
+github.com/wechatpay-apiv3/wechatpay-go/core/cipher/decryptors
+github.com/wechatpay-apiv3/wechatpay-go/core/cipher/encryptors
+github.com/wechatpay-apiv3/wechatpay-go/core/consts
+github.com/wechatpay-apiv3/wechatpay-go/core/downloader
+github.com/wechatpay-apiv3/wechatpay-go/core/option
+github.com/wechatpay-apiv3/wechatpay-go/services
+github.com/wechatpay-apiv3/wechatpay-go/services/payments
+github.com/wechatpay-apiv3/wechatpay-go/services/payments/native
+github.com/wechatpay-apiv3/wechatpay-go/utils
+github.com/wechatpay-apiv3/wechatpay-go/utils/task
 # github.com/xen0n/go-workwx v1.7.0
 ## explicit; go 1.17
 github.com/xen0n/go-workwx

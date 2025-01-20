@@ -45,6 +45,8 @@ type Payment struct {
 	PrePayResp string `gorm:"column:pre_pay_resp;type:text;comment:预支付响应体信息" json:"pre_pay_resp"`
 	// PrePaySign 预支付签名
 	PrePaySign string `gorm:"column:pre_pay_sign;type:varchar(256);comment:预支付签名" json:"pre_pay_sign"`
+	// ExpireTime 过期时间
+	ExpireTime time.Time `gorm:"column:expire_time;type:datetime;comment:过期时间" json:"expire_time"`
 }
 
 // TableName 表名

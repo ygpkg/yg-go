@@ -21,6 +21,7 @@ require (
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.1063
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms v1.0.1063
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.58
+	github.com/wechatpay-apiv3/wechatpay-go v0.2.20
 	github.com/xen0n/go-workwx v1.7.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/crypto v0.28.0
