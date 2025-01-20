@@ -24,11 +24,11 @@ type PayOrder struct {
 	// ShouldAmount 应支付金额
 	ShouldAmount types.Money `gorm:"column:should_amount;type:float;comment:总价" json:"should_amount"`
 	// PayType 支付类型
-	PayType PayType `gorm:"column:pay_type;type:tinyint;not null;comment:支付类型" json:"pay_type"`
+	PayType PayType `gorm:"column:pay_type;type:varchar(32);not null;comment:支付类型" json:"pay_type"`
 	// PayStatus 支付状态
-	PayStatus PayStatus `gorm:"column:pay_status;type:tinyint;not null;comment:支付状态" json:"pay_status"`
+	PayStatus PayStatus `gorm:"column:pay_status;type:varchar(32);not null;comment:支付状态" json:"pay_status"`
 	// OrderStatus 订单状态
-	OrderStatus OrderStatus `gorm:"column:order_status;type:tinyint;not null;comment:订单状态" json:"order_status"`
+	OrderStatus OrderStatus `gorm:"column:order_status;type:varchar(32);not null;comment:订单状态" json:"order_status"`
 	// ExpireTime 过期时间
 	ExpireTime *time.Time `gorm:"column:expire_time;type:datetime;comment:过期时间" json:"expire_time"`
 	// OrderSnapshot 订单快照

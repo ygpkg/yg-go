@@ -14,7 +14,7 @@ type PayStatement struct {
 	CompanyID uint `gorm:"column:company_id;type:bigint;comment:公司id" json:"company_id"`
 
 	// TransactionType 出账还是入账
-	TransactionType TransactionType `gorm:"column:transaction_type;type:tinyint;not null;comment:出账还是入账" json:"transaction_type"`
+	TransactionType TransactionType `gorm:"column:transaction_type;type:varchar(32);not null;comment:出账还是入账" json:"transaction_type"`
 	// OrderNo 订单号 来自订单表
 	OrderNo string `gorm:"column:order_no;type:varchar(32);not null;comment:订单号" json:"order_no"`
 	// SubjectNo 支付号或退款号根据PayWay判断

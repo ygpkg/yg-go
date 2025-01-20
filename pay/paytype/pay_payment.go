@@ -26,9 +26,9 @@ type Payment struct {
 	// Amount 支付金额
 	Amount types.Money `gorm:"column:amount;type:float;comment:支付金额" json:"amount"`
 	// PayStatus 支付状态
-	PayStatus PayStatus `gorm:"column:pay_status;type:tinyint;not null;comment:支付状态" json:"pay_status"`
+	PayStatus PayStatus `gorm:"column:pay_status;type:varchar(32);not null;comment:支付状态" json:"pay_status"`
 	// PayType 支付类型
-	PayType PayType `gorm:"column:pay_type;type:tinyint;not null;comment:支付类型" json:"pay_type"`
+	PayType PayType `gorm:"column:pay_type;type:varchar(32);not null;comment:支付类型" json:"pay_type"`
 	// TradeTpye 调起交易类型
 	TradeTpye string `gorm:"column:trade_tpye;type:varchar(32);comment:调起交易类型" json:"trade_tpye"`
 	// AppID 应用ID

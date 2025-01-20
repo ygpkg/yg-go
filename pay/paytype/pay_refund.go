@@ -22,7 +22,7 @@ type PayRefund struct {
 	// Amount 退款金额
 	Amount types.Money `gorm:"column:amount;type:float;comment:退款金额" json:"amount"`
 	// PayStatus 支付状态
-	PayStatus PayStatus `gorm:"column:pay_status;type:tinyint;not null;comment:支付状态" json:"pay_status"`
+	PayStatus PayStatus `gorm:"column:pay_status;type:varchar(32);not null;comment:支付状态" json:"pay_status"`
 	// RefundTime 第三方退款创建时间
 	RefundTime *time.Time `gorm:"column:refund_time;type:datetime;comment:第三方支付创建时间" json:"refund_time"`
 	// RefundSuccessTime 第三方退款成功时间

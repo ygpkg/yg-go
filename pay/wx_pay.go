@@ -9,7 +9,6 @@ import (
 	"github.com/wechatpay-apiv3/wechatpay-go/utils"
 	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
-	"github.com/ygpkg/yg-go/pay/paytype"
 	"github.com/ygpkg/yg-go/settings"
 )
 
@@ -37,7 +36,7 @@ func initWxPay(ctx context.Context, cfg *config.WXPayConfig) (*core.Client, erro
 }
 
 // NewWxPay 初始化微信支付
-func NewWxPay(payment *paytype.Payment, pay_type string) (Pay, error) {
+func NewWxPay(pay_type string) (Pay, error) {
 	var (
 		ctx = context.Background()
 		cfg = &config.WXPayConfig{}
@@ -56,10 +55,9 @@ func NewWxPay(payment *paytype.Payment, pay_type string) (Pay, error) {
 	switch pay_type {
 	case "native":
 		return &Native{
-			ctx:     ctx,
-			cfg:     cfg,
-			payment: payment,
-			client:  client,
+			ctx:    ctx,
+			cfg:    cfg,
+			client: client,
 		}, nil
 	case "jsapi":
 		return &JsApi{}, nil

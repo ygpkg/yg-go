@@ -19,5 +19,8 @@ const (
 func InitDB(db *gorm.DB) error {
 	return dbtools.InitModel(db,
 		&PayOrder{},
+		&Payment{},
+		&PayRefund{},
+		&PayStatement{},
 	)
 }
