@@ -20,8 +20,8 @@ type WxPay interface {
 	CloseOrder() error
 }
 
-// InitWxPay 初始化微信支付
-func InitWxPay(ctx context.Context, cfg *config.WXPayConfig) (*core.Client, error) {
+// initWxPay 初始化微信支付
+func initWxPay(ctx context.Context, cfg *config.WXPayConfig) (*core.Client, error) {
 	// 加载私钥生成签名
 	mchPrivateKey, err := utils.LoadPrivateKey(cfg.Pemkey)
 	if err != nil {
@@ -55,7 +55,7 @@ func NewWxPay(payment *paytype.Payment, pay_type string) (WxPay, error) {
 		logs.Errorf("get wxpay config error: %v", err)
 		return nil, err
 	}
-	client, err := InitWxPay(ctx, cfg)
+	client, err := initWxPay(ctx, cfg)
 	if err != nil {
 		logs.Errorf("init wechat pay client err:%v", err)
 		return nil, err
