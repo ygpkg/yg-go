@@ -17,6 +17,8 @@ type Payment struct {
 	// CompanyID 公司ID
 	CompanyID uint `gorm:"column:company_id;type:bigint;comment:公司id" json:"company_id"`
 
+	// Description 订单描述
+	Description string `gorm:"column:description;type:varchar(256);comment:订单描述" json:"description"`
 	// OrderNo 订单号 来自订单表
 	OrderNo string `gorm:"column:order_no;type:varchar(32);not null;comment:订单号" json:"order_no"`
 	// TradeNo 商户支付号

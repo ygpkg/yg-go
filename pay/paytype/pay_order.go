@@ -17,6 +17,8 @@ type PayOrder struct {
 
 	// OrderNo 订单号
 	OrderNo string `gorm:"column:order_no;type:varchar(32);not null;comment:订单号" json:"order_no"`
+	// Description 订单描述
+	Description string `gorm:"column:description;type:varchar(256);comment:订单描述" json:"description"`
 	// TotalAmount 总价
 	TotalAmount types.Money `gorm:"column:total_amount;type:float;comment:总价" json:"total_amount"`
 	// ShouldAmount 应支付金额

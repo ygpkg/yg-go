@@ -15,3 +15,9 @@ type WXPayConfig struct {
 	// 回调地址
 	NotifyURL string `yaml:"notify_url"`
 }
+
+// AliPayConfig 支付宝支付配置
+type AliPayConfig struct {
+	// 商户号
+	MchID string `yaml:"mch_id"`
+}
