@@ -24,9 +24,9 @@ type PayRefund struct {
 	// PayStatus 支付状态
 	PayStatus PayStatus `gorm:"column:pay_status;type:tinyint;not null;comment:支付状态" json:"pay_status"`
 	// RefundTime 第三方退款创建时间
-	RefundTime time.Time `gorm:"column:refund_time;type:datetime;comment:第三方支付创建时间" json:"refund_time"`
+	RefundTime *time.Time `gorm:"column:refund_time;type:datetime;comment:第三方支付创建时间" json:"refund_time"`
 	// RefundSuccessTime 第三方退款成功时间
-	RefundSuccessTime time.Time `gorm:"column:refund_success_time;type:datetime;comment:第三方退款成功时间" json:"refund_success_time"`
+	RefundSuccessTime *time.Time `gorm:"column:refund_success_time;type:datetime;comment:第三方退款成功时间" json:"refund_success_time"`
 	// RefundReq 发起退款请求体信息
 	RefundReq string `gorm:"column:pre_pay_req;type:text;comment:发起退款请求体信息" json:"pre_pay_req"`
 	// RefundResp 退款响应体信息

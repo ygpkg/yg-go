@@ -28,7 +28,7 @@ func (na *Native) Prepay() (string, error) {
 		Mchid:       core.String(na.cfg.MchID),           // 商户号
 		Description: core.String(na.payment.Description), // 商品描述
 		OutTradeNo:  core.String(na.payment.TradeNo),     // 自定义订单编号
-		TimeExpire:  core.Time(na.payment.ExpireTime),    // 交易结束时间
+		TimeExpire:  na.payment.ExpireTime,               // 交易结束时间
 		NotifyUrl:   core.String(na.cfg.NotifyURL),       // 回调地址
 		Amount: &native.Amount{
 			Currency: core.String("CNY"),                               // CNY：人民币，境内商户号仅支持人民币。
@@ -51,7 +51,7 @@ func (na *Native) Prepay() (string, error) {
 	return *resp.CodeUrl, nil
 }
 
-// NativeQueryOrderByTransactionID 根据支付号查询订单
+// QueryByTradeNo 根据支付号查询订单
 func (na *Native) QueryByTradeNo() (*payments.Transaction, error) {
 	svc := native.NativeApiService{Client: na.client}
 	resp, result, err := svc.QueryOrderByOutTradeNo(na.ctx,

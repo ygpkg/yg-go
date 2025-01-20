@@ -38,9 +38,9 @@ type Payment struct {
 	// TransactionID 第三方交易号
 	TransactionID string `gorm:"column:transaction_id;type:varchar(32);comment:第三方交易号" json:"transaction_id"`
 	// PayTime 第三方支付创建时间
-	PayTime time.Time `gorm:"column:pay_time;type:datetime;comment:第三方支付创建时间" json:"pay_time"`
+	PayTime *time.Time `gorm:"column:pay_time;type:datetime;comment:第三方支付创建时间" json:"pay_time"`
 	// SuccessTime 第三方支付成功时间
-	PaySuccessTime time.Time `gorm:"column:pay_success_time;type:datetime;comment:第三方支付成功时间" json:"pay_success_time"`
+	PaySuccessTime *time.Time `gorm:"column:pay_success_time;type:datetime;comment:第三方支付成功时间" json:"pay_success_time"`
 	// PrePayReq 预支付请求体信息
 	PrePayReq string `gorm:"column:pre_pay_req;type:text;comment:预支付请求体信息" json:"pre_pay_req"`
 	// PrePayResp 预支付响应体信息
@@ -48,7 +48,7 @@ type Payment struct {
 	// PrePaySign 预支付签名
 	PrePaySign string `gorm:"column:pre_pay_sign;type:varchar(256);comment:预支付签名" json:"pre_pay_sign"`
 	// ExpireTime 过期时间
-	ExpireTime time.Time `gorm:"column:expire_time;type:datetime;comment:过期时间" json:"expire_time"`
+	ExpireTime *time.Time `gorm:"column:expire_time;type:datetime;comment:过期时间" json:"expire_time"`
 }
 
 // TableName 表名

@@ -30,7 +30,7 @@ type PayOrder struct {
 	// OrderStatus 订单状态
 	OrderStatus OrderStatus `gorm:"column:order_status;type:tinyint;not null;comment:订单状态" json:"order_status"`
 	// ExpireTime 过期时间
-	ExpireTime time.Time `gorm:"column:expire_time;type:datetime;comment:过期时间" json:"expire_time"`
+	ExpireTime *time.Time `gorm:"column:expire_time;type:datetime;comment:过期时间" json:"expire_time"`
 	// OrderSnapshot 订单快照
 	OrderSnapshot string `gorm:"column:order_snapshot;type:text;comment:订单快照" json:"order_snapshot"`
 }
