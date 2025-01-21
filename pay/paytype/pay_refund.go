@@ -15,12 +15,16 @@ type PayRefund struct {
 	// CompanyID 公司ID
 	CompanyID uint `gorm:"column:company_id;type:bigint;comment:公司id" json:"company_id"`
 
+	// Reason 退款原因
+	Reason string `gorm:"column:reason;type:varchar(50);comment:退款原因" json:"reason"`
 	// OrderNo 订单号 来自订单表
 	OrderNo string `gorm:"column:order_no;type:varchar(32);not null;comment:订单号" json:"order_no"`
 	// RefundNo 商户退款号
 	RefundNo string `gorm:"column:refund_no;type:varchar(32);not null;comment:商户退款号" json:"refund_no"`
 	// Amount 退款金额
 	Amount types.Money `gorm:"column:amount;type:float;comment:退款金额" json:"amount"`
+	// PayType 支付方式
+	PayType PayType `gorm:"column:pay_type;type:varchar(32);not null;comment:支付类型" json:"pay_type"`
 	// PayStatus 支付状态
 	PayStatus PayStatus `gorm:"column:pay_status;type:varchar(32);not null;comment:支付状态" json:"pay_status"`
 	// RefundTime 第三方退款创建时间

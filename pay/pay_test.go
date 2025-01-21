@@ -1,6 +1,7 @@
 package pay
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -51,7 +52,7 @@ func TestInitiatePayment(t *testing.T) {
 	})
 	expire := time.Now().Add(5 * time.Minute)
 	var order paytype.PayOrder
-	err := dbtools.Std().Where("id = ?", 2).First(&order).Error
+	err := dbtools.Std().Where("id = ?", 5).First(&order).Error
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +78,7 @@ func TestQueryByTradeNo(t *testing.T) {
 		DB:       0,
 	})
 	var payment paytype.Payment
-	err := dbtools.Std().Where("id = ?", 3).First(&payment).Error
+	err := dbtools.Std().Where("id = ?", 5).First(&payment).Error
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,4 +109,55 @@ func TestCloseOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestRefund(t *testing.T) {
+	// go test -run TestRefund
+	dbtools.InitMutilMySQL(map[string]string{
+		"default": "",
+		"core":    "",
+	})
+	redispool.InitRedisWithConfig(&redis.Options{
+		Addr:     "192.168.1.106:6379",
+		Password: "",
+		DB:       0,
+	})
+	var order paytype.PayOrder
+	err := dbtools.Std().Where("id = ?", 5).First(&order).Error
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = Refund(dbtools.Std(), context.Background(), &paytype.PayRefund{
+		Uin:       order.Uin,
+		CompanyID: order.CompanyID,
+		OrderNo:   order.OrderNo,
+		Reason:    "测试退款",
+		Amount:    0.01,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestQueryRefund(t *testing.T) {
+	// go test -run TestQueryRefund
+	dbtools.InitMutilMySQL(map[string]string{
+		"default": "",
+		"core":    "",
+	})
+	redispool.InitRedisWithConfig(&redis.Options{
+		Addr:     "192.168.1.106:6379",
+		Password: "",
+		DB:       0,
+	})
+	var refund paytype.PayRefund
+	err := dbtools.Std().Where("id = ?", 1).First(&refund).Error
+	if err != nil {
+		t.Fatal(err)
+	}
+	str, err := QueryRefund(dbtools.Std(), context.Background(), &refund)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fmt.Println(str)
 }

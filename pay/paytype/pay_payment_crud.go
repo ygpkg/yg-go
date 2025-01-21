@@ -15,8 +15,19 @@ func CreatePayPayment(db *gorm.DB, payment *Payment) error {
 	return nil
 }
 
-// GetPayPaymentByOrderNo 根据订单号和状态获取支付记录
-func GetPayPaymentByOrderNo(db *gorm.DB, orderNo string, pay_status PayStatus) ([]*Payment, error) {
+// GetPayPaymentByOrderNo 根据订单号获取支付成功支付记录
+func GetPayPaymentByOrderNo(db *gorm.DB, orderNo string) (*Payment, error) {
+	var payment Payment
+	err := db.Where("order_no = ?", orderNo).Where("pay_status = ?", PayStatusSuccess).First(&payment).Error
+	if err != nil {
+		logs.Errorf("GetPayPaymentByOrderNo error: %v", err)
+		return nil, err
+	}
+	return &payment, nil
+}
+
+// GetPayPayment 根据订单号和状态获取支付记录
+func GetPayPayment(db *gorm.DB, orderNo string, pay_status PayStatus) ([]*Payment, error) {
 	var payments []*Payment
 	err := db.Where("order_no = ?", orderNo).Where("pay_status = ?", pay_status).Find(&payments).Error
 	if err != nil {

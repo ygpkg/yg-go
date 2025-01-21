@@ -18,7 +18,7 @@ type Pay interface {
 
 type QueryResp struct {
 	TransactionId string
-	TradeState    string
+	State         string
 	SuccessTime   *time.Time
 }
 
@@ -63,9 +63,9 @@ func InitiatePayment(db *gorm.DB, order *paytype.PayOrder, pay_type paytype.PayT
 		return nil, "", err
 	}
 	// 判断是否有正在支付的记录
-	payments, err := paytype.GetPayPaymentByOrderNo(db, order.OrderNo, paytype.PayStatusPending)
+	payments, err := paytype.GetPayPayment(db, order.OrderNo, paytype.PayStatusPending)
 	if err != nil {
-		logs.Errorf("GetPayPaymentByOrderNo failed,err=%v", err)
+		logs.Errorf("GetPayPayment failed,err=%v", err)
 		return nil, "", err
 	}
 	if len(payments) > 0 {
@@ -131,7 +131,7 @@ func QueryByTradeNo(db *gorm.DB, payment *paytype.Payment) (string, error) {
 		logs.Errorf("QueryByTradeNo QueryByTradeNo failed,err=%v", err)
 		return "", err
 	}
-	switch resp.TradeState {
+	switch resp.State {
 	case "NOTPAY":
 		if time.Now().After(*payment.ExpireTime) {
 			// 超时关闭订单
@@ -191,7 +191,7 @@ func QueryByTradeNo(db *gorm.DB, payment *paytype.Payment) (string, error) {
 			// 更新订单表信息
 			err = paytype.SavePayOrder(tx, order)
 			if err != nil {
-				logs.Errorf("QueryByTradeNo SavePayPayment failed,err=%v", err)
+				logs.Errorf("QueryByTradeNo SavePayOrder failed,err=%v", err)
 				return err
 			}
 			return nil
@@ -233,4 +233,160 @@ func CloseOrder(db *gorm.DB, payment *paytype.Payment) error {
 		return err
 	}
 	return nil
+}
+
+// Refund 退款
+func Refund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund) error {
+	// 获取订单信息
+	order, err := paytype.GetPayOrderByOrderNo(db, refund.OrderNo)
+	if err != nil {
+		logs.Errorf("get pay order error: %v", err)
+		return err
+	}
+	// 判断支付信息是否已完成
+	if order.PayStatus != "success" {
+		logs.Errorf("payment.TradeState is not success TradeNo:%s", order.OrderNo)
+		return fmt.Errorf("payment.TradeState is not success TradeNo:%s", order.OrderNo)
+	}
+	// 判断退款金额是否小于等于总金额并且不等于0
+	if refund.Amount > order.ShouldAmount || refund.Amount == 0 {
+		logs.Errorf("refund amount is not valid TradeNo:%s", order.OrderNo)
+		return fmt.Errorf("refund amount is not valid TradeNo:%s", order.OrderNo)
+	}
+	// 查找付款表获取付款号
+	payment, err := paytype.GetPayPaymentByOrderNo(db, order.OrderNo)
+	if err != nil {
+		logs.Errorf("get pay payment error: %v", err)
+		return err
+	}
+	// 生成退款号
+	refundNo, err := NewRefundNo(context.Background(), order.OrderNo)
+	if err != nil {
+		logs.Errorf("NewTradeNo failed,err=%v", err)
+		return err
+	}
+	now := time.Now()
+	refund.RefundNo = refundNo
+	refund.PayStatus = paytype.PayStatusPendingRefund
+	refund.RefundTime = &now
+	refund.PayType = payment.PayType
+	// 修改订单状态 待退款
+	order.PayStatus = paytype.PayStatusPendingRefund
+	// 判断是什么方式退款
+	switch payment.PayType {
+	case paytype.PayTypeWechat:
+		// 微信退款
+		err := WxRefund(ctx, payment, refund)
+		if err != nil {
+			logs.Errorf("WxRefund failed,err=%v", err)
+			return err
+		}
+	case paytype.PayTypeCash:
+		// 现金退款
+
+	default:
+		refund.PayStatus = paytype.PayStatusCancel
+		return nil
+	}
+	err = db.Transaction(func(tx *gorm.DB) error {
+		// 更新订单
+		err = paytype.SavePayOrder(tx, order)
+		if err != nil {
+			logs.Errorf("WxRefund SavePayOrder failed,err=%v", err)
+			return err
+		}
+		// 生成退款单
+		err = paytype.CreatePayRefund(tx, refund)
+		if err != nil {
+			logs.Errorf("WxRefund CreatePayRefund failed,err=%v", err)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		logs.Errorf("WxRefund Transaction failed,err=%v", err)
+		return err
+	}
+	return nil
+}
+
+// QueryRefund 查询退款
+func QueryRefund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund) (string, error) {
+	resp := &QueryResp{}
+	var err error
+	switch refund.PayType {
+	case paytype.PayTypeWechat:
+		// 微信退款
+		resp, err = WxQueryRefund(ctx, refund)
+		if err != nil {
+			logs.Errorf("WxQueryRefund failed,err=%v", err)
+			return "", err
+		}
+	case paytype.PayTypeCash:
+		// 现金退款
+	default:
+		return "", fmt.Errorf("paytype %s not support", refund.PayType)
+	}
+
+	switch resp.State {
+	case "CLOSED":
+		// 退款关闭
+		return "CLOSED", nil
+	case "ABNORMAL":
+		// 退款异常
+		return "ABNORMAL", fmt.Errorf("refund state is ABNORMAL")
+	case "PROCESSING":
+		return "PROCESSING", nil
+	case "SUCCESS":
+		refund.PayStatus = paytype.PayStatusSuccessRefund
+		refund.RefundSuccessTime = resp.SuccessTime
+		order, err := paytype.GetPayOrderByOrderNo(db, refund.OrderNo)
+		if err != nil {
+			logs.Errorf("QueryRefund GetPayOrderByOrderNo failed,err=%v", err)
+			return "", err
+		}
+		order.PayStatus = paytype.PayStatusSuccessRefund
+		// 事务操作三个表
+		err = db.Transaction(func(tx *gorm.DB) error {
+			// 新增流水
+			err := paytype.CreatePayStatement(tx, &paytype.PayStatement{
+				Uin:             order.Uin,
+				CompanyID:       order.CompanyID,
+				OrderNo:         order.OrderNo,
+				TransactionType: paytype.TransactionTypeOut,
+				SubjectNo:       refund.RefundNo,
+				Amount:          refund.Amount,
+			})
+			if err != nil {
+				logs.Errorf("QueryRefund CreatePayPayment failed,err=%v", err)
+				return err
+			}
+			// 更新退款表信息
+			err = paytype.SavePayRefund(tx, refund)
+			if err != nil {
+				logs.Errorf("QueryByTradeNo SavePayRefund failed,err=%v", err)
+				return err
+			}
+			// 更新订单表信息
+			err = paytype.SavePayOrder(tx, order)
+			if err != nil {
+				logs.Errorf("QueryByTradeNo SavePayOrder failed,err=%v", err)
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			logs.Errorf("QueryRefund Transaction failed,err=%v", err)
+			return "", err
+		}
+		// 删除支付号key
+		err = DeleteRefundNoKey(context.Background(), order.OrderNo)
+		if err != nil {
+			logs.Errorf("QueryRefund DeleteRefundNoKey failed,err=%v", err)
+			return "", err
+		}
+		return "SUCCESS", nil
+	default:
+		return "", fmt.Errorf("unknown result type")
+	}
 }

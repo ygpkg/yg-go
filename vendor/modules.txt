@@ -434,6 +434,7 @@ github.com/wechatpay-apiv3/wechatpay-go/core/option
 github.com/wechatpay-apiv3/wechatpay-go/services
 github.com/wechatpay-apiv3/wechatpay-go/services/payments
 github.com/wechatpay-apiv3/wechatpay-go/services/payments/native
+github.com/wechatpay-apiv3/wechatpay-go/services/refunddomestic
 github.com/wechatpay-apiv3/wechatpay-go/utils
 github.com/wechatpay-apiv3/wechatpay-go/utils/task
 # github.com/xen0n/go-workwx v1.7.0

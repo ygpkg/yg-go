@@ -71,9 +71,9 @@ func (na *Native) QueryByTradeNo(payment *paytype.Payment) (*QueryResp, error) {
 	}
 
 	queryResp := &QueryResp{
-		TradeState: *resp.TradeState,
+		State: *resp.TradeState,
 	}
-	if queryResp.TradeState == "SUCCESS" {
+	if queryResp.State == "SUCCESS" {
 		payment.PrePayResp, err = paytype.JsonString(resp)
 		if err != nil {
 			logs.Errorf("call QueryOrderByOutTradeNo err:%s", err)
