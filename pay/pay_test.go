@@ -12,15 +12,20 @@ import (
 	"github.com/ygpkg/yg-go/pay/paytype"
 )
 
+var (
+	group = "core"
+	key   = "wxpay"
+)
+
 func TestPlaceOrder(t *testing.T) {
 	// go test -run TestPlaceOrder
 	dbtools.InitMutilMySQL(map[string]string{
-		"default": "",
-		"core":    "",
+		"default": "root:skf021120@tcp(192.168.1.106:3306)/pay_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"core":    "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
 	})
 	redispool.InitRedisWithConfig(&redis.Options{
 		Addr:     "192.168.1.106:6379",
-		Password: "",
+		Password: "skf021120",
 		DB:       0,
 	})
 	paytype.InitDB(dbtools.Std())
@@ -42,23 +47,23 @@ func TestPlaceOrder(t *testing.T) {
 func TestInitiatePayment(t *testing.T) {
 	// go test -run TestInitiatePayment
 	dbtools.InitMutilMySQL(map[string]string{
-		"default": "",
-		"core":    "",
+		"default": "root:skf021120@tcp(192.168.1.106:3306)/pay_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"core":    "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
 	})
 	redispool.InitRedisWithConfig(&redis.Options{
 		Addr:     "192.168.1.106:6379",
-		Password: "",
+		Password: "skf021120",
 		DB:       0,
 	})
 	expire := time.Now().Add(5 * time.Minute)
 	var order paytype.PayOrder
-	err := dbtools.Std().Where("id = ?", 5).First(&order).Error
+	err := dbtools.Std().Where("id = ?", 9).First(&order).Error
 	if err != nil {
 		t.Fatal(err)
 	}
 	payment, key, err := InitiatePayment(dbtools.Std(),
 		&order, paytype.PayTypeWechat,
-		"native", &expire)
+		"native", group, key, &expire)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,20 +74,20 @@ func TestInitiatePayment(t *testing.T) {
 func TestQueryByTradeNo(t *testing.T) {
 	// go test -run TestQueryByTradeNo
 	dbtools.InitMutilMySQL(map[string]string{
-		"default": "",
-		"core":    "",
+		"default": "root:skf021120@tcp(192.168.1.106:3306)/pay_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"core":    "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
 	})
 	redispool.InitRedisWithConfig(&redis.Options{
 		Addr:     "192.168.1.106:6379",
-		Password: "",
+		Password: "skf021120",
 		DB:       0,
 	})
 	var payment paytype.Payment
-	err := dbtools.Std().Where("id = ?", 5).First(&payment).Error
+	err := dbtools.Std().Where("id = ?", 9).First(&payment).Error
 	if err != nil {
 		t.Fatal(err)
 	}
-	str, err := QueryByTradeNo(dbtools.Std(), &payment)
+	str, err := QueryByTradeNo(dbtools.Std(), &payment, group, key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +110,7 @@ func TestCloseOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = CloseOrder(dbtools.Std(), &payment)
+	err = CloseOrder(dbtools.Std(), &payment, group, key)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,16 +119,16 @@ func TestCloseOrder(t *testing.T) {
 func TestRefund(t *testing.T) {
 	// go test -run TestRefund
 	dbtools.InitMutilMySQL(map[string]string{
-		"default": "",
-		"core":    "",
+		"default": "root:skf021120@tcp(192.168.1.106:3306)/pay_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"core":    "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
 	})
 	redispool.InitRedisWithConfig(&redis.Options{
 		Addr:     "192.168.1.106:6379",
-		Password: "",
+		Password: "skf021120",
 		DB:       0,
 	})
 	var order paytype.PayOrder
-	err := dbtools.Std().Where("id = ?", 5).First(&order).Error
+	err := dbtools.Std().Where("id = ?", 9).First(&order).Error
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,7 +138,7 @@ func TestRefund(t *testing.T) {
 		OrderNo:   order.OrderNo,
 		Reason:    "测试退款",
 		Amount:    0.01,
-	})
+	}, "core", "wxpay")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +160,7 @@ func TestQueryRefund(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	str, err := QueryRefund(dbtools.Std(), context.Background(), &refund)
+	str, err := QueryRefund(dbtools.Std(), context.Background(), &refund, group, key)
 	if err != nil {
 		t.Fatal(err)
 	}

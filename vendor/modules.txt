@@ -430,6 +430,7 @@ github.com/wechatpay-apiv3/wechatpay-go/core/cipher/decryptors
 github.com/wechatpay-apiv3/wechatpay-go/core/cipher/encryptors
 github.com/wechatpay-apiv3/wechatpay-go/core/consts
 github.com/wechatpay-apiv3/wechatpay-go/core/downloader
+github.com/wechatpay-apiv3/wechatpay-go/core/notify
 github.com/wechatpay-apiv3/wechatpay-go/core/option
 github.com/wechatpay-apiv3/wechatpay-go/services
 github.com/wechatpay-apiv3/wechatpay-go/services/payments

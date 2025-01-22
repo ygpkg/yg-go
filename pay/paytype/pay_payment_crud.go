@@ -46,3 +46,14 @@ func SavePayPayment(db *gorm.DB, payment *Payment) error {
 	}
 	return nil
 }
+
+// GetPayPaymentByTradeNo 根据支付号获取支付记录
+func GetPayPaymentByTradeNo(db *gorm.DB, trade_no string) (*Payment, error) {
+	var payment Payment
+	err := db.Where("trade_no = ?", trade_no).First(&payment).Error
+	if err != nil {
+		logs.Errorf("GetPayPaymentByTradeNo error: %v", err)
+		return nil, err
+	}
+	return &payment, nil
+}

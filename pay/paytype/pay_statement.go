@@ -17,8 +17,8 @@ type PayStatement struct {
 	TransactionType TransactionType `gorm:"column:transaction_type;type:varchar(32);not null;comment:出账还是入账" json:"transaction_type"`
 	// OrderNo 订单号 来自订单表
 	OrderNo string `gorm:"column:order_no;type:varchar(32);not null;comment:订单号" json:"order_no"`
-	// SubjectNo 支付号或退款号根据PayWay判断
-	SubjectNo string `gorm:"column:subject_no;type:varchar(32);not null;comment:支付号或退款号" json:"subject_no"`
+	// SubjectNo 支付号或退款号
+	SubjectNo string `gorm:"column:subject_no;type:varchar(32);not null;unique;comment:支付号或退款号" json:"subject_no"`
 	// Amount 金额
 	Amount types.Money `gorm:"column:amount;type:float;comment:金额" json:"amount"`
 }

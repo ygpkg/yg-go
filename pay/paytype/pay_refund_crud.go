@@ -46,3 +46,14 @@ func GetPayRefund(db *gorm.DB, orderNo string, pay_status PayStatus) ([]*PayRefu
 	}
 	return refund, nil
 }
+
+// GetPayRefundByStatus 根据订单号和状态获取退款记录
+func GetPayRefundByStatus(db *gorm.DB, orderNo string, pay_status PayStatus) (*PayRefund, error) {
+	var refund PayRefund
+	err := db.Where("order_no = ?", orderNo).Where("pay_status = ?", pay_status).First(&refund).Error
+	if err != nil {
+		logs.Errorf("GetPayOrderByOrderNo error: %v", err)
+		return nil, err
+	}
+	return &refund, nil
+}

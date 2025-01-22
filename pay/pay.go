@@ -23,10 +23,10 @@ type QueryResp struct {
 }
 
 // NewPay 初始化支付
-func NewPay(pay_type paytype.PayType, trade_tpye string) (Pay, error) {
+func NewPay(pay_type paytype.PayType, trade_tpye, group, key string) (Pay, error) {
 	switch pay_type {
 	case paytype.PayTypeWechat:
-		return NewWxPay(trade_tpye)
+		return NewWxPay(trade_tpye, group, key)
 	case paytype.PayTypeCash:
 		return nil, fmt.Errorf("pay_type %s not support", pay_type)
 	default:
@@ -56,8 +56,8 @@ func PlaceOrder(db *gorm.DB, order *paytype.PayOrder, business int) (string, err
 }
 
 // InitiatePayment 对一个订单发起支付发起支付
-func InitiatePayment(db *gorm.DB, order *paytype.PayOrder, pay_type paytype.PayType, trade_tpye string, expire_time *time.Time) (*paytype.Payment, string, error) {
-	pay, err := NewPay(pay_type, trade_tpye)
+func InitiatePayment(db *gorm.DB, order *paytype.PayOrder, pay_type paytype.PayType, trade_tpye, group, key string, expire_time *time.Time) (*paytype.Payment, string, error) {
+	pay, err := NewPay(pay_type, trade_tpye, group, key)
 	if err != nil {
 		logs.Errorf("NewPay failed,err=%v", err)
 		return nil, "", err
@@ -102,12 +102,12 @@ func InitiatePayment(db *gorm.DB, order *paytype.PayOrder, pay_type paytype.PayT
 	}
 
 	// 发起预支付
-	key, err := pay.Prepay(payment)
+	signkey, err := pay.Prepay(payment)
 	if err != nil {
 		logs.Errorf("Prepay failed,err=%v", err)
 		return nil, "", err
 	}
-	payment.PrePaySign = key
+	payment.PrePaySign = signkey
 	// 创建记录
 	err = paytype.CreatePayPayment(db, payment)
 	if err != nil {
@@ -115,13 +115,13 @@ func InitiatePayment(db *gorm.DB, order *paytype.PayOrder, pay_type paytype.PayT
 		return nil, "", err
 	}
 	// 返回支付对象和预支付key
-	return payment, key, nil
+	return payment, signkey, nil
 }
 
 // QueryByTradeNo 根据订单号查询订单
-func QueryByTradeNo(db *gorm.DB, payment *paytype.Payment) (string, error) {
+func QueryByTradeNo(db *gorm.DB, payment *paytype.Payment, group, key string) (string, error) {
 	// 查询订单
-	pay, err := NewPay(payment.PayType, payment.TradeTpye)
+	pay, err := NewPay(payment.PayType, payment.TradeTpye, group, key)
 	if err != nil {
 		logs.Errorf("QueryByTradeNo NewPay failed,err=%v", err)
 		return "", err
@@ -135,7 +135,7 @@ func QueryByTradeNo(db *gorm.DB, payment *paytype.Payment) (string, error) {
 	case "NOTPAY":
 		if time.Now().After(*payment.ExpireTime) {
 			// 超时关闭订单
-			err = CloseOrder(db, payment)
+			err = CloseOrder(db, payment, group, key)
 			if err != nil {
 				logs.Errorf("QueryByTradeNo CloseOrder failed,err=%v", err)
 				return "", err
@@ -213,9 +213,9 @@ func QueryByTradeNo(db *gorm.DB, payment *paytype.Payment) (string, error) {
 }
 
 // CloseOrder 关闭订单
-func CloseOrder(db *gorm.DB, payment *paytype.Payment) error {
+func CloseOrder(db *gorm.DB, payment *paytype.Payment, group, key string) error {
 	// 查询订单
-	pay, err := NewPay(payment.PayType, payment.TradeTpye)
+	pay, err := NewPay(payment.PayType, payment.TradeTpye, group, key)
 	if err != nil {
 		logs.Errorf("CloseOrder NewPay failed,err=%v", err)
 		return err
@@ -236,7 +236,7 @@ func CloseOrder(db *gorm.DB, payment *paytype.Payment) error {
 }
 
 // Refund 退款
-func Refund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund) error {
+func Refund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund, group, key string) error {
 	// 获取订单信息
 	order, err := paytype.GetPayOrderByOrderNo(db, refund.OrderNo)
 	if err != nil {
@@ -276,7 +276,7 @@ func Refund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund) error {
 	switch payment.PayType {
 	case paytype.PayTypeWechat:
 		// 微信退款
-		err := WxRefund(ctx, payment, refund)
+		err := WxRefund(ctx, payment, refund, group, key)
 		if err != nil {
 			logs.Errorf("WxRefund failed,err=%v", err)
 			return err
@@ -311,13 +311,13 @@ func Refund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund) error {
 }
 
 // QueryRefund 查询退款
-func QueryRefund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund) (string, error) {
+func QueryRefund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund, group, key string) (string, error) {
 	resp := &QueryResp{}
 	var err error
 	switch refund.PayType {
 	case paytype.PayTypeWechat:
 		// 微信退款
-		resp, err = WxQueryRefund(ctx, refund)
+		resp, err = WxQueryRefund(ctx, refund, group, key)
 		if err != nil {
 			logs.Errorf("WxQueryRefund failed,err=%v", err)
 			return "", err
@@ -334,6 +334,33 @@ func QueryRefund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund) (s
 		return "CLOSED", nil
 	case "ABNORMAL":
 		// 退款异常
+		refund.PayStatus = paytype.PayStatusFailRefund
+		order, err := paytype.GetPayOrderByOrderNo(db, refund.OrderNo)
+		if err != nil {
+			logs.Errorf("QueryRefund GetPayOrderByOrderNo failed,err=%v", err)
+			return "", err
+		}
+		order.PayStatus = paytype.PayStatusFailRefund
+		// 事务操作2个表
+		err = db.Transaction(func(tx *gorm.DB) error {
+			// 更新退款表信息
+			err = paytype.SavePayRefund(tx, refund)
+			if err != nil {
+				logs.Errorf("QueryByTradeNo SavePayRefund failed,err=%v", err)
+				return err
+			}
+			// 更新订单表信息
+			err = paytype.SavePayOrder(tx, order)
+			if err != nil {
+				logs.Errorf("QueryByTradeNo SavePayOrder failed,err=%v", err)
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			logs.Errorf("QueryRefund Transaction failed,err=%v", err)
+			return "", err
+		}
 		return "ABNORMAL", fmt.Errorf("refund state is ABNORMAL")
 	case "PROCESSING":
 		return "PROCESSING", nil
