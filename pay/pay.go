@@ -155,6 +155,9 @@ func QueryByTradeNo(db *gorm.DB, payment *paytype.Payment, group, key string) (s
 		}
 		return "CLOSED", nil
 	case "SUCCESS":
+		if payment.PayStatus == paytype.PayStatusSuccess {
+			return "SUCCESS", nil
+		}
 		payment.PayStatus = paytype.PayStatusSuccess
 		payment.PaySuccessTime = resp.SuccessTime
 		payment.TransactionID = resp.TransactionId
@@ -253,12 +256,23 @@ func Refund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund, group, 
 		logs.Errorf("refund amount is not valid TradeNo:%s", order.OrderNo)
 		return fmt.Errorf("refund amount is not valid TradeNo:%s", order.OrderNo)
 	}
+	// 判断是否有正在退款的记录
+	payments, err := paytype.GetPayRefund(db, order.OrderNo, paytype.PayStatusPendingRefund)
+	if err != nil {
+		logs.Errorf("GetPayPayment failed,err=%v", err)
+		return err
+	}
+	if len(payments) > 0 {
+		logs.Errorf("refund is already in progress TradeNo:%s", order.OrderNo)
+		return fmt.Errorf("refund is already in progress TradeNo:%s", order.OrderNo)
+	}
 	// 查找付款表获取付款号
 	payment, err := paytype.GetPayPaymentByOrderNo(db, order.OrderNo)
 	if err != nil {
 		logs.Errorf("get pay payment error: %v", err)
 		return err
 	}
+
 	// 生成退款号
 	refundNo, err := NewRefundNo(context.Background(), order.OrderNo)
 	if err != nil {
@@ -365,6 +379,10 @@ func QueryRefund(db *gorm.DB, ctx context.Context, refund *paytype.PayRefund, gr
 	case "PROCESSING":
 		return "PROCESSING", nil
 	case "SUCCESS":
+		// 退款成功
+		if refund.PayStatus == paytype.PayStatusSuccessRefund {
+			return "SUCCESS", nil
+		}
 		refund.PayStatus = paytype.PayStatusSuccessRefund
 		refund.RefundSuccessTime = resp.SuccessTime
 		order, err := paytype.GetPayOrderByOrderNo(db, refund.OrderNo)

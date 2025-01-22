@@ -216,6 +216,9 @@ func WxNotify(db *gorm.DB, ctx *gin.Context, group, key string) error {
 	}
 	// 处理回调请求
 	if notifyReq.EventType == "TRANSACTION.SUCCESS" {
+		if payment.PayStatus == paytype.PayStatusSuccess {
+			return nil
+		}
 		// 支付成功
 		payment.PayStatus = paytype.PayStatusSuccess
 		payment.PrePayResp, err = paytype.JsonString(transaction)
@@ -279,6 +282,9 @@ func WxNotify(db *gorm.DB, ctx *gin.Context, group, key string) error {
 		if err != nil {
 			logs.Errorf("QueryByTradeNo GetPayRefund failed,err=%v", err)
 			return err
+		}
+		if refund.PayStatus == paytype.PayStatusSuccessRefund {
+			return nil
 		}
 		refund.PayStatus = paytype.PayStatusSuccessRefund
 		refund.RefundSuccessTime = &parsedTime
