@@ -39,6 +39,7 @@ func Logger() gin.HandlerFunc {
 				"latency", fmt.Sprintf("%.3f", cost.Seconds()),
 				"clientip", runtime.GetRealIP(ctx.Request),
 				"respsize", ctx.Writer.Size(),
+				"referer", ctx.Request.Referer(),
 			)
 		} else {
 			logs.LoggerFromContext(ctx).Infow(fmt.Sprint(ctx.Writer.Status()),
@@ -48,6 +49,7 @@ func Logger() gin.HandlerFunc {
 				"latency", fmt.Sprintf("%.3f", cost.Seconds()),
 				"clientip", runtime.GetRealIP(ctx.Request),
 				"respsize", ctx.Writer.Size(),
+				"referer", ctx.Request.Referer(),
 			)
 		}
 	}
