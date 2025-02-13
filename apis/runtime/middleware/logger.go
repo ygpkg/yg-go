@@ -40,6 +40,7 @@ func Logger() gin.HandlerFunc {
 				"clientip", runtime.GetRealIP(ctx.Request),
 				"respsize", ctx.Writer.Size(),
 				"referer", ctx.Request.Referer(),
+				"uin", ctx.GetUint(constants.CtxKeyUin),
 			)
 		} else {
 			logs.LoggerFromContext(ctx).Infow(fmt.Sprint(ctx.Writer.Status()),
@@ -50,6 +51,7 @@ func Logger() gin.HandlerFunc {
 				"clientip", runtime.GetRealIP(ctx.Request),
 				"respsize", ctx.Writer.Size(),
 				"referer", ctx.Request.Referer(),
+				"uin", ctx.GetUint(constants.CtxKeyUin),
 			)
 		}
 	}

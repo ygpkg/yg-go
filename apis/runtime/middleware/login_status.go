@@ -20,6 +20,9 @@ func LoginStatus() gin.HandlerFunc {
 		)
 		defer func() {
 			ctx.Set(constants.CtxKeyLoginStatus, ls)
+			if ls.Claim != nil && ls.Claim.Uin > 0 {
+				ctx.Set(constants.CtxKeyUin, ls.Claim.Uin)
+			}
 			// logs.Debugf("login status: %+v", ls)
 		}()
 		if authstr == "" {
