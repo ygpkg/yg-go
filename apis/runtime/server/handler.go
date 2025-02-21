@@ -109,9 +109,14 @@ func fixBaseResponse(ctx *gin.Context, val reflect.Value) {
 			}
 
 			fieldName := val.Type().Field(i).Name
-			if fieldName == "Code" && field.CanInt() {
-				ctx.Set(constants.CtxKeyCode, int(field.Int()))
-				return
+			if fieldName == "Code" {
+				if field.CanUint() {
+					ctx.Set(constants.CtxKeyCode, int(field.Uint()))
+					return
+				} else if field.CanInt() {
+					ctx.Set(constants.CtxKeyCode, int(field.Int()))
+					return
+				}
 			}
 
 			if field.Type() == reflect.TypeOf(apiobj.BaseResponse{}) {
