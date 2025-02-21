@@ -110,7 +110,7 @@ func fixBaseResponse(ctx *gin.Context, val reflect.Value) {
 
 			fieldName := val.Type().Field(i).Name
 			if fieldName == "Code" && field.CanInt() {
-				ctx.Set(constants.CtxKeyCode, field.Int())
+				ctx.Set(constants.CtxKeyCode, int(field.Int()))
 				return
 			}
 
@@ -119,7 +119,7 @@ func fixBaseResponse(ctx *gin.Context, val reflect.Value) {
 				if br.Message == "" {
 					br.Message = errcode.GetMessage(br.Code)
 				}
-				ctx.Set(constants.CtxKeyCode, br.Code)
+				ctx.Set(constants.CtxKeyCode, int(br.Code))
 				br.RequestID = ctx.GetString(constants.CtxKeyRequestID)
 				br.Env = config.Conf().MainConf.Env
 				field.Set(reflect.ValueOf(br))
