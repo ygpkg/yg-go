@@ -112,6 +112,7 @@ func fixBaseResponse(ctx *gin.Context, val reflect.Value) {
 				if br.Message == "" {
 					br.Message = errcode.GetMessage(br.Code)
 				}
+				ctx.Set(constants.CtxKeyCode, br.Code)
 				br.RequestID = ctx.GetString(constants.CtxKeyRequestID)
 				br.Env = config.Conf().MainConf.Env
 				field.Set(reflect.ValueOf(br))

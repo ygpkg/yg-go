@@ -43,7 +43,8 @@ func Logger() gin.HandlerFunc {
 				"uin", ctx.GetUint(constants.CtxKeyUin),
 			)
 		} else {
-			logs.LoggerFromContext(ctx).Infow(fmt.Sprint(ctx.Writer.Status()),
+			code := ctx.GetInt(constants.CtxKeyCode)
+			logs.LoggerFromContext(ctx).Infow(fmt.Sprint(code),
 				"method", ctx.Request.Method,
 				"uri", ctx.Request.RequestURI,
 				"reqsize", ctx.Request.ContentLength,

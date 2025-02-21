@@ -3,6 +3,7 @@ package constants
 const (
 	CtxKeyRequestID = "reqid"
 	CtxKeyLogger    = "logger"
+	CtxKeyCode      = "code"
 
 	CtxKeyPlatform = "platform"
 	CtxKeyUserRole = "userrole"
