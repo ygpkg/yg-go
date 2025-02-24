@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"path"
 	"strings"
-	"time"
 
 	minio "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -82,9 +81,9 @@ func (mfs *MinFs) GetPublicURL(storagePath string, _ bool) string {
 }
 
 // GetPresignedURL 获取预签名URL
-func (mfs *MinFs) GetPresignedURL(storagePath string) (string, error) {
+func (mfs *MinFs) GetPresignedURL(method, storagePath string) (string, error) {
 	reqParams := make(url.Values)
-	presignedURL, err := mfs.client.PresignedGetObject(mfs.ctx, mfs.mfsCfg.Bucket, storagePath, time.Hour*24, reqParams)
+	presignedURL, err := mfs.client.PresignedGetObject(mfs.ctx, mfs.mfsCfg.Bucket, storagePath, mfs.opt.PresignedTimeout, reqParams)
 	if err != nil {
 		// 如果生成预签名URL失败，返回原始存储路径
 		return "", err

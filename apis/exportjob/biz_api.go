@@ -1,6 +1,8 @@
 package exportjob
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/ygpkg/yg-go/apis/errcode"
 	"github.com/ygpkg/yg-go/apis/runtime"
@@ -38,7 +40,7 @@ func DetailExportJob(ctx *gin.Context, req *DetailExportJobRequest, resp *Detail
 		resp.Code = errcode.ErrCode_InternalError
 		return
 	}
-	fileURL, err := s.GetPresignedURL(job.Output)
+	fileURL, err := s.GetPresignedURL(http.MethodGet, job.Output)
 	if err != nil {
 		logs.Errorf("[exportjob] get presigned url failed, %v", err)
 		resp.Message = err.Error()
