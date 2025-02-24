@@ -103,7 +103,7 @@ func (tc *TencentCos) GetPublicURL(storagePath string, temp bool) string {
 }
 
 // GetPresignedURL 获取预签名URL
-func (tc *TencentCos) GetPresignedURL(storagePath string) (string, error) {
+func (tc *TencentCos) GetPresignedURL(method, storagePath string) (string, error) {
 	host := fmt.Sprintf("https://%s.cos.%s.myqcloud.com/", tc.cosCfg.Bucket, tc.cosCfg.Region)
 	u, _ := url.Parse(host)
 	b := &cos.BaseURL{BucketURL: u}
@@ -117,7 +117,7 @@ func (tc *TencentCos) GetPresignedURL(storagePath string) (string, error) {
 		},
 	})
 	ctx := context.Background()
-	presignedURL, err := client.Object.GetPresignedURL(ctx, http.MethodGet, storagePath,
+	presignedURL, err := client.Object.GetPresignedURL(ctx, method, storagePath,
 		tc.cosCfg.TencentConfig.SecretID, tc.cosCfg.TencentConfig.SecretKey, tc.opt.PresignedTimeout, nil)
 	if err != nil {
 		logs.Errorf("tencent cos get presigned url error: %v", err)

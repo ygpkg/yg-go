@@ -62,7 +62,7 @@ func (ls *LocalStorage) GetPublicURL(storagePath string, _ bool) string {
 	return fmt.Sprintf("%s/public.src?p=%s", ls.cfg.PublicPrefix, storagePath)
 }
 
-func (ls *LocalStorage) GetPresignedURL(storagePath string) (string, error) {
+func (ls *LocalStorage) GetPresignedURL(method, storagePath string) (string, error) {
 	return "", nil
 }
 

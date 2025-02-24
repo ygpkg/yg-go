@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"testing"
 
@@ -71,7 +72,7 @@ func TestMinBucketClient_GetPresignedURL(t *testing.T) {
 		t.Logf(err.Error())
 	}
 	path := "test/a/test.txt"
-	url, err := mc.GetPresignedURL(path)
+	url, err := mc.GetPresignedURL(http.MethodGet, path)
 	if err != nil {
 		t.Logf(err.Error())
 	}
