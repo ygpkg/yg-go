@@ -3,6 +3,8 @@ package lifecycle
 import (
 	"fmt"
 	"os"
+
+	"github.com/ygpkg/yg-go/nettools"
 )
 
 // OwnerID 获取当前服务的ownerID
@@ -15,5 +17,6 @@ func OwnerID() string {
 		hostname = "unknown"
 	}
 	pid := os.Getpid()
-	return fmt.Sprintf("%s-%d", hostname, pid)
+	ip := nettools.MustLocalPrimearyIP()
+	return fmt.Sprintf("%s-%s-%d", hostname, ip, pid)
 }
