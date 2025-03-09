@@ -13,6 +13,7 @@ require (
 	github.com/minio/minio-go/v7 v7.0.76
 	github.com/mr-tron/base58 v1.2.0
 	github.com/redis/go-redis/v9 v9.5.1
+	github.com/robfig/cron/v3 v3.0.0
 	github.com/satori/go.uuid v1.2.0
 	github.com/silenceper/wechat/v2 v2.1.6
 	github.com/swaggo/files v1.0.1
