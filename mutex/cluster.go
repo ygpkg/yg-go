@@ -62,6 +62,12 @@ func (m *ClusterMutex) daemonRoutine() {
 					continue
 				}
 			}
+
+		case <-m.ctx.Done():
+			tc.Stop()
+			m.refund()
+			logs.InfoContextf(m.ctx, "cluster mutex: %s stop", m.myName)
+			return
 		}
 
 	}
@@ -75,6 +81,18 @@ func (m *ClusterMutex) tryPreempt() error {
 // relete 续约
 func (m *ClusterMutex) relete() error {
 	_, err := m.cli.Expire(m.ctx, m.key, clusterMutexExpiration).Result()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// refund 归还
+func (m *ClusterMutex) refund() error {
+	if !m.IsMaster() {
+		return fmt.Errorf("not master")
+	}
+	_, err := m.cli.Del(m.ctx, m.key).Result()
 	if err != nil {
 		return err
 	}
