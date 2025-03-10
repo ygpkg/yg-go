@@ -142,6 +142,7 @@ func (l *LifeCycle) exit() {
 		}(v)
 	}
 	wg.Wait()
+	time.Sleep(time.Second)
 	os.Exit(0)
 }
 

@@ -13,6 +13,7 @@ import (
 
 const clusterMutexExpiration = 30 * time.Second
 
+// ClusterMutex 集群互斥锁
 type ClusterMutex struct {
 	cli      *redis.Client
 	ctx      context.Context
@@ -23,6 +24,7 @@ type ClusterMutex struct {
 	currentMaster string
 }
 
+// NewClusterMutex .
 func NewClusterMutex(ctx context.Context, cli *redis.Client, name string) *ClusterMutex {
 	cm := &ClusterMutex{
 		ctx:      ctx,
@@ -42,6 +44,7 @@ func (m *ClusterMutex) IsMaster() bool {
 
 // daemonRoutine 后台守护协程
 func (m *ClusterMutex) daemonRoutine() {
+	m.tryPreempt()
 	tc := time.NewTicker(m.interval)
 	for {
 		select {
@@ -52,21 +55,20 @@ func (m *ClusterMutex) daemonRoutine() {
 				if err := m.tryPreempt(); err != nil {
 					continue
 				}
-				logs.InfoContextf(m.ctx, "cluster mutex: %s become master", m.myName)
+
 				continue
 			}
 			if m.IsMaster() {
 				// 续约
 				if err := m.relete(); err != nil {
-					logs.ErrorContextf(m.ctx, "cluster mutex: %s relete error: %v", m.myName, err)
-					continue
+					logs.ErrorContextf(m.ctx, "[%s] cluster mutex: %s relete error: %v", m.key, m.myName, err)
 				}
 			}
 
 		case <-m.ctx.Done():
 			tc.Stop()
 			m.refund()
-			logs.InfoContextf(m.ctx, "cluster mutex: %s stop", m.myName)
+			logs.InfoContextf(m.ctx, "[%s] cluster mutex: %s stop", m.key, m.myName)
 			return
 		}
 
@@ -75,7 +77,15 @@ func (m *ClusterMutex) daemonRoutine() {
 
 // tryPreempt 争抢锁
 func (m *ClusterMutex) tryPreempt() error {
-	return m.cli.SetNX(m.ctx, m.key, m.myName, clusterMutexExpiration).Err()
+	succ, err := m.cli.SetNX(m.ctx, m.key, m.myName, clusterMutexExpiration).Result()
+	if err != nil {
+		return err
+	}
+	if succ {
+		m.currentMaster = m.myName
+		logs.InfoContextf(m.ctx, "[%s] cluster mutex: %s become master", m.key, m.myName)
+	}
+	return nil
 }
 
 // relete 续约
@@ -92,10 +102,13 @@ func (m *ClusterMutex) refund() error {
 	if !m.IsMaster() {
 		return fmt.Errorf("not master")
 	}
-	_, err := m.cli.Del(m.ctx, m.key).Result()
+
+	_, err := m.cli.Del(context.Background(), m.key).Result()
 	if err != nil {
+		logs.ErrorContextf(m.ctx, "[%s] cluster mutex: %s refund error: %v", m.key, m.myName, err)
 		return err
 	}
+	logs.InfoContextf(m.ctx, "[%s] cluster mutex: %s refund", m.key, m.myName)
 	return nil
 }
 
