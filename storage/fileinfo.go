@@ -197,3 +197,10 @@ func GenerateFileStoragePath(purpose string, owner uint, fileExt string) string 
 		purpose, time.Now().Format("20060102"), owner, random.String(9), fileExt)
 	return storagePath
 }
+
+// GenerateFileStoragePathWithName 生成文件存储路径
+func GenerateFileStoragePathWithName(purpose string, owner uint, fileName string) string {
+	storagePath := fmt.Sprintf("%s/%s/%d-%s/%s",
+		purpose, time.Now().Format("20060102"), owner, random.String(9), fileName)
+	return storagePath
+}
