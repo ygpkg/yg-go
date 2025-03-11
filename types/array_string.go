@@ -9,7 +9,8 @@ import (
 // StringArray 字符串数组，用于Mysql数据库和接口之间的转换
 type StringArray string
 
-func New(v ...string) StringArray {
+// NewStringArray 新建字符串数组
+func NewStringArray(v []string) StringArray {
 	if len(v) == 0 {
 		return StringArray("")
 	}
@@ -43,7 +44,7 @@ func (i *StringArray) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err != nil {
 		return err
 	}
-	*i = New(arr...)
+	*i = NewStringArray(arr)
 	return nil
 }
 
