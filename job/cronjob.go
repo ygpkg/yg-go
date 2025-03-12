@@ -4,16 +4,16 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
-	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/types"
+	"gorm.io/gorm"
 )
 
 // 定时任务调度器
 var stdCron *cron.Cron
 
 // RegistryCronFunc 通用任务注册
-func RegistryCronFunc(spec string, companyID, uin uint, purpose string, f func() (string, error)) {
+func RegistryCronFunc(db *gorm.DB, spec string, companyID, uin uint, purpose string, taskFunc func() (string, error)) {
 	// 确保 stdCron 已初始化
 	if stdCron == nil {
 		stdCron = cron.New(cron.WithSeconds())
@@ -42,13 +42,13 @@ func RegistryCronFunc(spec string, companyID, uin uint, purpose string, f func()
 		}
 
 		// 存储 Job
-		if err := dbtools.Core().Create(&job).Error; err != nil {
+		if err := db.Create(&job).Error; err != nil {
 			logs.Errorf("Failed to store Job record: %v", err)
 			return
 		}
 
 		// 执行任务
-		output, taskErr := f()
+		output, taskErr := taskFunc()
 		costTime := int(time.Since(startTime).Seconds())
 
 		// 更新 Job 状态
@@ -62,7 +62,7 @@ func RegistryCronFunc(spec string, companyID, uin uint, purpose string, f func()
 		}
 
 		// 更新 Job 记录
-		if err := dbtools.Core().Save(&job).Error; err != nil {
+		if err := db.Save(&job).Error; err != nil {
 			logs.Errorf("Failed to update Job record: %v", err)
 		} else {
 			logs.Info("[RegistryCronFunc] Task completed in %d seconds, status: %s", costTime, job.JobStatus)

@@ -12,11 +12,11 @@ import (
 func TestRegistryCronFunc(t *testing.T) {
 
 	dbtools.InitMutilMySQL(map[string]string{
-		"core": "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"core": "",
 	})
 	InitDB(dbtools.Core())
 	// 注册定时任务
-	RegistryCronFunc("*/2 * * * * *", 0, 0, "SyncLLMModelAndAccount", func() (string, error) {
+	RegistryCronFunc(dbtools.Core(), "*/2 * * * * *", 0, 0, "SyncLLMModelAndAccount", func() (string, error) {
 		SyncLLMModelAndAccountToLLMModelHealth()
 		return "Synchronization complete", nil
 	})
@@ -36,12 +36,12 @@ func SyncLLMModelAndAccountToLLMModelHealth() {
 func TestRegistryCronFunc_Failure(t *testing.T) {
 	// **初始化数据库**（此处模拟数据库初始化失败）
 	dbtools.InitMutilMySQL(map[string]string{
-		"core": "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"core": "",
 	})
 	InitDB(dbtools.Core())
 
 	// **注册定时任务（任务返回错误）**
-	RegistryCronFunc("*/2 * * * * *", 0, 0, "SyncLLMModelAndAccount_Failure", func() (string, error) {
+	RegistryCronFunc(dbtools.Core(), "*/2 * * * * *", 0, 0, "SyncLLMModelAndAccount_Failure", func() (string, error) {
 		logs.Errorf("Execution failed test: LLMModel and Account synchronization tasks...")
 		return "", errors.New("Simulation task failure: data synchronization error")
 	})
@@ -57,11 +57,11 @@ func TestRegistryCronFunc_Failure(t *testing.T) {
 func TestRegistryCronFunc_Panic(t *testing.T) {
 	// **初始化数据库**（此处模拟数据库初始化失败）
 	dbtools.InitMutilMySQL(map[string]string{
-		"core": "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"core": "",
 	})
 	InitDB(dbtools.Core())
 	// **注册定时任务（任务发生 panic）**
-	RegistryCronFunc("*/2 * * * * *", 0, 0, "SyncLLMModelAndAccount_Panic", func() (string, error) {
+	RegistryCronFunc(dbtools.Core(), "*/2 * * * * *", 0, 0, "SyncLLMModelAndAccount_Panic", func() (string, error) {
 		logs.Errorf("Run crash tests: LLMModel and Account sync tasks...")
 		panic("Simulated task crash: code exception")
 	})
