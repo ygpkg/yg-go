@@ -20,12 +20,12 @@ var (
 func TestPlaceOrder(t *testing.T) {
 	// go test -run TestPlaceOrder
 	dbtools.InitMutilMySQL(map[string]string{
-		"default": "root:skf021120@tcp(192.168.1.106:3306)/pay_test?charset=utf8mb4&parseTime=true&loc=Local",
-		"core":    "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"default": "",
+		"core":    "",
 	})
 	redispool.InitRedisWithConfig(&redis.Options{
-		Addr:     "192.168.1.106:6379",
-		Password: "skf021120",
+		Addr:     "",
+		Password: "",
 		DB:       0,
 	})
 	paytype.InitDB(dbtools.Std())
@@ -47,12 +47,12 @@ func TestPlaceOrder(t *testing.T) {
 func TestInitiatePayment(t *testing.T) {
 	// go test -run TestInitiatePayment
 	dbtools.InitMutilMySQL(map[string]string{
-		"default": "root:skf021120@tcp(192.168.1.106:3306)/pay_test?charset=utf8mb4&parseTime=true&loc=Local",
-		"core":    "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"default": "",
+		"core":    "",
 	})
 	redispool.InitRedisWithConfig(&redis.Options{
-		Addr:     "192.168.1.106:6379",
-		Password: "skf021120",
+		Addr:     "",
+		Password: "",
 		DB:       0,
 	})
 	expire := time.Now().Add(5 * time.Minute)
@@ -74,12 +74,12 @@ func TestInitiatePayment(t *testing.T) {
 func TestQueryByTradeNo(t *testing.T) {
 	// go test -run TestQueryByTradeNo
 	dbtools.InitMutilMySQL(map[string]string{
-		"default": "root:skf021120@tcp(192.168.1.106:3306)/pay_test?charset=utf8mb4&parseTime=true&loc=Local",
-		"core":    "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"default": "",
+		"core":    "",
 	})
 	redispool.InitRedisWithConfig(&redis.Options{
-		Addr:     "192.168.1.106:6379",
-		Password: "skf021120",
+		Addr:     "",
+		Password: "",
 		DB:       0,
 	})
 	var payment paytype.Payment
@@ -101,7 +101,7 @@ func TestCloseOrder(t *testing.T) {
 		"core":    "",
 	})
 	redispool.InitRedisWithConfig(&redis.Options{
-		Addr:     "192.168.1.106:6379",
+		Addr:     "",
 		Password: "",
 		DB:       0,
 	})
@@ -119,12 +119,12 @@ func TestCloseOrder(t *testing.T) {
 func TestRefund(t *testing.T) {
 	// go test -run TestRefund
 	dbtools.InitMutilMySQL(map[string]string{
-		"default": "root:skf021120@tcp(192.168.1.106:3306)/pay_test?charset=utf8mb4&parseTime=true&loc=Local",
-		"core":    "yygu_test_rw:vhc99v3dcxico74h@tcp(bj-cdb-feu2hlj6.sql.tencentcdb.com:63807)/yygu_test?charset=utf8mb4&parseTime=true&loc=Local",
+		"default": "",
+		"core":    "",
 	})
 	redispool.InitRedisWithConfig(&redis.Options{
-		Addr:     "192.168.1.106:6379",
-		Password: "skf021120",
+		Addr:     "",
+		Password: "",
 		DB:       0,
 	})
 	var order paytype.PayOrder
