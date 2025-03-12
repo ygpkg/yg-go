@@ -1,6 +1,7 @@
 package job
 
 import (
+	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/types"
 	"gorm.io/gorm"
 )
@@ -20,10 +21,12 @@ const (
 // Job 导出任务
 type Job struct {
 	gorm.Model
-	// JobUUID
-	JobUUID   string `gorm:"column:job_uuid;type:varchar(36);not null;index"`
-	CompanyID uint   `gorm:"column:company_id;type:int;not null;index"`
-	Uin       uint   `gorm:"column:uin;type:int;not null;index"`
+	// JobUUID 任务的唯一标识符
+	JobUUID string `gorm:"column:job_uuid;type:varchar(36);not null;index"`
+	// CompanyID 公司 ID
+	CompanyID uint `gorm:"column:company_id;type:int;not null;index"`
+	// Uin 用户 ID
+	Uin uint `gorm:"column:uin;type:int;not null;index"`
 	// Purpose 目的
 	Purpose string `gorm:"column:purpose;type:varchar(255);not null;index"`
 	// JobStatus 状态
@@ -41,4 +44,10 @@ type Job struct {
 // TableName 表名
 func (j *Job) TableName() string {
 	return "core_jobs"
+}
+
+func InitDB(db *gorm.DB) error {
+	return dbtools.InitModel(db,
+		&Job{},
+	)
 }

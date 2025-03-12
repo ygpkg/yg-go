@@ -74,3 +74,15 @@ func (i StringArray) First() string {
 	}
 	return ""
 }
+
+// Add 向 StringArray 中添加一个新元素
+func (i *StringArray) Add(item string) {
+	// 获取当前数组
+	arr := i.Slice()
+
+	// 追加新元素
+	arr = append(arr, item)
+
+	// 更新 StringArray
+	*i = NewStringArray(arr)
+}
