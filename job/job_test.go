@@ -16,7 +16,7 @@ func TestRegistryCronFunc(t *testing.T) {
 	})
 	InitDB(dbtools.Core())
 	// 注册定时任务
-	RegistryCronFunc(dbtools.Core(), "*/2 * * * * *", 0, 0, "SyncLLMModelAndAccount", func() (string, error) {
+	RegistryCronFunc(dbtools.Core(), "*/2 * * * * *", "SyncLLMModelAndAccount", func() (string, error) {
 		SyncLLMModelAndAccountToLLMModelHealth()
 		return "Synchronization complete", nil
 	})
@@ -41,7 +41,7 @@ func TestRegistryCronFunc_Failure(t *testing.T) {
 	InitDB(dbtools.Core())
 
 	// **注册定时任务（任务返回错误）**
-	RegistryCronFunc(dbtools.Core(), "*/2 * * * * *", 0, 0, "SyncLLMModelAndAccount_Failure", func() (string, error) {
+	RegistryCronFunc(dbtools.Core(), "*/2 * * * * *", "SyncLLMModelAndAccount_Failure", func() (string, error) {
 		logs.Errorf("Execution failed test: LLMModel and Account synchronization tasks...")
 		return "", errors.New("Simulation task failure: data synchronization error")
 	})
@@ -61,7 +61,7 @@ func TestRegistryCronFunc_Panic(t *testing.T) {
 	})
 	InitDB(dbtools.Core())
 	// **注册定时任务（任务发生 panic）**
-	RegistryCronFunc(dbtools.Core(), "*/2 * * * * *", 0, 0, "SyncLLMModelAndAccount_Panic", func() (string, error) {
+	RegistryCronFunc(dbtools.Core(), "*/2 * * * * *", "SyncLLMModelAndAccount_Panic", func() (string, error) {
 		logs.Errorf("Run crash tests: LLMModel and Account sync tasks...")
 		panic("Simulated task crash: code exception")
 	})

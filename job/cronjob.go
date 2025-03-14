@@ -13,7 +13,7 @@ import (
 var stdCron *cron.Cron
 
 // RegistryCronFunc 通用任务注册
-func RegistryCronFunc(db *gorm.DB, spec string, companyID, uin uint, purpose string, taskFunc func() (string, error)) {
+func RegistryCronFunc(db *gorm.DB, spec string, purpose string, taskFunc func() (string, error)) {
 	// 确保 stdCron 已初始化
 	if stdCron == nil {
 		stdCron = cron.New(cron.WithSeconds())
@@ -31,8 +31,6 @@ func RegistryCronFunc(db *gorm.DB, spec string, companyID, uin uint, purpose str
 		// 生成 Job 任务
 		job := Job{
 			JobUUID:     types.GenerateID(),
-			CompanyID:   companyID,
-			Uin:         uin,
 			Purpose:     purpose,
 			JobStatus:   JobStatusPending,
 			CostSeconds: 0,
