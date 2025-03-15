@@ -8,15 +8,15 @@ import (
 )
 
 const (
-    _entry__validate_one = 480
+    _entry__validate_one = 704
 )
 
 const (
-    _stack__validate_one = 112
+    _stack__validate_one = 208
 )
 
 const (
-    _size__validate_one = 10664
+    _size__validate_one = 15136
 )
 
 var (
@@ -27,16 +27,16 @@ var (
         {0xa, 24},
         {0xc, 32},
         {0xd, 40},
-        {0x11, 48},
-        {0x27f5, 112},
-        {0x27f6, 48},
-        {0x27f8, 40},
-        {0x27fa, 32},
-        {0x27fc, 24},
-        {0x27fe, 16},
-        {0x27ff, 8},
-        {0x2803, 0},
-        {0x29a8, 112},
+        {0x14, 48},
+        {0x38dd, 208},
+        {0x38de, 48},
+        {0x38e0, 40},
+        {0x38e2, 32},
+        {0x38e4, 24},
+        {0x38e6, 16},
+        {0x38e7, 8},
+        {0x38eb, 0},
+        {0x3b20, 208},
     }
 )
 
