@@ -19,13 +19,16 @@ func MonitorExportJobRoutine() {
 		logs.Errorf("[exportjob] monitor routine auto migrate failed: %s", err)
 		return
 	}
+	interval := time.Second * 10
+	tmr := time.NewTimer(interval)
 	for {
 		select {
 		case <-lifecycle.Std().C():
 			logs.Infof("[exportjob] monitor routine exit")
 			return
-		default:
+		case <-tmr.C:
 			repairTimeoutJobs()
+			tmr.Reset(interval)
 		}
 	}
 }
