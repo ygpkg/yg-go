@@ -1,18 +1,16 @@
 package job
 
 import (
-	"sync"
 	"time"
 
 	"github.com/robfig/cron/v3"
 	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/mutex"
 	"github.com/ygpkg/yg-go/types"
 	"gorm.io/gorm"
 )
 
 var stdCron *cron.Cron
-
-var taskMutex sync.Mutex // 用于确保任务串行执行
 
 // RegistryCronFunc 通用任务注册
 func RegistryCronFunc(db *gorm.DB, spec string, purpose string, taskFunc func() (string, error)) {
@@ -27,11 +25,10 @@ func RegistryCronFunc(db *gorm.DB, spec string, purpose string, taskFunc func() 
 				logs.Errorf("Crash during task execution: %v", r)
 			}
 		}()
-
-		// 加锁，确保任务串行执行
-		taskMutex.Lock()
-		defer taskMutex.Unlock()
-
+		if !mutex.IsMaster() {
+			logs.Debugf("Not master")
+			return
+		}
 		startTime := time.Now()
 
 		// 生成 Job 任务
