@@ -5,11 +5,11 @@ import (
 
 	"github.com/robfig/cron/v3"
 	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/mutex"
 	"github.com/ygpkg/yg-go/types"
 	"gorm.io/gorm"
 )
 
-// 定时任务调度器
 var stdCron *cron.Cron
 
 // RegistryCronFunc 通用任务注册
@@ -19,13 +19,16 @@ func RegistryCronFunc(db *gorm.DB, spec string, purpose string, taskFunc func() 
 		stdCron = cron.New(cron.WithSeconds())
 		stdCron.Start()
 	}
-
 	_, err := stdCron.AddFunc(spec, func() {
 		defer func() {
 			if r := recover(); r != nil {
 				logs.Errorf("Crash during task execution: %v", r)
 			}
 		}()
+		if !mutex.IsMaster() {
+			logs.Debugf("Not master")
+			return
+		}
 		startTime := time.Now()
 
 		// 生成 Job 任务
@@ -63,7 +66,7 @@ func RegistryCronFunc(db *gorm.DB, spec string, purpose string, taskFunc func() 
 		if err := db.Save(&job).Error; err != nil {
 			logs.Errorf("Failed to update Job record: %v", err)
 		} else {
-			logs.Info("[RegistryCronFunc] Task completed in %d seconds, status: %s", costTime, job.JobStatus)
+			logs.Infof("[RegistryCronFunc] Task completed in %d seconds, status: %s", costTime, job.JobStatus)
 		}
 	})
 	if err != nil {
