@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ygpkg/yg-go/dbtools"
+	"github.com/ygpkg/yg-go/job"
 	"github.com/ygpkg/yg-go/lifecycle"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -15,7 +16,7 @@ func MonitorExportJobRoutine() {
 			logs.Errorf("[exportjob] monitor routine panic: %s", err)
 		}
 	}()
-	if err := dbtools.Core().AutoMigrate(&ExportJob{}); err != nil {
+	if err := dbtools.Core().AutoMigrate(&job.ExportJob{}); err != nil {
 		logs.Errorf("[exportjob] monitor routine auto migrate failed: %s", err)
 		return
 	}
@@ -35,33 +36,33 @@ func MonitorExportJobRoutine() {
 
 // repairTimeoutJobs 修复超时任务
 func repairTimeoutJobs() {
-	jobs := []*ExportJob{}
-	err := dbtools.Core().Where("export_status = ? AND timeout_seconds > 0", ExportStatusPending).
+	jobs := []*job.ExportJob{}
+	err := dbtools.Core().Where("export_status = ? AND timeout_seconds > 0", job.JobStatusPending).
 		Find(&jobs).Error
 	if err != nil {
 		logs.Errorf("[exportjob] repair timeout jobs failed: %s", err)
 		return
 	}
-	for _, job := range jobs {
-		timeout, err := checkTimeoutJob(job)
+	for _, j := range jobs {
+		timeout, err := checkTimeoutJob(j)
 		if err != nil {
 			logs.Errorf("[exportjob] repair timeout job failed: %s", err)
 			return
 		}
 		if timeout {
-			logs.Infof("[exportjob] repair timeout job: %s", job.JobUUID)
+			logs.Infof("[exportjob] repair timeout job: %s", j.JobUUID)
 		}
 	}
 }
 
-func checkTimeoutJob(job *ExportJob) (bool, error) {
+func checkTimeoutJob(j *job.ExportJob) (bool, error) {
 	timeout := false
-	if job.TimeoutSeconds > 0 &&
-		time.Since(job.CreatedAt).Seconds() > float64(job.TimeoutSeconds) {
+	if j.TimeoutSeconds > 0 &&
+		time.Since(j.CreatedAt).Seconds() > float64(j.TimeoutSeconds) {
 		timeout = true
-		job.ExportStatus = ExportStatusFailed
-		job.ErrorMsg = "timeout"
-		return timeout, dbtools.Core().Save(job).Error
+		j.ExportStatus = job.JobStatusFailed
+		j.ErrorMsg = "timeout"
+		return timeout, dbtools.Core().Save(j).Error
 	}
 
 	return timeout, nil
