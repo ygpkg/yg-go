@@ -3,14 +3,14 @@ package asyncjob
 import (
 	"time"
 
-	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/encryptor"
 	"github.com/ygpkg/yg-go/job"
 	"github.com/ygpkg/yg-go/logs"
+	"gorm.io/gorm"
 )
 
 // CreateAsyncJob 新建异步任务
-func CreateAsyncJob(compid, uin uint, purpose string) (*job.AsyncJob, error) {
+func CreateAsyncJob(db *gorm.DB, compid, uin uint, purpose string) (*job.AsyncJob, error) {
 	ajob := &job.AsyncJob{
 		JobUUID:   encryptor.GenerateUUID(),
 		CompanyID: compid,
@@ -18,7 +18,7 @@ func CreateAsyncJob(compid, uin uint, purpose string) (*job.AsyncJob, error) {
 		Purpose:   purpose,
 		JobStatus: job.JobStatusPending,
 	}
-	err := dbtools.Core().Create(ajob).Error
+	err := db.Create(ajob).Error
 	if err != nil {
 		logs.Errorf("[asyncjob] create job failed: %s]", err)
 		return nil, err
@@ -27,9 +27,9 @@ func CreateAsyncJob(compid, uin uint, purpose string) (*job.AsyncJob, error) {
 }
 
 // GetJobByUUID 获取任务
-func GetJobByUUID(uuid string) (*job.AsyncJob, error) {
+func GetJobByUUID(db *gorm.DB, uuid string) (*job.AsyncJob, error) {
 	ejob := &job.AsyncJob{}
-	err := dbtools.Core().Where("job_uuid = ?", uuid).Last(ejob).Error
+	err := db.Where("job_uuid = ?", uuid).Last(ejob).Error
 	if err != nil {
 		logs.Errorf("[asyncjob] get ejob failed: %s]", err)
 		return nil, err
@@ -38,8 +38,8 @@ func GetJobByUUID(uuid string) (*job.AsyncJob, error) {
 }
 
 // UpdateJobStatus 更新任务状态
-func UpdateJobStatus(uuid string, output string, e error) (*job.AsyncJob, error) {
-	ejob, err := GetJobByUUID(uuid)
+func UpdateJobStatus(db *gorm.DB, uuid string, output string, e error) (*job.AsyncJob, error) {
+	ejob, err := GetJobByUUID(db, uuid)
 	if err != nil {
 		return nil, err
 	}
@@ -61,7 +61,7 @@ func UpdateJobStatus(uuid string, output string, e error) (*job.AsyncJob, error)
 	}
 	ejob.CostSeconds = int(time.Now().Sub(ejob.CreatedAt).Seconds())
 
-	err = dbtools.Core().Save(ejob).Error
+	err = db.Save(ejob).Error
 	if err != nil {
 		logs.Errorf("[asyncjob] update job failed: %s]", err)
 		return nil, err
