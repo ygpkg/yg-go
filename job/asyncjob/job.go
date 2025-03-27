@@ -51,9 +51,7 @@ func UpdateJobStatus(db *gorm.DB, uuid string, output string, e error) (*job.Asy
 			ejob.ErrorMsg += "; " + e.Error()
 		}
 	} else {
-		if ejob.JobStatus == job.JobStatusPending {
-			ejob.JobStatus = job.JobStatusSuccess
-		}
+		ejob.JobStatus = job.JobStatusSuccess
 	}
 	if output != "" {
 		ejob.Output = output
