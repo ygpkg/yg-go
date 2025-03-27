@@ -10,10 +10,9 @@ import (
 )
 
 // CreateAsyncJob 新建异步任务
-func CreateAsyncJob(db *gorm.DB, compid, uin uint, purpose string) (*job.AsyncJob, error) {
+func CreateAsyncJob(db *gorm.DB, uin uint, purpose string) (*job.AsyncJob, error) {
 	ajob := &job.AsyncJob{
 		JobUUID:   encryptor.GenerateUUID(),
-		CompanyID: compid,
 		Uin:       uin,
 		Purpose:   purpose,
 		JobStatus: job.JobStatusPending,

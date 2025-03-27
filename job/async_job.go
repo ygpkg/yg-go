@@ -8,9 +8,9 @@ import (
 type AsyncJob struct {
 	gorm.Model
 	// JobUUID
-	JobUUID   string `gorm:"column:job_uuid;type:varchar(36);not null;index"`
-	CompanyID uint   `gorm:"column:company_id;type:int;not null;index"`
-	Uin       uint   `gorm:"column:uin;type:int;not null;index"`
+	JobUUID string `gorm:"column:job_uuid;type:varchar(36);not null;index"`
+	// CompanyID uint   `gorm:"column:company_id;type:int;not null;index"`
+	Uin uint `gorm:"column:uin;type:int;not null;index"`
 	// Purpose 任务类型
 	Purpose string `gorm:"column:purpose;type:varchar(255);not null;index"`
 	// JobStatus 导出状态
