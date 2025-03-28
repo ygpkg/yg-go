@@ -30,7 +30,7 @@ type Job struct {
 	// Purpose 目的
 	Purpose string `gorm:"column:purpose;type:varchar(255);not null;index"`
 	// JobStatus 状态
-	JobStatus JobStatus `gorm:"column:export_status;type:varchar(20);not null;index"`
+	JobStatus JobStatus `gorm:"column:job_status;type:varchar(20);not null;index"`
 	// CostSeconds 耗时
 	CostSeconds int `gorm:"column:cost_seconds;type:int;not null"`
 	// Output 结果
@@ -46,8 +46,11 @@ func (j *Job) TableName() string {
 	return "core_jobs"
 }
 
+// InitDB 初始化数据库
 func InitDB(db *gorm.DB) error {
 	return dbtools.InitModel(db,
 		&Job{},
+		&ExportJob{},
+		&AsyncJob{},
 	)
 }

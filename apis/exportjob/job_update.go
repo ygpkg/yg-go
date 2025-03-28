@@ -4,42 +4,44 @@ import (
 	"time"
 
 	"github.com/ygpkg/yg-go/dbtools"
+	"github.com/ygpkg/yg-go/job"
 	"github.com/ygpkg/yg-go/logs"
 )
 
 // UpdateJobStatus 更新任务状态
-func UpdateJobStatus(uuid string, output string, e error) (*ExportJob, error) {
-	job, err := GetJobByUUID(uuid)
+func UpdateJobStatus(uuid string, output string, e error) (*job.ExportJob, error) {
+	ejob, err := GetJobByUUID(uuid)
 	if err != nil {
 		return nil, err
 	}
 
-	if job.TimeoutSeconds > 0 &&
-		time.Since(job.CreatedAt).Seconds() > float64(job.TimeoutSeconds) {
-		job.ExportStatus = ExportStatusFailed
-		job.ErrorMsg = "timeout"
+	if ejob.TimeoutSeconds > 0 &&
+		time.Since(ejob.CreatedAt).Seconds() > float64(ejob.TimeoutSeconds) {
+		ejob.ExportStatus = job.JobStatusFailed
+		ejob.ErrorMsg = "timeout"
 	}
 	if e != nil {
-		job.ExportStatus = ExportStatusFailed
-		if job.ErrorMsg == "" {
-			job.ErrorMsg = e.Error()
+		ejob.ExportStatus = job.JobStatusFailed
+		if ejob.ErrorMsg == "" {
+			ejob.ErrorMsg = e.Error()
 		} else {
-			job.ErrorMsg += "; " + e.Error()
+			ejob.ErrorMsg += "; " + e.Error()
 		}
 	} else {
-		if job.ExportStatus == ExportStatusPending {
-			job.ExportStatus = ExportStatusSuccess
+		if ejob.ExportStatus == job.JobStatusPending {
+			ejob.ExportStatus = job.JobStatusSuccess
 		}
 	}
 	if output != "" {
-		job.Output = output
+		ejob.Output = output
 	}
-	job.CostSeconds = int(job.UpdatedAt.Sub(job.CreatedAt).Seconds())
 
-	err = dbtools.Core().Save(job).Error
+	ejob.CostSeconds = int(time.Now().Sub(ejob.CreatedAt).Seconds())
+
+	err = dbtools.Core().Save(ejob).Error
 	if err != nil {
 		logs.Errorf("[exportjob] update job failed: %s]", err)
 		return nil, err
 	}
-	return job, nil
+	return ejob, nil
 }
