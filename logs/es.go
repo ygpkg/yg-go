@@ -2,26 +2,33 @@ package logs
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"time"
 
 	jsoniter "github.com/json-iterator/go"
 	"go.uber.org/zap"
 )
 
-func NewEsLogger() *EsLog {
-	return &EsLog{}
+func GetESLogger(lgrName string) *ESLogger {
+	lw := Get(lgrName)
+	return &ESLogger{
+		l: lw.Desugar().WithOptions(zap.AddCallerSkip(2)).Sugar(),
+	}
 }
 
-type EsLog struct {
-	service string
+type ESLogger struct {
+	l *zap.SugaredLogger
 }
 
-func (e *EsLog) LogRoundTrip(req *http.Request, res *http.Response, err error, start time.Time, dur time.Duration) error {
+func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error, start time.Time, dur time.Duration) error {
 	ctx := req.Context()
-	end := start.Add(dur)
+
+	reqID, ok := ctx.Value(string(contextKeyRequestID)).(string)
+	if !ok {
+		reqID = ""
+	}
 
 	// 获取查询的 HTTP method 和路径
 	method := req.Method
@@ -30,22 +37,12 @@ func (e *EsLog) LogRoundTrip(req *http.Request, res *http.Response, err error, s
 
 	var fields []interface{}
 	fields = append(fields,
-		zap.String("service", e.service),
-		zap.String("proto", "es"),
-		zap.String("start_time", start.Format(time.RFC3339)),
-		zap.String("end_time", end.Format(time.RFC3339)),
-		zap.Int64("cost", dur.Milliseconds()),
+		zap.String(string(contextKeyRequestID), reqID),
+		zap.String("elapsed", fmt.Sprintf("%dms", dur.Nanoseconds()/1e6)),
 		zap.String("dslMethod", method),
 		zap.String("dslPath", path),
-		zap.Int("real_code", realCode),
 	)
-	msg := "es execute success"
-	if err != nil {
-		realCode = -1
-		msg = err.Error()
-		fields = append(fields, zap.String("error", msg))
-	}
-
+	var dslBody string
 	if req.Body != nil && req.Body != http.NoBody {
 		var buf bytes.Buffer
 		if req.GetBody != nil {
@@ -54,8 +51,20 @@ func (e *EsLog) LogRoundTrip(req *http.Request, res *http.Response, err error, s
 		} else {
 			buf.ReadFrom(req.Body)
 		}
-		fields = append(fields, zap.String("dslBody", buf.String()))
+		dslBody = buf.String()
 	}
+
+	if err != nil {
+		realCode = -1
+		fields = append(fields,
+			zap.Error(err),
+			zap.Int("realcode", realCode),
+		)
+		e.l.With(fields...).Error(dslBody)
+		return err
+	}
+
+	fields = append(fields, zap.Int("realcode", realCode))
 	var affectedRows int
 	if res.Body != nil && res.Body != http.NoBody {
 		bodyBytes, readErr := io.ReadAll(res.Body)
@@ -63,9 +72,9 @@ func (e *EsLog) LogRoundTrip(req *http.Request, res *http.Response, err error, s
 			res.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 		}()
 		if readErr != nil {
-			fields = append(fields, zap.String("error", readErr.Error()))
-			ErrorContextw(ctx, "read es response body fail", fields)
-			return readErr
+			fields = append(fields, zap.Error(readErr))
+			e.l.With(fields...).Error(dslBody)
+			return err
 		}
 
 		var resBody map[string]any
@@ -78,21 +87,21 @@ func (e *EsLog) LogRoundTrip(req *http.Request, res *http.Response, err error, s
 				}
 			}
 		}
-		// 恢复 res.Body 给后续使用者
-		fields = append(fields, zap.String("affected_rows", strconv.Itoa(affectedRows)))
 	}
+	fields = append(fields, zap.Int("rows", affectedRows))
+	
 	if realCode != 200 {
-		ErrorContextw(ctx, msg, fields...)
+		e.l.With(fields...).Error(dslBody)
 	} else {
-		InfoContextw(ctx, msg, fields...)
+		e.l.With(fields...).Info(dslBody)
 	}
 	return err
 }
 
-func (e *EsLog) RequestBodyEnabled() bool {
+func (e *ESLogger) RequestBodyEnabled() bool {
 	return true
 }
 
-func (e *EsLog) ResponseBodyEnabled() bool {
+func (e *ESLogger) ResponseBodyEnabled() bool {
 	return true
 }

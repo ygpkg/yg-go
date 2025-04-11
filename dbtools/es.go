@@ -25,7 +25,7 @@ func InitES(cfg ESConfig) (*elasticsearch.Client, error) {
 				InsecureSkipVerify: true, // 忽略 SSL 证书验证
 			},
 		},
-		Logger: logs.NewEsLogger(),
+		Logger: logs.GetESLogger("es"),
 	}
 	client, newClientErr := elasticsearch.NewClient(esCfg)
 	if newClientErr != nil {

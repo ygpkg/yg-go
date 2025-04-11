@@ -15,7 +15,7 @@ func TestInitES(t *testing.T) {
 	client, initErr := InitES(cfg)
 	assert.Nil(t, initErr)
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, "requestId", "12312312312312")
+	ctx = context.WithValue(ctx, "reqid", "12312312312312")
 	res, searchErr := client.Search(
 		client.Search.WithContext(ctx),
 		client.Search.WithIndex("accounts"),
