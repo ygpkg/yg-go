@@ -40,6 +40,7 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 	// 获取查询的 HTTP method 和路径
 	method := req.Method
 	path := req.URL.Path
+	ralCodeKey := "ralcode"
 	realCode := res.StatusCode
 
 	var fields []interface{}
@@ -65,13 +66,13 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 		realCode = -1
 		fields = append(fields,
 			zap.Error(err),
-			zap.Int("realcode", realCode),
+			zap.Int(ralCodeKey, realCode),
 		)
 		e.l.With(fields...).Error(dslBody)
 		return err
 	}
 
-	fields = append(fields, zap.Int("realcode", realCode))
+	fields = append(fields, zap.Int(ralCodeKey, realCode))
 	var affectedRows int
 	if res.Body != nil && res.Body != http.NoBody {
 		bodyBytes, readErr := io.ReadAll(res.Body)
