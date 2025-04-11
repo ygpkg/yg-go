@@ -104,6 +104,26 @@ func FatalContextf(ctx context.Context, template string, args ...interface{}) {
 	LoggerFromContext(ctx).Fatalf(template, args...)
 }
 
+func DebugContextw(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	LoggerFromContext(ctx).Debugw(msg, keysAndValues...)
+}
+
+func InfoContextw(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	LoggerFromContext(ctx).Infow(msg, keysAndValues...)
+}
+
+func WarnContextw(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	LoggerFromContext(ctx).Warnw(msg, keysAndValues...)
+}
+
+func ErrorContextw(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	LoggerFromContext(ctx).Errorw(msg, keysAndValues...)
+}
+
+func FatalContextw(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	LoggerFromContext(ctx).Fatalw(msg, keysAndValues...)
+}
+
 // WithContextFields 设置日志字段上下文
 func WithContextFields(ctx context.Context, fields ...interface{}) context.Context {
 	if ctx == nil {
