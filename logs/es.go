@@ -11,15 +11,22 @@ import (
 	"go.uber.org/zap"
 )
 
-func GetESLogger(lgrName string) *ESLogger {
-	lw := Get(lgrName)
+func GetESLogger(cfg ESLoggerConfig) *ESLogger {
+	lw := Get(cfg.LoggerName)
 	return &ESLogger{
-		l: lw.Desugar().WithOptions(zap.AddCallerSkip(2)).Sugar(),
+		l:             lw.Desugar().WithOptions(zap.AddCallerSkip(2)).Sugar(),
+		slowThreshold: cfg.SlowThreshold,
 	}
 }
 
+type ESLoggerConfig struct {
+	LoggerName    string        // 日志模块名称
+	SlowThreshold time.Duration // 慢查询阈值
+}
+
 type ESLogger struct {
-	l *zap.SugaredLogger
+	l             *zap.SugaredLogger
+	slowThreshold time.Duration
 }
 
 func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error, start time.Time, dur time.Duration) error {
@@ -89,11 +96,15 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 		}
 	}
 	fields = append(fields, zap.Int("rows", affectedRows))
-	
+
 	if realCode != 200 {
 		e.l.With(fields...).Error(dslBody)
 	} else {
 		e.l.With(fields...).Info(dslBody)
+	}
+
+	if e.slowThreshold > 0 && dur > e.slowThreshold {
+		e.l.With(fields...).Warnf("slow dsl: %s", dslBody)
 	}
 	return err
 }

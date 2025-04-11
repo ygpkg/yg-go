@@ -4,13 +4,15 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestInitES(t *testing.T) {
 	cfg := ESConfig{
-		Addr: "http://localhost:9200",
+		Addresses:     []string{"http://localhost:9200"},
+		SlowThreshold: time.Millisecond,
 	}
 	client, initErr := InitES(cfg)
 	assert.Nil(t, initErr)
