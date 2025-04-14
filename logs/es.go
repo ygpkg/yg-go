@@ -101,7 +101,7 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 	if realCode != 200 {
 		e.l.With(fields...).Error(dslBody)
 	} else {
-		e.l.With(fields...).Info(dslBody)
+		e.l.With(fields...).Debug(dslBody)
 	}
 
 	if e.slowThreshold > 0 && dur > e.slowThreshold {
