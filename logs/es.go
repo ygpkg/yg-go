@@ -14,7 +14,7 @@ import (
 func GetESLogger(cfg ESLoggerConfig) *ESLogger {
 	lw := Get(cfg.LoggerName)
 	return &ESLogger{
-		l:             lw.Desugar().WithOptions(zap.AddCallerSkip(2)).Sugar(),
+		l:             lw.Desugar().WithOptions(zap.AddCallerSkip(5)).Sugar(),
 		slowThreshold: cfg.SlowThreshold,
 	}
 }
@@ -82,7 +82,7 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 		if readErr != nil {
 			fields = append(fields, zap.Error(readErr))
 			e.l.With(fields...).Error(dslBody)
-			return err
+			return nil
 		}
 
 		var resBody map[string]any
@@ -107,7 +107,7 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 	if e.slowThreshold > 0 && dur > e.slowThreshold {
 		e.l.With(fields...).Warnf("slow dsl: %s", dslBody)
 	}
-	return err
+	return nil
 }
 
 func (e *ESLogger) RequestBodyEnabled() bool {
