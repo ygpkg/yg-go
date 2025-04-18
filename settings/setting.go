@@ -91,7 +91,7 @@ func SetText(group, key, value string) error {
 		Value:     value,
 		ValueType: ValueText,
 	}
-	return updateSettings(si)
+	return UpsertSetting(si)
 }
 
 // SetYaml 插入yaml配置
@@ -107,11 +107,11 @@ func SetYaml(group, key string, value interface{}) error {
 		Value:     string(vData),
 		ValueType: ValueYaml,
 	}
-	return updateSettings(si)
+	return UpsertSetting(si)
 }
 
-// updateSettings or update the trade calendar of a stock.
-func updateSettings(v *SettingItem) error {
+// UpsertSetting or update the trade calendar of a stock.
+func UpsertSetting(v *SettingItem) error {
 	rdsKey := redisCacheKey(v.Group, v.Key)
 	cache.Std().Delete(rdsKey)
 	return dbtools.Core().Table(TableNameSettings).
