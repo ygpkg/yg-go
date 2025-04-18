@@ -49,6 +49,14 @@ type SettingItem struct {
 // TableName .
 func (*SettingItem) TableName() string { return TableNameSettings }
 
+// BeforeCreate .
+func (item *SettingItem) BeforeCreate(tx *gorm.DB) error {
+	if item.ValueType == ValueSecret || item.ValueType == ValuePassword {
+		item.Value = EncryptSecret(item.Value)
+	}
+	return nil
+}
+
 // Identify 唯一建
 func (item SettingItem) Identify() string {
 	return fmt.Sprintf("%s/%s", item.Group, item.Key)
@@ -206,9 +214,6 @@ func Updates(sets ...*SettingItem) error {
 			sql = sql.Where("id = ?", set.ID)
 		} else {
 			sql = sql.Where("`group` = ? AND `key` = ?", set.Group, set.Key)
-		}
-		if set.ValueType == ValueSecret || set.ValueType == ValuePassword {
-			set.Value = EncryptSecret(set.Value)
 		}
 		update := map[string]interface{}{
 			"value":      set.Value,
