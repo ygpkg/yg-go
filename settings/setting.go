@@ -185,6 +185,15 @@ func GetSecret(group, key string) (string, error) {
 	return DecryptSecret(si.Value), nil
 }
 
+// GetSecretYaml 获取密码配置YAML
+func GetSecretYaml(group, key string, value interface{}) error {
+	date, err := GetSecret(group, key)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal([]byte(date), value)
+}
+
 // GetJSON 获取json配置
 func GetJSON(group, key string, value interface{}) error {
 	text, err := GetValue(group, key)
