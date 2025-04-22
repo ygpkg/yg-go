@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/go-playground/validator/v10"
 )
 
 // type Func func(v interface{}) error
@@ -157,4 +159,18 @@ func IsApplicationNumber(value string) bool {
 		return true
 	}
 	return false
+}
+
+func IsValidStruct(data any, translate bool) error {
+	err := paramValidate.Struct(data)
+	if err != nil {
+		if !translate {
+			return err
+		}
+		for _, e := range err.(validator.ValidationErrors) {
+			return fmt.Errorf("%s", e.Translate(translator))
+		}
+
+	}
+	return nil
 }
