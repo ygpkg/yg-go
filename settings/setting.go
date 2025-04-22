@@ -50,7 +50,7 @@ type SettingItem struct {
 func (*SettingItem) TableName() string { return TableNameSettings }
 
 // BeforeCreate .
-func (item *SettingItem) BeforeCreate(tx *gorm.DB) error {
+func (item *SettingItem) BeforeSave(tx *gorm.DB) error {
 	if item.ValueType == ValueSecret || item.ValueType == ValuePassword {
 		item.Value = EncryptSecret(item.Value)
 	}
