@@ -224,13 +224,13 @@ func Updates(sets ...*SettingItem) error {
 		} else {
 			sql = sql.Where("`group` = ? AND `key` = ?", set.Group, set.Key)
 		}
-		update := map[string]interface{}{
-			"value":      set.Value,
-			"value_type": set.ValueType,
-			"describe":   set.Describe,
-			"name":       set.Name,
+		update := &SettingItem{
+			Value:     set.Value,
+			ValueType: set.ValueType,
+			Describe:  set.Describe,
+			Name:      set.Name,
 		}
-		err := sql.Updates(update).Error
+		err := sql.Select("value", "value_type", "describe", "name").Updates(update).Error
 		if err != nil {
 			logs.Errorf("[settings] update %s failed, %s", set.Identify(), err)
 			return err
