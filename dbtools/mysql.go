@@ -6,7 +6,6 @@ import (
 
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/driver/mysql"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -72,26 +71,7 @@ func InitMySQL(name, dburl string) (*gorm.DB, error) {
 	return db, nil
 }
 
-func InitSQLite(name, dburl string) (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open(dburl), &gorm.Config{
-		CreateBatchSize: 20,
-	})
-	if err != nil {
-		logs.Errorf("[init-db] open sqlite(%s) failed, %s", name, err)
-		return nil, err
-	}
-	logs.Infof("[init-db] open sqlite(%s) success", name)
-
-	if name == "" {
-		name = "default"
-	}
-	dbsLocker.Lock()
-	dbs[name] = db
-	dbsLocker.Unlock()
-
-	return db, nil
-}
-
+// InitMutilMySQL 批量初始化mysql数据库
 func InitMutilMySQL(dburls map[string]string) error {
 	for name, dburl := range dburls {
 		logs.Infof("[init-db] init mysql(%s) %s", name, dburl)
@@ -110,6 +90,19 @@ func InsertOrUpdate(db *gorm.DB, v interface{}, columns ...string) error {
 	}).Create(v).Error
 }
 
+// RegistryDB 注册数据库
+func RegistryDB(name string, db *gorm.DB) {
+	dbsLocker.Lock()
+	defer dbsLocker.Unlock()
+	if _, ok := dbs[name]; ok {
+		logs.Errorf("[init-db] db %s is already exist", name)
+		return
+	}
+	dbs[name] = db
+	logs.Infof("[init-db] registry db %s success", name)
+}
+
+// DB 获取数据库连接
 func DB(name string) *gorm.DB {
 	dbsLocker.RLock()
 	db, ok := dbs[name]
