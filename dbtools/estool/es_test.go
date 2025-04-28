@@ -1,4 +1,4 @@
-package dbtools
+package estool
 
 import (
 	"context"
@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/ygpkg/yg-go/config"
 )
 
 func TestInitES(t *testing.T) {
-	cfg := ESConfig{
+	cfg := config.ESConfig{
 		Addresses:     []string{"http://localhost:9200"},
 		SlowThreshold: time.Millisecond,
 	}

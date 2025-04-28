@@ -1,23 +1,16 @@
-package dbtools
+package estool
 
 import (
 	"crypto/tls"
 	"net/http"
-	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
 )
 
-type ESConfig struct {
-	Addresses     []string
-	Username      string
-	Password      string
-	MaxRetries    int           // 最大重试次数
-	SlowThreshold time.Duration // 慢查询阈值，示例 100ms
-}
-
-func InitES(cfg ESConfig) (*elasticsearch.Client, error) {
+// InitES 初始化ES
+func InitES(cfg config.ESConfig) (*elasticsearch.Client, error) {
 	logCfg := logs.ESLoggerConfig{
 		LoggerName:    "es",
 		SlowThreshold: cfg.SlowThreshold,
