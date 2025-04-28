@@ -18,45 +18,45 @@ func NewBuilder() *Builder {
 	}
 }
 
-// set 通用设置方法，支持链式调用
-func (b *Builder) set(key string, value interface{}) *Builder {
+// Set 通用设置方法，支持链式调用
+func (b *Builder) Set(key string, value interface{}) *Builder {
 	b.body[key] = value
 	return b
 }
 
 // SetQuery 设置查询条件
 func (b *Builder) SetQuery(query interface{}) *Builder {
-	return b.set("query", query)
+	return b.Set("query", query)
 }
 
 // SetAggs 设置聚合
 func (b *Builder) SetAggs(aggs interface{}) *Builder {
-	return b.set("aggs", aggs)
+	return b.Set("aggs", aggs)
 }
 
 // SetSort 设置排序
 func (b *Builder) SetSort(sort interface{}) *Builder {
-	return b.set("sort", sort)
+	return b.Set("sort", sort)
 }
 
 // SetSize 设置返回数量
 func (b *Builder) SetSize(size int) *Builder {
-	return b.set("size", size)
+	return b.Set("size", size)
 }
 
 // SetFrom 设置偏移量
 func (b *Builder) SetFrom(from int) *Builder {
-	return b.set("from", from)
+	return b.Set("from", from)
 }
 
 // SetSource 设置返回字段
 func (b *Builder) SetSource(fields []string) *Builder {
-	return b.set("_source", fields)
+	return b.Set("_source", fields)
 }
 
 // SetHighlight 设置高亮
 func (b *Builder) SetHighlight(highlight interface{}) *Builder {
-	return b.set("highlight", highlight)
+	return b.Set("highlight", highlight)
 }
 
 // Build 构建DSL
