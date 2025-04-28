@@ -1,4 +1,4 @@
-package dbtools
+package estools
 
 import (
 	"crypto/tls"
