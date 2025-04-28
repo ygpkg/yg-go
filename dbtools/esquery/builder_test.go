@@ -8,8 +8,22 @@ import (
 
 func TestBuilder(t *testing.T) {
 	// 对应原生 DSL：
-	// GET /pt_patent_sup/_search
 	// {
+	//	"highlight": {
+	//		"fields": {
+	//			"content": {}
+	//		},
+	//		"fragment_size": 200,
+	//		"number_of_fragments": 4,
+	//		"pre_tags": ["\u003cem\u003e"],
+	//		"post_tags": ["\u003c/em\u003e"]
+	//	},
+	//	"sort": {
+	//		"create_time": {
+	//			"order": "desc"
+	//		}
+	//	},
+	//	"size": 10,
 	//	"_source": ["document_number", "field_name", "content"],
 	//	"query": {
 	//		"bool": {
@@ -23,22 +37,7 @@ func TestBuilder(t *testing.T) {
 	//				}
 	//			}]
 	//		}
-	//	},
-	//	"highlight": {
-	//		"pre_tags": ["\u003cem\u003e"],
-	//		"post_tags": ["\u003c/em\u003e"],
-	//		"fields": {
-	//			"content": {}
-	//		},
-	//		"fragment_size": 200,
-	//		"number_of_fragments": 5
-	//	},
-	//	"sort": {
-	//		"create_time": {
-	//			"order": "desc"
-	//		}
-	//	},
-	//	"size": 10
+	//	}
 	// }
 	boolQuery := BuildMap("must", []Map{
 		BuildMap("terms", BuildMap("document_number", []string{"CN212195649U"})),
@@ -48,7 +47,7 @@ func TestBuilder(t *testing.T) {
 	query := NewBuilder().
 		SetSource([]string{"document_number", "field_name", "content"}).
 		SetQuery(BuildMap("bool", boolQuery)).
-		SetHighlight(BuildHighlightField([]string{"content"}, WithFragmentSize(200))).
+		SetHighlight(BuildHighlightField([]string{"content"}, WithFragmentSize(200), WithNumberOfFragments(4))).
 		SetSort(BuildSortField("create_time", "desc")).
 		SetSize(10).
 		Build()

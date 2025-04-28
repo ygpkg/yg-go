@@ -84,30 +84,38 @@ type HighlightCfg struct {
 	PostTags          []string
 }
 
-type HighlightOption func(*HighlightCfg)
+type HighlightOption interface {
+	apply(*HighlightCfg)
+}
+
+type funcHighlightOption func(*HighlightCfg)
+
+func (f funcHighlightOption) apply(cfg *HighlightCfg) {
+	f(cfg)
+}
 
 func WithFragmentSize(size int) HighlightOption {
-	return func(cfg *HighlightCfg) {
+	return funcHighlightOption(func(cfg *HighlightCfg) {
 		cfg.fragmentSize = size
-	}
+	})
 }
 
 func WithNumberOfFragments(number int) HighlightOption {
-	return func(cfg *HighlightCfg) {
+	return funcHighlightOption(func(cfg *HighlightCfg) {
 		cfg.numberOfFragments = number
-	}
+	})
 }
 
 func WithPreTags(tags []string) HighlightOption {
-	return func(cfg *HighlightCfg) {
+	return funcHighlightOption(func(cfg *HighlightCfg) {
 		cfg.PreTags = tags
-	}
+	})
 }
 
 func WithPostTags(tags []string) HighlightOption {
-	return func(cfg *HighlightCfg) {
+	return funcHighlightOption(func(cfg *HighlightCfg) {
 		cfg.PostTags = tags
-	}
+	})
 }
 
 func BuildHighlightField(fields []string, options ...HighlightOption) Map {
@@ -117,8 +125,8 @@ func BuildHighlightField(fields []string, options ...HighlightOption) Map {
 		PreTags:           []string{"<em>"},
 		PostTags:          []string{"</em>"},
 	}
-	for _, option := range options {
-		option(cfg)
+	for _, opt := range options {
+		opt.apply(cfg)
 	}
 
 	fieldMap := make(map[string]interface{})
