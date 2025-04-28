@@ -4,7 +4,7 @@ import (
 	jsoniter "github.com/json-iterator/go"
 )
 
-type Map map[string]interface{}
+type Map = map[string]interface{}
 
 // Builder ES DSL构造器
 type Builder struct {
