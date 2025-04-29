@@ -1,4 +1,4 @@
-package esquery
+package estool
 
 import (
 	jsoniter "github.com/json-iterator/go"

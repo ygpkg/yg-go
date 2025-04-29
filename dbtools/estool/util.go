@@ -1,4 +1,4 @@
-package esquery
+package estool
 
 // BuildMap 用于构造map[string]interface{}的辅助方法
 // kvs 为连续的 key-value 对，key 必须是 string 类型，如 ["key", "value", "key2", "value2", ...]
