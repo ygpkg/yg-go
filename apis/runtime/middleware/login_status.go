@@ -33,6 +33,7 @@ func LoginStatus() gin.HandlerFunc {
 		authstr = strings.TrimSpace(authstr)
 		ls.Token = authstr
 		if strings.HasPrefix(authstr, auth.AuthAPIKeyPrefix) {
+			ls.Role = auth.RoleAPI
 			return
 		}
 
