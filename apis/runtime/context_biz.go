@@ -20,3 +20,8 @@ func EmployeeID(ctx *gin.Context) uint {
 func Uin(ctx *gin.Context) uint {
 	return LoginStatus(ctx).GetID(constants.CtxKeyUin)
 }
+
+// CtxKeyAPIKeyID
+func APIKeyID(ctx *gin.Context) uint {
+	return LoginStatus(ctx).GetID(constants.CtxKeyAPIKeyID)
+}

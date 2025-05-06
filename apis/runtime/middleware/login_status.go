@@ -34,6 +34,9 @@ func LoginStatus() gin.HandlerFunc {
 		ls.Token = authstr
 		if strings.HasPrefix(authstr, auth.AuthAPIKeyPrefix) {
 			ls.Role = auth.RoleAPI
+			ls.State = auth.StateSucc
+			claims := new(auth.UserClaims)
+			ls.Claim = claims
 			return
 		}
 
