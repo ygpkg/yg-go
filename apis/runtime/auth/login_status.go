@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	AuthBearer = "Bearer "
+	AuthBearer       = "Bearer "
+	AuthAPIKeyPrefix = "yg-"
 )
 
 type InjectorFunc func(ctx *gin.Context, ls *LoginStatus) (err error)

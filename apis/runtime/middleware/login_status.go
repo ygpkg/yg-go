@@ -32,6 +32,9 @@ func LoginStatus() gin.HandlerFunc {
 		authstr = strings.TrimPrefix(authstr, auth.AuthBearer)
 		authstr = strings.TrimSpace(authstr)
 		ls.Token = authstr
+		if strings.HasPrefix(authstr, auth.AuthAPIKeyPrefix) {
+			return
+		}
 
 		claims := new(auth.UserClaims)
 		_, err := jwt.ParseWithClaims(ls.Token, claims, func(token *jwt.Token) (interface{}, error) {
