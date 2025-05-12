@@ -161,3 +161,9 @@ func (svr *Router) PRequireEmployee(action string, hdrs ...interface{}) {
 	newhdrs := append([]interface{}{middleware.AuthMiddleWareEmployee}, hdrs...)
 	svr.P(action, newhdrs...)
 }
+
+// GRequireLogin .
+func (svr *Router) GRequireLogin(action string, hdrs ...interface{}) {
+	newhdrs := append([]interface{}{middleware.AuthMiddleWare}, hdrs...)
+	svr.G(action, newhdrs...)
+}
