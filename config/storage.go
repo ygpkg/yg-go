@@ -72,3 +72,13 @@ type MinossConfig struct {
 	// UseSSL          bool   `yaml:"use_ssl"`
 	Bucket string `yaml:"bucket"`
 }
+
+// S3StorageConfig S3通用存储
+type S3StorageConfig struct {
+	EndPoint        string `yaml:"end_point"`
+	AccessKeyID     string `yaml:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key"`
+	Region          string `yaml:"region"`
+	Bucket          string `yaml:"bucket"`
+	UsePathStyle    bool   `yaml:"use_path_style"` // 是否使用路径风格的URL minio true 腾讯云 false
+}
