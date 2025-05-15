@@ -13,6 +13,7 @@ type StorageConfig struct {
 	UpYun   *UpYunConfig        `yaml:"upyun,omitempty"`
 	Tencent *TencentCOSConfig   `yaml:"tencent,omitempty"`
 	Minoss  *MinossConfig       `yaml:"minoss,omitempty"`
+	S3      *S3StorageConfig    `yaml:"s3,omitempty"`
 }
 
 // StorageOption 对象存储通用配置选项
