@@ -15,4 +15,5 @@ const (
 	CtxKeyCompanyID  = "companyid"
 	CtxKeyEmployeeID = "employeeid" // 运营端员工
 	CtxKeyUin        = "uin"
+	CtxKeyAPIKeyID   = "api_key_id"
 )

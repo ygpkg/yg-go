@@ -77,7 +77,7 @@ func (c *tencentClsWriteWyncer) Write(p []byte) (n int, err error) {
 }
 
 func (c *tencentClsWriteWyncer) Success(result *cls.Result) {
-	fmt.Println("send tencent cls message success:", result)
+	// fmt.Println("send tencent cls message success:", result)
 }
 func (c *tencentClsWriteWyncer) Fail(result *cls.Result) {
 	fmt.Println("send tencent cls message failed:", result)

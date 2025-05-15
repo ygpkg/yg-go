@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	AuthBearer = "Bearer "
+	AuthBearer       = "Bearer "
+	AuthAPIKeyPrefix = "yg-"
 )
 
 type InjectorFunc func(ctx *gin.Context, ls *LoginStatus) (err error)
@@ -29,6 +30,8 @@ const (
 	RoleUser
 	// RoleEmployee 运营用户
 	RoleEmployee
+	// RoleAPI API用户
+	RoleAPI
 )
 
 // LoginStatus 登录状态

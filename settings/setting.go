@@ -49,6 +49,14 @@ type SettingItem struct {
 // TableName .
 func (*SettingItem) TableName() string { return TableNameSettings }
 
+// BeforeCreate .
+func (item *SettingItem) BeforeSave(tx *gorm.DB) error {
+	if item.ValueType == ValueSecret || item.ValueType == ValuePassword {
+		item.Value = EncryptSecret(item.Value)
+	}
+	return nil
+}
+
 // Identify 唯一建
 func (item SettingItem) Identify() string {
 	return fmt.Sprintf("%s/%s", item.Group, item.Key)
@@ -91,7 +99,7 @@ func SetText(group, key, value string) error {
 		Value:     value,
 		ValueType: ValueText,
 	}
-	return updateSettings(si)
+	return UpsertSetting(si)
 }
 
 // SetYaml 插入yaml配置
@@ -107,11 +115,11 @@ func SetYaml(group, key string, value interface{}) error {
 		Value:     string(vData),
 		ValueType: ValueYaml,
 	}
-	return updateSettings(si)
+	return UpsertSetting(si)
 }
 
-// updateSettings or update the trade calendar of a stock.
-func updateSettings(v *SettingItem) error {
+// UpsertSetting or update the trade calendar of a stock.
+func UpsertSetting(v *SettingItem) error {
 	rdsKey := redisCacheKey(v.Group, v.Key)
 	cache.Std().Delete(rdsKey)
 	return dbtools.Core().Table(TableNameSettings).
@@ -177,6 +185,15 @@ func GetSecret(group, key string) (string, error) {
 	return DecryptSecret(si.Value), nil
 }
 
+// GetSecretYaml 获取密码配置YAML
+func GetSecretYaml(group, key string, value interface{}) error {
+	date, err := GetSecret(group, key)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal([]byte(date), value)
+}
+
 // GetJSON 获取json配置
 func GetJSON(group, key string, value interface{}) error {
 	text, err := GetValue(group, key)
@@ -207,16 +224,13 @@ func Updates(sets ...*SettingItem) error {
 		} else {
 			sql = sql.Where("`group` = ? AND `key` = ?", set.Group, set.Key)
 		}
-		if set.ValueType == ValueSecret || set.ValueType == ValuePassword {
-			set.Value = EncryptSecret(set.Value)
+		update := &SettingItem{
+			Value:     set.Value,
+			ValueType: set.ValueType,
+			Describe:  set.Describe,
+			Name:      set.Name,
 		}
-		update := map[string]interface{}{
-			"value":      set.Value,
-			"value_type": set.ValueType,
-			"describe":   set.Describe,
-			"name":       set.Name,
-		}
-		err := sql.Updates(update).Error
+		err := sql.Select("value", "value_type", "describe", "name").Updates(update).Error
 		if err != nil {
 			logs.Errorf("[settings] update %s failed, %s", set.Identify(), err)
 			return err

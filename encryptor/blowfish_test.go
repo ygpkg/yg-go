@@ -1,6 +1,7 @@
 package encryptor
 
 import (
+	"encoding/hex"
 	"testing"
 )
 
@@ -18,7 +19,7 @@ func TestBlowfishEncryptString(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		t.Log(key, str, encrypted)
+		t.Log(string(key), string(str), encrypted)
 
 		decrypted, err := BlowfishDecryptFromBase58(key, encrypted)
 		if err != nil {
@@ -27,7 +28,7 @@ func TestBlowfishEncryptString(t *testing.T) {
 		if string(decrypted) != string(str) {
 			t.Error("test error")
 		}
-		t.Log(key, str, encrypted, decrypted)
+		t.Log(string(key), string(str), string(encrypted), string(decrypted))
 	}
 
 }
@@ -54,7 +55,8 @@ func TestBlowfishEncrypt(t *testing.T) {
 		if string(decrypted) != string(str) {
 			t.Error("test error")
 		}
-		t.Log(key, str, encrypted, decrypted)
+
+		t.Log(string(key), string(str), hex.EncodeToString(encrypted), string(decrypted))
 	}
 }
 
@@ -72,7 +74,7 @@ func TestBlowfishEncryptCBC(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		t.Logf("encrypted....: %v", EncodeBase64(encrypted))
+		// t.Logf("encrypted....: %v", EncodeBase64(encrypted))
 
 		decrypted, err := DecryptBlowfishCBC(key, encrypted)
 		if err != nil {
@@ -81,6 +83,6 @@ func TestBlowfishEncryptCBC(t *testing.T) {
 		if string(decrypted) != string(str) {
 			t.Error("test error")
 		}
-		t.Log(key, str, encrypted, decrypted)
+		t.Log(string(key), string(str), hex.EncodeToString(encrypted), string(decrypted))
 	}
 }

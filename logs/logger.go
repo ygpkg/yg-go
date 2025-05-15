@@ -10,7 +10,8 @@ import (
 type contextKey string
 
 const (
-	contextKeyLogger contextKey = "yg-go-logger"
+	contextKeyLogger    contextKey = "yg-go-logger"
+	contextKeyRequestID contextKey = "reqid"
 )
 
 // With 设置日志字段, 返回一个新的日志对象,参数为键值对, 如: With("key", "value")
@@ -102,6 +103,26 @@ func ErrorContextf(ctx context.Context, template string, args ...interface{}) {
 // FatalContextf 致命错误
 func FatalContextf(ctx context.Context, template string, args ...interface{}) {
 	LoggerFromContext(ctx).Fatalf(template, args...)
+}
+
+func DebugContextw(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	LoggerFromContext(ctx).Debugw(msg, keysAndValues...)
+}
+
+func InfoContextw(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	LoggerFromContext(ctx).Infow(msg, keysAndValues...)
+}
+
+func WarnContextw(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	LoggerFromContext(ctx).Warnw(msg, keysAndValues...)
+}
+
+func ErrorContextw(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	LoggerFromContext(ctx).Errorw(msg, keysAndValues...)
+}
+
+func FatalContextw(ctx context.Context, msg string, keysAndValues ...interface{}) {
+	LoggerFromContext(ctx).Fatalw(msg, keysAndValues...)
 }
 
 // WithContextFields 设置日志字段上下文
