@@ -22,7 +22,7 @@ import (
 
 var _ Storager = (*S3Fs)(nil)
 
-// MinFs .
+// S3Fs .
 type S3Fs struct {
 	opt     config.StorageOption
 	s3fsCfg config.S3StorageConfig
