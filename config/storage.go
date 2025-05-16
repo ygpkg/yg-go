@@ -13,6 +13,7 @@ type StorageConfig struct {
 	UpYun   *UpYunConfig        `yaml:"upyun,omitempty"`
 	Tencent *TencentCOSConfig   `yaml:"tencent,omitempty"`
 	Minoss  *MinossConfig       `yaml:"minoss,omitempty"`
+	S3      *S3StorageConfig    `yaml:"s3,omitempty"`
 }
 
 // StorageOption 对象存储通用配置选项
@@ -71,4 +72,14 @@ type MinossConfig struct {
 	SecretAccessKey string `yaml:"secret_access_key"`
 	// UseSSL          bool   `yaml:"use_ssl"`
 	Bucket string `yaml:"bucket"`
+}
+
+// S3StorageConfig S3通用存储
+type S3StorageConfig struct {
+	EndPoint        string `yaml:"end_point"`
+	AccessKeyID     string `yaml:"access_key_id"`
+	SecretAccessKey string `yaml:"secret_access_key"`
+	Region          string `yaml:"region"`
+	Bucket          string `yaml:"bucket"`
+	UsePathStyle    bool   `yaml:"use_path_style"` // 是否使用路径风格的URL minio true 腾讯云 false
 }
