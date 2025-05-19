@@ -64,7 +64,7 @@ func (mfs *MinFs) Save(ctx context.Context, fi *FileInfo, r io.Reader) error {
 	}
 	// 上传一条记录
 	_, err := mfs.client.PutObject(mfs.ctx, mfs.mfsCfg.Bucket, fi.StoragePath, r, fi.Size, minio.PutObjectOptions{
-		ContentType: fi.FileExt,
+		// ContentType: fi.FileExt,
 	})
 
 	if err != nil {
