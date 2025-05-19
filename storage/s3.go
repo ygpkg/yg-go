@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"path"
@@ -76,9 +77,10 @@ func (s3fs *S3Fs) Save(ctx context.Context, fi *FileInfo, r io.Reader) error {
 	}
 	uploader := manager.NewUploader(s3fs.client)
 	_, err := uploader.Upload(s3fs.ctx, &s3.PutObjectInput{
-		Bucket: aws.String(s3fs.s3fsCfg.Bucket),
-		Key:    aws.String(fi.StoragePath),
-		Body:   r,
+		Bucket:      aws.String(s3fs.s3fsCfg.Bucket),
+		Key:         aws.String(fi.StoragePath),
+		Body:        r,
+		ContentType: aws.String(mime.TypeByExtension(fi.FileExt)),
 	})
 	if err != nil {
 		return err
