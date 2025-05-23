@@ -13,12 +13,16 @@ type AsyncJob struct {
 	Uin uint `gorm:"column:uin;type:int;not null;index"`
 	// Purpose 任务类型
 	Purpose string `gorm:"column:purpose;type:varchar(255);not null;index"`
+	// BusinessID 业务数据ID
+	BusinessID uint `gorm:"column:business_id;type:bigint;not null;index"`
 	// JobStatus 导出状态
 	JobStatus JobStatus `gorm:"column:job_status;type:varchar(20);not null;index"`
 	// ErrorMsg 错误信息
 	ErrorMsg string `gorm:"column:error_msg;type:varchar(255)"`
 	// CostSeconds 耗时
 	CostSeconds int `gorm:"column:cost_seconds;type:int;not null"`
+	// 输入内容
+	Input string `gorm:"column:input;type:varchar(4096)"`
 	// Output 输出内容
 	Output string `gorm:"column:output;type:text"`
 	// Extra 扩展字段
