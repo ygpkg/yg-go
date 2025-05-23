@@ -22,7 +22,7 @@ type AsyncJob struct {
 	// CostSeconds 耗时
 	CostSeconds int `gorm:"column:cost_seconds;type:int;not null"`
 	// 输入内容
-	Input string `gorm:"column:input;type:varchar(255)"`
+	Input string `gorm:"column:input;type:varchar(4096)"`
 	// Output 输出内容
 	Output string `gorm:"column:output;type:text"`
 	// Extra 扩展字段
