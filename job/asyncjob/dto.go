@@ -17,9 +17,6 @@ func (req *CreateJobRequest) Validate() error {
 	if req.Purpose == "" {
 		return errors.New("purpose is empty")
 	}
-	if req.BusinessID == 0 {
-		return errors.New("business_id is empty")
-	}
 	return nil
 }
 
