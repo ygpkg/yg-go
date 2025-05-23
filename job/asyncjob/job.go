@@ -71,9 +71,6 @@ func UpdateJobStatus(ctx context.Context, db *gorm.DB, req *UpdateJobStatusReque
 	if req.Output != "" {
 		updateMap["output"] = req.Output
 	}
-	if req.Extra != "" {
-		updateMap["extra"] = req.Extra
-	}
 
 	err = db.WithContext(ctx).Model(&job.AsyncJob{}).Where("id = ?", ejob.ID).Updates(updateMap).Error
 	if err != nil {

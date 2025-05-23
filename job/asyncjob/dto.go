@@ -24,7 +24,6 @@ type UpdateJobStatusRequest struct {
 	JobUUID string `json:"job_uuid"` // 任务UUID
 	Error   error  `json:"error"`    // 错误信息
 	Output  string `json:"output"`   // 输出内容
-	Extra   string `json:"extra"`    // 扩展信息
 }
 
 func (req *UpdateJobStatusRequest) Validate() error {
