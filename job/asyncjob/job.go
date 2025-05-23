@@ -54,25 +54,28 @@ func UpdateJobStatus(ctx context.Context, db *gorm.DB, req *UpdateJobStatusReque
 		return nil, err
 	}
 
+	updateMap := map[string]interface{}{
+		"cost_seconds": int(time.Now().Sub(ejob.CreatedAt).Seconds()),
+	}
+
 	if req.Error != nil {
-		ejob.JobStatus = job.JobStatusFailed
+		updateMap["job_status"] = job.JobStatusFailed
 		if ejob.ErrorMsg == "" {
-			ejob.ErrorMsg = req.Error.Error()
+			updateMap["error_msg"] = req.Error.Error()
 		} else {
-			ejob.ErrorMsg += "; " + req.Error.Error()
+			updateMap["error_msg"] = ejob.ErrorMsg + "; " + req.Error.Error()
 		}
 	} else {
-		ejob.JobStatus = job.JobStatusSuccess
+		updateMap["job_status"] = job.JobStatusSuccess
 	}
 	if req.Output != "" {
-		ejob.Output = req.Output
+		updateMap["output"] = req.Output
 	}
 	if req.Extra != "" {
-		ejob.Extra = req.Extra
+		updateMap["extra"] = req.Extra
 	}
-	ejob.CostSeconds = int(time.Now().Sub(ejob.CreatedAt).Seconds())
 
-	err = db.WithContext(ctx).Save(ejob).Error
+	err = db.WithContext(ctx).Model(&job.AsyncJob{}).Where("id = ?", ejob.ID).Updates(updateMap).Error
 	if err != nil {
 		logs.ErrorContextf(ctx, "[asyncjob] update job failed, err: %v, req:%s", err, logs.JSON(req))
 		return nil, err
