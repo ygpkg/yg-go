@@ -13,7 +13,7 @@ import (
 // CreateAsyncJob 新建异步任务
 func CreateAsyncJob(ctx context.Context, db *gorm.DB, req *CreateJobRequest) (*job.AsyncJob, error) {
 	if err := req.Validate(); err != nil {
-		logs.ErrorContextf(ctx, "[asyncjob] validate job failed, err: %v, req:%s", err, logs.JSON(req))
+		logs.ErrorContextf(ctx, "[asyncjob.CreateAsyncJob] validate job failed, err: %v, req:%s", err, logs.JSON(req))
 		return nil, err
 	}
 	ajob := &job.AsyncJob{
@@ -26,7 +26,7 @@ func CreateAsyncJob(ctx context.Context, db *gorm.DB, req *CreateJobRequest) (*j
 		Extra:      req.Extra,
 	}
 	if err := db.WithContext(ctx).Create(ajob).Error; err != nil {
-		logs.ErrorContextf(ctx, "[asyncjob] create job failed, err: %v, req:%s", err, logs.JSON(req))
+		logs.ErrorContextf(ctx, "[asyncjob.CreateAsyncJob] create job failed, err: %v, req:%s", err, logs.JSON(req))
 		return nil, err
 	}
 	return ajob, nil
@@ -37,16 +37,42 @@ func GetJobByUUID(ctx context.Context, db *gorm.DB, jobUUID string) (*job.AsyncJ
 	ejob := &job.AsyncJob{}
 	err := db.WithContext(ctx).Where("job_uuid = ?", jobUUID).Last(ejob).Error
 	if err != nil {
-		logs.ErrorContextf(ctx, "[asyncjob] get job failed, err: %v, jobUUID:%s", err, jobUUID)
+		logs.ErrorContextf(ctx, "[asyncjob.GetJobByUUID] get job failed, err: %v, jobUUID:%s", err, jobUUID)
 		return nil, err
 	}
 	return ejob, nil
 }
 
+// BatchGetJobByUUIDs 批量获取任务
+func BatchGetJobByUUIDs(ctx context.Context, db *gorm.DB, jobUUIDs []string) ([]job.AsyncJob, error) {
+	var ejobs []job.AsyncJob
+	err := db.WithContext(ctx).Where("job_uuid IN (?)", jobUUIDs).Find(&ejobs).Error
+	if err != nil {
+		logs.ErrorContextf(ctx, "[asyncjob.BatchGetJobByUUIDs] get jobs failed, err: %v, jobUUIDs:%s", err, logs.JSON(jobUUIDs))
+		return nil, err
+	}
+	return ejobs, nil
+}
+
+// BatchGetJobStatusByUUIDs 批量获取任务状态
+func BatchGetJobStatusByUUIDs(ctx context.Context, db *gorm.DB, jobUUIDs []string) (map[string]job.JobStatus, error) {
+	var ejobs []job.AsyncJob
+	err := db.WithContext(ctx).Select("job_uuid, job_status").Where("job_uuid IN (?)", jobUUIDs).Find(&ejobs).Error
+	if err != nil {
+		logs.ErrorContextf(ctx, "[asyncjob.BatchGetJobStatusByUUIDs] get jobs failed, err: %v, jobUUIDs:%s", err, logs.JSON(jobUUIDs))
+		return nil, err
+	}
+	statusMap := make(map[string]job.JobStatus)
+	for _, ejob := range ejobs {
+		statusMap[ejob.JobUUID] = ejob.JobStatus
+	}
+	return statusMap, nil
+}
+
 // UpdateJobStatus 更新任务状态
 func UpdateJobStatus(ctx context.Context, db *gorm.DB, req *UpdateJobStatusRequest) (*job.AsyncJob, error) {
 	if err := req.Validate(); err != nil {
-		logs.ErrorContextf(ctx, "[asyncjob] validate job failed, err: %v, req:%s", err, logs.JSON(req))
+		logs.ErrorContextf(ctx, "[asyncjob.UpdateJobStatus] validate job failed, err: %v, req:%s", err, logs.JSON(req))
 		return nil, err
 	}
 	ejob, err := GetJobByUUID(ctx, db, req.JobUUID)
@@ -74,7 +100,7 @@ func UpdateJobStatus(ctx context.Context, db *gorm.DB, req *UpdateJobStatusReque
 
 	err = db.WithContext(ctx).Model(&job.AsyncJob{}).Where("id = ?", ejob.ID).Updates(updateMap).Error
 	if err != nil {
-		logs.ErrorContextf(ctx, "[asyncjob] update job failed, err: %v, req:%s", err, logs.JSON(req))
+		logs.ErrorContextf(ctx, "[asyncjob.UpdateJobStatus] update job failed, err: %v, req:%s", err, logs.JSON(req))
 		return nil, err
 	}
 	return ejob, nil
