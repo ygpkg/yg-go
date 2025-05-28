@@ -11,6 +11,8 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
+var _ Storager = (*LocalStorage)(nil)
+
 // LocalStorage .
 type LocalStorage struct {
 	cfg config.LocalStorageConfig
@@ -133,6 +135,9 @@ func (ls *LocalStorage) CopyDir(storagePath, dest string) error {
 
 	// 如果源路径是文件，则复制文件
 	return ls.copyFile(srcPath, destPath)
+}
+func (ls *LocalStorage) UploadDirectory(localDirPath, destDir string) ([]string, error) {
+	return nil, fmt.Errorf("UploadDirectory not implemented for LocalStorage")
 }
 
 // copyFile 复制文件

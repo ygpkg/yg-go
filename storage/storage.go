@@ -34,6 +34,7 @@ type Storager interface {
 	// Stat(name string) (*FileInfo, error)
 	DeleteFile(storagePath string) error
 	CopyDir(storagePath, dest string) error
+	UploadDirectory(localDirPath, destDir string) ([]string, error)
 }
 
 // InitDB .

@@ -5,10 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"mime"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -206,6 +209,72 @@ func (sfs *S3Fs) CopyDir(storagePath, dest string) error {
 		// 复制单个文件
 		return sfs.copyObject(storagePath, dest)
 	}
+}
+
+// UploadDirectory 上传本地目录到远程存储
+func (sfs *S3Fs) UploadDirectory(localDirPath, destDir string) ([]string, error) {
+	var uploadedPaths []string
+
+	// 参数校验
+	if localDirPath == "" {
+		return nil, fmt.Errorf("local directory path is empty")
+	}
+	if destDir == "" {
+		return nil, fmt.Errorf("destination storage path is empty")
+	}
+
+	// 遍历本地目录
+	err := filepath.WalkDir(localDirPath, func(filePath string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("error accessing path %s: %w", filePath, err)
+		}
+
+		// 跳过目录
+		if d.IsDir() {
+			return nil
+		}
+
+		// 获取相对于源目录的相对路径
+		relPath, err := filepath.Rel(localDirPath, filePath)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path for %s: %w", filePath, err)
+		}
+
+		// 构造 S3 存储路径（使用正斜杠作为路径分隔符）
+		storagePath := path.Join(destDir, relPath)
+
+		// 获取文件扩展名
+		fileExt := path.Ext(filePath)
+
+		// 打开文件
+		file, err := os.Open(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to open file %s: %w", filePath, err)
+		}
+		defer file.Close() // 确保在本次迭代中关闭文件
+
+		// 构造 FileInfo 结构体
+		fi := &FileInfo{
+			StoragePath: storagePath,
+			FileExt:     fileExt,
+		}
+
+		// 上传文件
+		if err := sfs.Save(sfs.ctx, fi, file); err != nil {
+			return fmt.Errorf("failed to upload file %s to %s: %w", filePath, storagePath, err)
+		}
+
+		// 记录上传成功的路径
+		uploadedPaths = append(uploadedPaths, storagePath)
+		return nil
+	})
+
+	// 检查遍历过程中是否有错误
+	if err != nil {
+		return nil, err
+	}
+
+	return uploadedPaths, nil
 }
 
 // isDirectory 判断路径是否为目录（如果 HeadObject 失败且不存在，则认为是目录）

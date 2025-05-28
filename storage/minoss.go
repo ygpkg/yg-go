@@ -16,6 +16,8 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
+var _ Storager = (*MinFs)(nil)
+
 // MinFs .
 type MinFs struct {
 	opt    config.StorageOption
@@ -144,6 +146,9 @@ func (mfs *MinFs) CopyDir(storagePath, dest string) error {
 		// 复制文件
 		return mfs.copyObject(storagePath, dest)
 	}
+}
+func (mfs *MinFs) UploadDirectory(localDirPath, destDir string) ([]string, error) {
+	return nil, fmt.Errorf("UploadDirectory not implemented for MinFs")
 }
 
 // isDirectory 检查路径是否为文件夹

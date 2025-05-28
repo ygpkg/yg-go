@@ -160,3 +160,25 @@ func TestS3FsCopyDir(t *testing.T) {
 		fmt.Println(err)
 	}
 }
+
+// TestS3FsCopyDir 复制 测试通过：minio cos
+func TestS3FsUploadDirectory(t *testing.T) {
+	var defaultCfg = config.S3StorageConfig{
+		EndPoint:        "",
+		AccessKeyID:     "",
+		SecretAccessKey: "",
+		Bucket:          "",
+		Region:          "ap-",
+		UsePathStyle:    true, // 目前测试minio为true cos为false
+	}
+	if defaultCfg.EndPoint == "" || defaultCfg.AccessKeyID == "" || defaultCfg.SecretAccessKey == "" {
+		t.Skip("skip test, no minoss config")
+		return
+	}
+	s3c, err := NewS3Fs(defaultCfg, config.StorageOption{})
+	if err != nil {
+		fmt.Println(err)
+	}
+	paths, err := s3c.UploadDirectory("/usr/local/goProject/src/yg-go/storage/weedfs", "test/b")
+	fmt.Println(paths, err)
+}
