@@ -63,3 +63,30 @@ func (i *UintArray) Remove(item uint) {
 	}
 	*i = NewUintArray(newArray)
 }
+
+// Contains 检查 UintArray 是否包含指定值
+func (i UintArray) Contains(value uint) bool {
+	arr := i.Slice()
+	for _, v := range arr {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveDuplicates 移除重复值
+func (i *UintArray) RemoveDuplicates() {
+	arr := i.Slice()
+	unique := make(map[uint]bool)
+	var result []uint
+
+	for _, v := range arr {
+		if !unique[v] {
+			unique[v] = true
+			result = append(result, v)
+		}
+	}
+
+	*i = NewUintArray(result)
+}
