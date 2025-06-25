@@ -1,9 +1,9 @@
-package sseclient
+package middleware
 
 import "github.com/gin-gonic/gin"
 
-// HeadersMiddleware SSE头部中间件
-func HeadersMiddleware() gin.HandlerFunc {
+// SSEHeader 设置SSE头部中间件
+func SSEHeader() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Content-Type", "text/event-stream")
 		c.Writer.Header().Set("Cache-Control", "no-cache")

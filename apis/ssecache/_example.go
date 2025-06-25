@@ -1,4 +1,4 @@
-package sseclient
+package ssecache
 
 import (
 	"net/http"

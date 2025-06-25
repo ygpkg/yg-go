@@ -1,16 +1,21 @@
-package sseclient
+package ssecache
 
 import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/go-redis/redis/v8"
 )
 
+const (
+	defaultExpiration = 30 * time.Minute
+)
+
 type Storage interface {
 	// WriteMessage 写入消息到指定流
-	WriteMessage(ctx context.Context, key string, msg string) error
+	WriteMessage(ctx context.Context, key string, msg string, expiration time.Duration) error
 	// ReadMessages 读取指定流的消息
 	ReadMessages(ctx context.Context, key string, lastID string) ([]string, error)
 	// SetStopSignal 设置停止信号
@@ -20,7 +25,9 @@ type Storage interface {
 }
 
 type config struct {
-	rdb *redis.Client
+	rdb        *redis.Client
+	ch         chan string
+	expiration time.Duration
 }
 
 type Option interface {
@@ -39,18 +46,31 @@ func WithRedisClient(rdb *redis.Client) Option {
 	})
 }
 
+func WithChannel(ch chan string) Option {
+	return configFunc(func(cfg *config) {
+		cfg.ch = ch
+	})
+}
+
+func WithExpiration(expiration time.Duration) Option {
+	return configFunc(func(cfg *config) {
+		cfg.expiration = expiration
+	})
+}
+
 // SSEClient SSE客户端管理器
 type SSEClient struct {
 	// 存储接口
 	storage Storage
-	ch      chan string
 	once    sync.Once
 	config  *config
 }
 
 // NewSSEClient 创建SSE客户端实例
-func NewSSEClient(ch chan string, opts ...Option) *SSEClient {
-	cfg := &config{}
+func NewSSEClient(opts ...Option) *SSEClient {
+	cfg := &config{
+		expiration: defaultExpiration,
+	}
 	for _, opt := range opts {
 		opt.apply(cfg)
 	}
@@ -86,7 +106,9 @@ func (s *SSEClient) WriteMessage(ctx context.Context, streamID string, msg strin
 	if err := s.storage.WriteMessage(ctx, writeKey, msg); err != nil {
 		return err
 	}
-	s.ch <- msg
+	if s.config.ch != nil {
+		s.config.ch <- msg
+	}
 
 	return nil
 }
@@ -109,7 +131,7 @@ func (s *SSEClient) Stop(ctx context.Context, streamID string) error {
 // Close 写入完成时关闭相关资源
 func (s *SSEClient) Close() error {
 	s.once.Do(func() {
-		close(s.ch)
+		close(s.config.ch)
 	})
 	return nil
 }

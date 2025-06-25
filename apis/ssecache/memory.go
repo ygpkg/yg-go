@@ -1,8 +1,9 @@
-package sseclient
+package ssecache
 
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 type memoryStorage struct {
@@ -18,7 +19,7 @@ func newMemoryStorage() *memoryStorage {
 	}
 }
 
-func (m *memoryStorage) WriteMessage(ctx context.Context, key string, msg string) error {
+func (m *memoryStorage) WriteMessage(ctx context.Context, key string, msg string, expiration time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.data[key] = append(m.data[key], msg)
