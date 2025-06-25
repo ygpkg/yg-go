@@ -51,7 +51,7 @@ func (r *redisStorage) ReadMessages(ctx context.Context, key string, lastID stri
 
 	// 读取已有的全部数据
 	streams, err := r.rdb.XRead(ctx, &redis.XReadArgs{
-		Streams: []string{key},
+		Streams: []string{key, "0"},
 		Count:   count,
 		Block:   0,
 	}).Result()

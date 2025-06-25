@@ -103,7 +103,7 @@ func (s *SSEClient) WriteMessage(ctx context.Context, streamID string, msg strin
 	}
 
 	writeKey := s.buildWriteKey(streamID)
-	if err := s.storage.WriteMessage(ctx, writeKey, msg); err != nil {
+	if err := s.storage.WriteMessage(ctx, writeKey, msg, s.config.expiration); err != nil {
 		return err
 	}
 	if s.config.ch != nil {
@@ -126,6 +126,11 @@ func (s *SSEClient) Stop(ctx context.Context, streamID string) error {
 		return fmt.Errorf("failed to set write stop signal, err: %v, key:%s", err, key)
 	}
 	return nil
+}
+
+func (s *SSEClient) GetStopSignal(ctx context.Context, streamID string) (bool, error) {
+	key := s.buildStopKey(streamID)
+	return s.storage.GetStopSignal(ctx, key)
 }
 
 // Close 写入完成时关闭相关资源
