@@ -1,0 +1,191 @@
+package sseclient
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"sync"
+	"time"
+
+	"github.com/go-redis/redis/v8"
+)
+
+const (
+	defaultExpiration = 30 * time.Minute
+)
+
+type StreamErrorHandler func(err error)
+
+var defaultStreamErrorHandler StreamErrorHandler = func(err error) {
+}
+
+type StreamHandler func(w io.Writer) bool
+
+type config struct {
+	rdb        *redis.Client
+	expiration time.Duration
+}
+
+type Option interface {
+	apply(*config)
+}
+
+type configFunc func(*config)
+
+func (f configFunc) apply(cfg *config) {
+	f(cfg)
+}
+
+func WithRedisClient(rdb *redis.Client) Option {
+	return configFunc(func(cfg *config) {
+		cfg.rdb = rdb
+	})
+}
+
+func WithExpiration(expiration time.Duration) Option {
+	return configFunc(func(cfg *config) {
+		cfg.expiration = expiration
+	})
+}
+
+// SSEClient SSE客户端管理器
+type SSEClient struct {
+	// 存储接口
+	storage Cache
+	ch      chan string
+	once    sync.Once
+	config  *config
+}
+
+// New 创建SSE客户端实例
+func New(opts ...Option) *SSEClient {
+	cfg := &config{
+		expiration: defaultExpiration,
+	}
+	for _, opt := range opts {
+		opt.apply(cfg)
+	}
+
+	var storage Cache
+	if cfg.rdb != nil {
+		storage = newRedisCache(cfg.rdb)
+	} else {
+		storage = newMemoryCache()
+	}
+
+	cache := &SSEClient{
+		config:  cfg,
+		storage: storage,
+		ch:      make(chan string, 100),
+	}
+
+	return cache
+}
+
+func (s *SSEClient) SetHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
+// WriteMessage 写入消息到指定流，返回写入是否被停止：true-被停止，false-未停止
+func (s *SSEClient) WriteMessage(ctx context.Context, streamID, msg string) (bool, error) {
+	// 检查写入是否被停止
+	stopKey := s.buildStopKey(streamID)
+	stopped, err := s.storage.GetStopSignal(ctx, stopKey)
+	if err != nil {
+		return false, fmt.Errorf("failed to get write stop signal, err: %v, key:%s", err, stopKey)
+	}
+	if stopped {
+		return true, nil
+	}
+
+	writeKey := s.buildWriteKey(streamID)
+	if err := s.storage.WriteMessage(ctx, writeKey, msg, s.config.expiration); err != nil {
+		return false, err
+	}
+
+	select {
+	case s.ch <- msg:
+	default:
+	}
+
+	return false, nil
+}
+
+// ReadMessages 读取指定流的消息
+func (s *SSEClient) ReadMessages(ctx context.Context, streamID string) ([]string, error) {
+	key := s.buildWriteKey(streamID)
+	return s.storage.ReadMessages(ctx, key)
+}
+
+// Stop 停止指定流的写入操作
+func (s *SSEClient) Stop(ctx context.Context, streamID string) error {
+	stopKey := s.buildStopKey(streamID)
+	if err := s.storage.SetStopSignal(ctx, stopKey); err != nil {
+		return fmt.Errorf("failed to set write stop signal, err: %v, key:%s", err, stopKey)
+	}
+	writeKey := s.buildWriteKey(streamID)
+	if err := s.storage.Delete(ctx, writeKey); err != nil {
+		return fmt.Errorf("failed to delete message, err: %v, key:%s", err, writeKey)
+	}
+	return nil
+}
+
+func (s *SSEClient) GetStopSignal(ctx context.Context, streamID string) (bool, error) {
+	key := s.buildStopKey(streamID)
+	return s.storage.GetStopSignal(ctx, key)
+}
+
+func (s *SSEClient) GetStreamHandler(ctx context.Context, streamID string, errHandler StreamErrorHandler) StreamHandler {
+	return func(w io.Writer) bool {
+		if errHandler == nil {
+			errHandler = defaultStreamErrorHandler
+		}
+		select {
+		case msg := <-s.ch:
+			if ctx.Err() != nil {
+				errHandler(ctx.Err())
+				return false
+			}
+			stopped, err := s.GetStopSignal(ctx, streamID)
+			if err != nil {
+				errHandler(err)
+				return false
+			}
+			if stopped {
+				return false
+			}
+			if _, err := w.Write([]byte(msg + "\n")); err != nil {
+				errHandler(err)
+				return false
+			}
+		case <-ctx.Done():
+			errHandler(ctx.Err())
+			return false
+		case <-time.After(300 * time.Millisecond):
+			// 超出一定时间后重试
+			return true
+		}
+		return true
+	}
+}
+
+// Close 写入完成时关闭相关资源
+func (s *SSEClient) Close() error {
+	s.once.Do(func() {
+		close(s.ch)
+	})
+	return nil
+}
+
+func (s *SSEClient) buildWriteKey(streamID string) string {
+	return fmt.Sprintf("stream_write:%s", streamID)
+}
+
+func (s *SSEClient) buildStopKey(streamID string) string {
+	return fmt.Sprintf("stream_stop:%s", streamID)
+}
