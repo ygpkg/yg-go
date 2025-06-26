@@ -22,7 +22,7 @@ type ProxyConfig struct {
 type LLMModelConfig struct {
 	Proxy *ProxyConfig `yaml:"proxy"`
 
-	APIKEY    string `json:"api_key"`
-	BaseURL   string `json:"base_url"`
-	ModelName string `json:"model_name"`
+	APIKEY    string `json:"api_key" yaml:"api_key"`
+	BaseURL   string `json:"base_url" yaml:"base_url"`
+	ModelName string `json:"model_name" yaml:"model_name"`
 }
