@@ -69,15 +69,15 @@ func (r *redisCache) ReadMessages(ctx context.Context, key string) ([]string, er
 	return messages, nil
 }
 
-func (r *redisCache) SetStopSignal(ctx context.Context, key string) error {
-	_, err := r.rdb.Set(ctx, key, "stop_signal", defaultExpiration*2).Result()
+func (r *redisCache) Set(ctx context.Context, key string, expiration time.Duration) error {
+	_, err := r.rdb.Set(ctx, key, "stop_signal", expiration).Result()
 	if err != nil {
 		return fmt.Errorf("failed to set stop signal, err: %v, key:%s", err, key)
 	}
 	return nil
 }
 
-func (r *redisCache) GetStopSignal(ctx context.Context, key string) (bool, error) {
+func (r *redisCache) Get(ctx context.Context, key string) (bool, error) {
 	count, err := r.rdb.Exists(ctx, key).Result()
 	if err != nil {
 		return false, fmt.Errorf("failed to get stop signal, err: %v, key:%s", err, key)

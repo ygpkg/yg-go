@@ -13,6 +13,9 @@ import (
 
 const (
 	defaultExpiration = 30 * time.Minute
+
+	writeKeyPrefix = "stream_write"
+	stopKeyPrefix  = "stream_stop"
 )
 
 type StreamErrorHandler func(err error)
@@ -71,7 +74,7 @@ func New(opts ...Option) *SSEClient {
 	if cfg.rdb != nil {
 		storage = newRedisCache(cfg.rdb)
 	} else {
-		storage = newMemoryCache()
+		storage = newMemoryCache(writeKeyPrefix, stopKeyPrefix)
 	}
 
 	cache := &SSEClient{
@@ -87,15 +90,13 @@ func (s *SSEClient) SetHeaders(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 }
 
 // WriteMessage 写入消息到指定流，返回写入是否被停止：true-被停止，false-未停止
-func (s *SSEClient) WriteMessage(ctx context.Context, streamID, msg string) (bool, error) {
+func (s *SSEClient) WriteMessage(ctx context.Context, writer io.Writer, streamID, msg string) (bool, error) {
 	// 检查写入是否被停止
 	stopKey := s.buildStopKey(streamID)
-	stopped, err := s.storage.GetStopSignal(ctx, stopKey)
+	stopped, err := s.storage.Get(ctx, stopKey)
 	if err != nil {
 		return false, fmt.Errorf("failed to get write stop signal, err: %v, key:%s", err, stopKey)
 	}
@@ -108,9 +109,18 @@ func (s *SSEClient) WriteMessage(ctx context.Context, streamID, msg string) (boo
 		return false, err
 	}
 
-	select {
-	case s.ch <- msg:
-	default:
+	// 立即写入前端响应流
+	if writer != nil {
+		if _, err := writer.Write([]byte(msg)); err != nil {
+			return false, fmt.Errorf("failed to write to response writer: %w", err)
+		}
+
+		// 尝试刷新响应流
+		if flusher, ok := writer.(http.Flusher); ok {
+			flusher.Flush()
+		} else {
+			return false, fmt.Errorf("failed to flush response writer, key:%s", writeKey)
+		}
 	}
 
 	return false, nil
@@ -125,7 +135,7 @@ func (s *SSEClient) ReadMessages(ctx context.Context, streamID string) ([]string
 // Stop 停止指定流的写入操作
 func (s *SSEClient) Stop(ctx context.Context, streamID string) error {
 	stopKey := s.buildStopKey(streamID)
-	if err := s.storage.SetStopSignal(ctx, stopKey); err != nil {
+	if err := s.storage.Set(ctx, stopKey, s.config.expiration*2); err != nil {
 		return fmt.Errorf("failed to set write stop signal, err: %v, key:%s", err, stopKey)
 	}
 	writeKey := s.buildWriteKey(streamID)
@@ -137,55 +147,25 @@ func (s *SSEClient) Stop(ctx context.Context, streamID string) error {
 
 func (s *SSEClient) GetStopSignal(ctx context.Context, streamID string) (bool, error) {
 	key := s.buildStopKey(streamID)
-	return s.storage.GetStopSignal(ctx, key)
-}
-
-func (s *SSEClient) GetStreamHandler(ctx context.Context, streamID string, errHandler StreamErrorHandler) StreamHandler {
-	return func(w io.Writer) bool {
-		if errHandler == nil {
-			errHandler = defaultStreamErrorHandler
-		}
-		select {
-		case msg := <-s.ch:
-			if ctx.Err() != nil {
-				errHandler(ctx.Err())
-				return false
-			}
-			stopped, err := s.GetStopSignal(ctx, streamID)
-			if err != nil {
-				errHandler(err)
-				return false
-			}
-			if stopped {
-				return false
-			}
-			if _, err := w.Write([]byte(msg + "\n")); err != nil {
-				errHandler(err)
-				return false
-			}
-		case <-ctx.Done():
-			errHandler(ctx.Err())
-			return false
-		case <-time.After(300 * time.Millisecond):
-			// 超出一定时间后重试
-			return true
-		}
-		return true
-	}
+	return s.storage.Get(ctx, key)
 }
 
 // Close 写入完成时关闭相关资源
-func (s *SSEClient) Close() error {
+func (s *SSEClient) Close(ctx context.Context, streamID string) error {
 	s.once.Do(func() {
 		close(s.ch)
 	})
+	key := s.buildWriteKey(streamID)
+	if err := s.storage.Delete(ctx, key); err != nil {
+		return fmt.Errorf("failed to delete stop signal, err: %v, key:%s", err, key)
+	}
 	return nil
 }
 
 func (s *SSEClient) buildWriteKey(streamID string) string {
-	return fmt.Sprintf("stream_write:%s", streamID)
+	return fmt.Sprintf("%s:%s", writeKeyPrefix, streamID)
 }
 
 func (s *SSEClient) buildStopKey(streamID string) string {
-	return fmt.Sprintf("stream_stop:%s", streamID)
+	return fmt.Sprintf("%s:%s", stopKeyPrefix, streamID)
 }
