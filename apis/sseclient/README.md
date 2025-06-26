@@ -3,56 +3,52 @@
 
 ### 流式返回
 ``` go
-func Chat(ctx *gin.Context) {
-	questionID := "202506261643"
-
-    // 实例化 client
-	sseClient := sseclient.New(sseclient.WithRedisClient(rdb), sseclient.WithExpiration(time.Second*60))
-
-    // 修改 header
+func StreamChat(ctx *gin.Context) {
+	// 设置 SSE 响应头
+	sseClient := sseclient.New(sseclient.WithRedisClient(rdb))
 	sseClient.SetHeaders(ctx.Writer)
 
-    // 模拟数据写入
-	var writeCount int
-	var mu sync.Mutex
-	go func() {
-		ticker := time.NewTicker(200 * time.Millisecond)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				mu.Lock()
-				if writeCount > 100 {
-					mu.Unlock()
-					return
-				}
-				msg := time.Now().Format(time.RFC3339)
-				if stoped, err := sseClient.WriteMessage(ctx, questionID, msg); err != nil {
-					glog.Errorf(ctx, "[Chat] WriteMessage failed: %v", err)
-					mu.Unlock()
-					return
-				} else if stoped {
-					mu.Unlock()
-					return
-				}
-				writeCount++
-				mu.Unlock()
-			}
-		}
-	}()
-
-    // 流式返回
-	errorHandler := func(err error) {
-		glog.Errorf(ctx, "[Chat] stream handler failed, err: %v", err)
+	question := "世界上海拔排名前十的山峰"
+	sysPrompt := "请简单给出排名即可"
+	messages := []openai.ChatCompletionMessageParamUnion{
+		openai.SystemMessage(sysPrompt),
+		openai.UserMessage(question),
 	}
 
-	clientGone := ctx.Stream(sseClient.GetStreamHandler(ctx, questionID, errorHandler))
-    if clientGone {
-        glog.Infof(ctx, "[Chat] client gone")
-    }
+	params := openai.ChatCompletionNewParams{
+		Messages: messages,
+		Seed:     openai.Int(0),
+		Model:    LLMModel,
+	}
+
+	// 创建流式请求
+	stream := llmClient.Chat.Completions.NewStreaming(ctx, params)
+	acc := openai.ChatCompletionAccumulator{}
+	ctx.SSEvent("start", "start")
+	ctx.Writer.Flush()
+	for stream.Next() {
+		chunk := stream.Current()
+
+		acc.AddChunk(chunk)
+
+		// 若本轮 chunk 含有 Content 增量，则输出
+		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
+			content := chunk.Choices[0].Delta.Content
+			stopped, err := sseClient.WriteMessage(ctx, ctx.Writer, question, content)
+			if err != nil {
+				glog.Errorf(ctx, "[StreamChat] WriteMessage failed: %v", err)
+				return
+			} else if stopped {
+				return
+			}
+		}
+
+		// 判断是否拒绝生成（如违反政策）
+		if refusal, ok := acc.JustFinishedRefusal(); ok {
+			ctx.SSEvent("refusal", refusal)
+			ctx.Writer.Flush()
+		}
+	}
 }
 ```
 
