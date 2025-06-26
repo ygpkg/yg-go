@@ -1,4 +1,4 @@
-package ssecache
+package sseclient
 
 import (
 	"context"
@@ -6,27 +6,27 @@ import (
 	"time"
 )
 
-type memoryStorage struct {
+type memoryCache struct {
 	data    map[string][]string
 	signals map[string]bool
 	mu      sync.RWMutex
 }
 
-func newMemoryStorage() *memoryStorage {
-	return &memoryStorage{
+func newMemoryCache() *memoryCache {
+	return &memoryCache{
 		data:    make(map[string][]string),
 		signals: make(map[string]bool),
 	}
 }
 
-func (m *memoryStorage) WriteMessage(ctx context.Context, key string, msg string, expiration time.Duration) error {
+func (m *memoryCache) WriteMessage(ctx context.Context, key, msg string, expiration time.Duration) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.data[key] = append(m.data[key], msg)
 	return nil
 }
 
-func (m *memoryStorage) ReadMessages(ctx context.Context, key string, lastID string) ([]string, error) {
+func (m *memoryCache) ReadMessages(ctx context.Context, key string) ([]string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -38,20 +38,20 @@ func (m *memoryStorage) ReadMessages(ctx context.Context, key string, lastID str
 	return []string{}, nil
 }
 
-func (m *memoryStorage) SetStopSignal(ctx context.Context, key string) error {
+func (m *memoryCache) SetStopSignal(ctx context.Context, key string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.signals[key] = true
 	return nil
 }
 
-func (m *memoryStorage) GetStopSignal(ctx context.Context, key string) (bool, error) {
+func (m *memoryCache) GetStopSignal(ctx context.Context, key string) (bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.signals[key], nil
 }
 
-func (m *memoryStorage) DeleteMessage(ctx context.Context, key string) error {
+func (m *memoryCache) DeleteMessage(ctx context.Context, key string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.data, key)

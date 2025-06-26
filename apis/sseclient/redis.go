@@ -1,4 +1,4 @@
-package ssecache
+package sseclient
 
 import (
 	"context"
@@ -8,17 +8,17 @@ import (
 	"github.com/go-redis/redis/v8"
 )
 
-type redisStorage struct {
+type redisCache struct {
 	rdb *redis.Client
 }
 
-func newRedisStorage(rdb *redis.Client) *redisStorage {
-	return &redisStorage{
+func newRedisCache(rdb *redis.Client) *redisCache {
+	return &redisCache{
 		rdb: rdb,
 	}
 }
 
-func (r *redisStorage) WriteMessage(ctx context.Context, key string, msg string, expiration time.Duration) error {
+func (r *redisCache) WriteMessage(ctx context.Context, key, msg string, expiration time.Duration) error {
 	args := &redis.XAddArgs{
 		Stream: key,
 		ID:     "*",
@@ -39,10 +39,7 @@ func (r *redisStorage) WriteMessage(ctx context.Context, key string, msg string,
 	return nil
 }
 
-func (r *redisStorage) ReadMessages(ctx context.Context, key string, lastID string) ([]string, error) {
-	if lastID == "" {
-		lastID = "0"
-	}
+func (r *redisCache) ReadMessages(ctx context.Context, key string) ([]string, error) {
 
 	count, countErr := r.rdb.XLen(ctx, key).Result()
 	if countErr != nil {
@@ -51,7 +48,7 @@ func (r *redisStorage) ReadMessages(ctx context.Context, key string, lastID stri
 
 	// 读取已有的全部数据
 	streams, err := r.rdb.XRead(ctx, &redis.XReadArgs{
-		Streams: []string{key, lastID},
+		Streams: []string{key, "0"},
 		Count:   count,
 		Block:   0,
 	}).Result()
@@ -72,7 +69,7 @@ func (r *redisStorage) ReadMessages(ctx context.Context, key string, lastID stri
 	return messages, nil
 }
 
-func (r *redisStorage) SetStopSignal(ctx context.Context, key string) error {
+func (r *redisCache) SetStopSignal(ctx context.Context, key string) error {
 	_, err := r.rdb.Set(ctx, key, "stop_signal", defaultExpiration*2).Result()
 	if err != nil {
 		return fmt.Errorf("failed to set stop signal, err: %v, key:%s", err, key)
@@ -80,7 +77,7 @@ func (r *redisStorage) SetStopSignal(ctx context.Context, key string) error {
 	return nil
 }
 
-func (r *redisStorage) GetStopSignal(ctx context.Context, key string) (bool, error) {
+func (r *redisCache) GetStopSignal(ctx context.Context, key string) (bool, error) {
 	count, err := r.rdb.Exists(ctx, key).Result()
 	if err != nil {
 		return false, fmt.Errorf("failed to get stop signal, err: %v, key:%s", err, key)
@@ -88,7 +85,7 @@ func (r *redisStorage) GetStopSignal(ctx context.Context, key string) (bool, err
 	return count > 0, nil
 }
 
-func (r *redisStorage) DeleteMessage(ctx context.Context, key string) error {
+func (r *redisCache) DeleteMessage(ctx context.Context, key string) error {
 	_, err := r.rdb.XDel(ctx, key).Result()
 	if err != nil {
 		return fmt.Errorf("failed to delete message, err: %v, key:%s", err, key)
