@@ -22,6 +22,8 @@ type Storage interface {
 	SetStopSignal(ctx context.Context, key string) error
 	// GetStopSignal 获取停止信号状态
 	GetStopSignal(ctx context.Context, key string) (bool, error)
+	// DeleteMessage 删除消息
+	DeleteMessage(ctx context.Context, key string) error
 }
 
 type config struct {
@@ -58,16 +60,16 @@ func WithExpiration(expiration time.Duration) Option {
 	})
 }
 
-// SSEClient SSE客户端管理器
-type SSEClient struct {
+// Cache SSE客户端管理器
+type Cache struct {
 	// 存储接口
 	storage Storage
 	once    sync.Once
 	config  *config
 }
 
-// NewSSEClient 创建SSE客户端实例
-func NewSSEClient(opts ...Option) *SSEClient {
+// New 创建SSE客户端实例
+func New(opts ...Option) *Cache {
 	cfg := &config{
 		expiration: defaultExpiration,
 	}
@@ -82,7 +84,7 @@ func NewSSEClient(opts ...Option) *SSEClient {
 		storage = newMemoryStorage()
 	}
 
-	client := &SSEClient{
+	client := &Cache{
 		config:  cfg,
 		storage: storage,
 	}
@@ -91,10 +93,10 @@ func NewSSEClient(opts ...Option) *SSEClient {
 }
 
 // WriteMessage 写入消息到指定流
-func (s *SSEClient) WriteMessage(ctx context.Context, streamID string, msg string) error {
+func (c *Cache) WriteMessage(ctx context.Context, streamID string, msg string) error {
 	// 检查写入是否被停止
-	stopKey := s.buildStopKey(streamID)
-	stopped, err := s.storage.GetStopSignal(ctx, stopKey)
+	stopKey := c.buildStopKey(streamID)
+	stopped, err := c.storage.GetStopSignal(ctx, stopKey)
 	if err != nil {
 		return fmt.Errorf("failed to get write stop signal, err: %v, key:%s", err, stopKey)
 	}
@@ -102,49 +104,53 @@ func (s *SSEClient) WriteMessage(ctx context.Context, streamID string, msg strin
 		return fmt.Errorf("write to stream %s is stopped", streamID)
 	}
 
-	writeKey := s.buildWriteKey(streamID)
-	if err := s.storage.WriteMessage(ctx, writeKey, msg, s.config.expiration); err != nil {
+	writeKey := c.buildWriteKey(streamID)
+	if err := c.storage.WriteMessage(ctx, writeKey, msg, c.config.expiration); err != nil {
 		return err
 	}
-	if s.config.ch != nil {
-		s.config.ch <- msg
+	if c.config.ch != nil {
+		c.config.ch <- msg
 	}
 
 	return nil
 }
 
 // ReadMessages 读取指定流的消息
-func (s *SSEClient) ReadMessages(ctx context.Context, streamID string, lastID string) ([]string, error) {
-	key := s.buildWriteKey(streamID)
-	return s.storage.ReadMessages(ctx, key, lastID)
+func (c *Cache) ReadMessages(ctx context.Context, streamID string, lastID string) ([]string, error) {
+	key := c.buildWriteKey(streamID)
+	return c.storage.ReadMessages(ctx, key, lastID)
 }
 
 // Stop 停止指定流的写入操作
-func (s *SSEClient) Stop(ctx context.Context, streamID string) error {
-	key := s.buildStopKey(streamID)
-	if err := s.storage.SetStopSignal(ctx, key); err != nil {
-		return fmt.Errorf("failed to set write stop signal, err: %v, key:%s", err, key)
+func (c *Cache) Stop(ctx context.Context, streamID string) error {
+	stopKey := c.buildStopKey(streamID)
+	if err := c.storage.SetStopSignal(ctx, stopKey); err != nil {
+		return fmt.Errorf("failed to set write stop signal, err: %v, key:%s", err, stopKey)
+	}
+	writeKey := c.buildWriteKey(streamID)
+	if err := c.storage.DeleteMessage(ctx, writeKey); err != nil {
+		return fmt.Errorf("failed to delete message, err: %v, key:%s", err, writeKey)
 	}
 	return nil
 }
 
-func (s *SSEClient) GetStopSignal(ctx context.Context, streamID string) (bool, error) {
-	key := s.buildStopKey(streamID)
-	return s.storage.GetStopSignal(ctx, key)
+func (c *Cache) GetStopSignal(ctx context.Context, streamID string) (bool, error) {
+	key := c.buildStopKey(streamID)
+	return c.storage.GetStopSignal(ctx, key)
 }
 
 // Close 写入完成时关闭相关资源
-func (s *SSEClient) Close() error {
-	s.once.Do(func() {
-		close(s.config.ch)
+func (c *Cache) Close() error {
+	c.once.Do(func() {
+		close(c.config.ch)
 	})
 	return nil
 }
 
-func (s *SSEClient) buildWriteKey(streamID string) string {
+func (c *Cache) buildWriteKey(streamID string) string {
 	return fmt.Sprintf("stream_write:%s", streamID)
 }
 
-func (s *SSEClient) buildStopKey(streamID string) string {
+func (c *Cache) buildStopKey(streamID string) string {
 	return fmt.Sprintf("stream_stop:%s", streamID)
 }

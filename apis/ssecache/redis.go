@@ -51,7 +51,7 @@ func (r *redisStorage) ReadMessages(ctx context.Context, key string, lastID stri
 
 	// 读取已有的全部数据
 	streams, err := r.rdb.XRead(ctx, &redis.XReadArgs{
-		Streams: []string{key, "0"},
+		Streams: []string{key, lastID},
 		Count:   count,
 		Block:   0,
 	}).Result()
@@ -88,10 +88,10 @@ func (r *redisStorage) GetStopSignal(ctx context.Context, key string) (bool, err
 	return count > 0, nil
 }
 
-func (r *redisStorage) RemoveStopSignal(ctx context.Context, key string) error {
-	_, err := r.rdb.Del(ctx, key).Result()
+func (r *redisStorage) DeleteMessage(ctx context.Context, key string) error {
+	_, err := r.rdb.XDel(ctx, key).Result()
 	if err != nil {
-		return fmt.Errorf("failed to remove stop signal, err: %v, key:%s", err, key)
+		return fmt.Errorf("failed to delete message, err: %v, key:%s", err, key)
 	}
 	return nil
 }

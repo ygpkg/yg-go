@@ -50,3 +50,10 @@ func (m *memoryStorage) GetStopSignal(ctx context.Context, key string) (bool, er
 	defer m.mu.RUnlock()
 	return m.signals[key], nil
 }
+
+func (m *memoryStorage) DeleteMessage(ctx context.Context, key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.data, key)
+	return nil
+}
