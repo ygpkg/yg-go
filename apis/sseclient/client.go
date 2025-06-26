@@ -93,7 +93,7 @@ func (s *SSEClient) SetHeaders(w http.ResponseWriter) {
 }
 
 // WriteMessage 写入消息到指定流，返回写入是否被停止：true-被停止，false-未停止
-func (s *SSEClient) WriteMessage(ctx context.Context, streamID, msg string) (bool, error) {
+func (s *SSEClient) WriteMessage(ctx context.Context, writer io.Writer, streamID, msg string) (bool, error) {
 	// 检查写入是否被停止
 	stopKey := s.buildStopKey(streamID)
 	stopped, err := s.storage.Get(ctx, stopKey)
@@ -109,9 +109,18 @@ func (s *SSEClient) WriteMessage(ctx context.Context, streamID, msg string) (boo
 		return false, err
 	}
 
-	select {
-	case s.ch <- msg:
-	default:
+	// 立即写入前端响应流
+	if writer != nil {
+		if _, err := writer.Write([]byte(msg)); err != nil {
+			return false, fmt.Errorf("failed to write to response writer: %w", err)
+		}
+
+		// 尝试刷新响应流
+		if flusher, ok := writer.(http.Flusher); ok {
+			flusher.Flush()
+		} else {
+			return false, fmt.Errorf("failed to flush response writer, key:%s", writeKey)
+		}
 	}
 
 	return false, nil
@@ -139,40 +148,6 @@ func (s *SSEClient) Stop(ctx context.Context, streamID string) error {
 func (s *SSEClient) GetStopSignal(ctx context.Context, streamID string) (bool, error) {
 	key := s.buildStopKey(streamID)
 	return s.storage.Get(ctx, key)
-}
-
-func (s *SSEClient) GetStreamHandler(ctx context.Context, streamID string, errHandler StreamErrorHandler) StreamHandler {
-	return func(w io.Writer) bool {
-		if errHandler == nil {
-			errHandler = defaultStreamErrorHandler
-		}
-		select {
-		case msg := <-s.ch:
-			if ctx.Err() != nil {
-				errHandler(ctx.Err())
-				return false
-			}
-			stopped, err := s.GetStopSignal(ctx, streamID)
-			if err != nil {
-				errHandler(err)
-				return false
-			}
-			if stopped {
-				return false
-			}
-			if _, err := w.Write([]byte(msg + "\n")); err != nil {
-				errHandler(err)
-				return false
-			}
-		case <-ctx.Done():
-			errHandler(ctx.Err())
-			return false
-		case <-time.After(300 * time.Millisecond):
-			// 超出一定时间后重试
-			return true
-		}
-		return true
-	}
 }
 
 // Close 写入完成时关闭相关资源
