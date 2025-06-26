@@ -85,8 +85,8 @@ func (r *redisCache) GetStopSignal(ctx context.Context, key string) (bool, error
 	return count > 0, nil
 }
 
-func (r *redisCache) DeleteMessage(ctx context.Context, key string) error {
-	_, err := r.rdb.XDel(ctx, key).Result()
+func (r *redisCache) Delete(ctx context.Context, key string) error {
+	err := r.rdb.Del(ctx, key).Err()
 	if err != nil {
 		return fmt.Errorf("failed to delete message, err: %v, key:%s", err, key)
 	}

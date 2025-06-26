@@ -15,5 +15,5 @@ type Cache interface {
 	// GetStopSignal 获取停止信号状态
 	GetStopSignal(ctx context.Context, key string) (bool, error)
 	// DeleteMessage 删除消息
-	DeleteMessage(ctx context.Context, key string) error
+	Delete(ctx context.Context, key string) error
 }

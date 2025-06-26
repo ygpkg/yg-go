@@ -51,7 +51,7 @@ func (m *memoryCache) GetStopSignal(ctx context.Context, key string) (bool, erro
 	return m.signals[key], nil
 }
 
-func (m *memoryCache) DeleteMessage(ctx context.Context, key string) error {
+func (m *memoryCache) Delete(ctx context.Context, key string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	delete(m.data, key)

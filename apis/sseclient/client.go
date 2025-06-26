@@ -3,6 +3,8 @@ package sseclient
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"sync"
 	"time"
 
@@ -12,6 +14,13 @@ import (
 const (
 	defaultExpiration = 30 * time.Minute
 )
+
+type StreamErrorHandler func(err error)
+
+var defaultStreamErrorHandler StreamErrorHandler = func(err error) {
+}
+
+type StreamHandler func(w io.Writer) bool
 
 type config struct {
 	rdb        *redis.Client
@@ -74,6 +83,14 @@ func New(opts ...Option) *SSEClient {
 	return cache
 }
 
+func (s *SSEClient) SetHeaders(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+}
+
 // WriteMessage 写入消息到指定流，返回写入是否被停止：true-被停止，false-未停止
 func (s *SSEClient) WriteMessage(ctx context.Context, streamID, msg string) (bool, error) {
 	// 检查写入是否被停止
@@ -90,8 +107,7 @@ func (s *SSEClient) WriteMessage(ctx context.Context, streamID, msg string) (boo
 	if err := s.storage.WriteMessage(ctx, writeKey, msg, s.config.expiration); err != nil {
 		return false, err
 	}
-	// s.ch <- msg
-	// 写入消息到 ch，防止 ch 被关闭导致 panic
+
 	select {
 	case s.ch <- msg:
 	default:
@@ -113,7 +129,7 @@ func (s *SSEClient) Stop(ctx context.Context, streamID string) error {
 		return fmt.Errorf("failed to set write stop signal, err: %v, key:%s", err, stopKey)
 	}
 	writeKey := s.buildWriteKey(streamID)
-	if err := s.storage.DeleteMessage(ctx, writeKey); err != nil {
+	if err := s.storage.Delete(ctx, writeKey); err != nil {
 		return fmt.Errorf("failed to delete message, err: %v, key:%s", err, writeKey)
 	}
 	return nil
@@ -122,6 +138,40 @@ func (s *SSEClient) Stop(ctx context.Context, streamID string) error {
 func (s *SSEClient) GetStopSignal(ctx context.Context, streamID string) (bool, error) {
 	key := s.buildStopKey(streamID)
 	return s.storage.GetStopSignal(ctx, key)
+}
+
+func (s *SSEClient) GetStreamHandler(ctx context.Context, streamID string, errHandler StreamErrorHandler) StreamHandler {
+	return func(w io.Writer) bool {
+		if errHandler == nil {
+			errHandler = defaultStreamErrorHandler
+		}
+		select {
+		case msg := <-s.ch:
+			if ctx.Err() != nil {
+				errHandler(ctx.Err())
+				return false
+			}
+			stopped, err := s.GetStopSignal(ctx, streamID)
+			if err != nil {
+				errHandler(err)
+				return false
+			}
+			if stopped {
+				return false
+			}
+			if _, err := w.Write([]byte(msg + "\n")); err != nil {
+				errHandler(err)
+				return false
+			}
+		case <-ctx.Done():
+			errHandler(ctx.Err())
+			return false
+		case <-time.After(300 * time.Millisecond):
+			// 超出一定时间后重试
+			return true
+		}
+		return true
+	}
 }
 
 // Close 写入完成时关闭相关资源
