@@ -39,34 +39,61 @@ func (r *redisCache) WriteMessage(ctx context.Context, key, msg string, expirati
 	return nil
 }
 
-func (r *redisCache) ReadMessages(ctx context.Context, key string) ([]string, error) {
+func (r *redisCache) ReadMessages(ctx context.Context, key string) (string, []string, error) {
 
-	count, countErr := r.rdb.XLen(ctx, key).Result()
-	if countErr != nil {
-		return nil, fmt.Errorf("failed to get stream length, err: %v, key: %s", countErr, key)
+	// 获取最新的 id
+	latestResList, getLatestErr := r.rdb.XRevRangeN(ctx, key, "+", "-", 1).Result()
+	if getLatestErr != nil {
+		return "", nil, fmt.Errorf("failed to get latest id, err: %v, key: %s", getLatestErr, key)
 	}
+	if len(latestResList) == 0 {
+		return "", nil, nil
+	}
+	latestID := latestResList[0].ID
 
-	// 读取已有的全部数据
-	streams, err := r.rdb.XRead(ctx, &redis.XReadArgs{
-		Streams: []string{key, "0"},
-		Count:   count,
-		Block:   0,
-	}).Result()
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to read from redis stream, err: %v, key: %s", err, key)
+	// 读取指定 id 之前的数据，包含 latest id
+	resList, getListErr := r.rdb.XRange(ctx, key, "-", latestID).Result()
+	if getListErr != nil {
+		return "", nil, fmt.Errorf("failed to read from redis stream, err: %v, key: %s", getListErr, key)
 	}
 
 	var messages []string
-	for _, stream := range streams {
-		for _, msg := range stream.Messages {
-			if data, ok := msg.Values["data"].(string); ok {
-				messages = append(messages, data)
+	for _, v := range resList {
+		if dataVal, ok := v.Values["data"]; ok {
+			if str, ok := dataVal.(string); ok {
+				messages = append(messages, str)
 			}
 		}
 	}
 
-	return messages, nil
+	return latestID, messages, nil
+}
+
+func (r *redisCache) ReadAfterID(ctx context.Context, key, id string) (string, string, error) {
+	res, err := r.rdb.XRead(ctx, &redis.XReadArgs{
+		Streams: []string{key, id},
+		Block:   time.Millisecond * 200,
+		Count:   1,
+	}).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return "", "", nil
+		}
+		return "", "", fmt.Errorf("failed to read from redis stream, err: %v, key: %s, id:%s", err, key, id)
+	}
+	var msg string
+	var msgID string
+	for _, v := range res {
+		for _, msgVal := range v.Messages {
+			msgID = msgVal.ID
+			if dataVal, ok := msgVal.Values["data"]; ok {
+				if str, ok := dataVal.(string); ok {
+					msg = str
+				}
+			}
+		}
+	}
+	return msgID, msg, nil
 }
 
 func (r *redisCache) Set(ctx context.Context, key string, expiration time.Duration) error {
@@ -77,7 +104,7 @@ func (r *redisCache) Set(ctx context.Context, key string, expiration time.Durati
 	return nil
 }
 
-func (r *redisCache) Get(ctx context.Context, key string) (bool, error) {
+func (r *redisCache) Exist(ctx context.Context, key string) (bool, error) {
 	count, err := r.rdb.Exists(ctx, key).Result()
 	if err != nil {
 		return false, fmt.Errorf("failed to get stop signal, err: %v, key:%s", err, key)

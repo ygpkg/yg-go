@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -17,13 +18,6 @@ const (
 	writeKeyPrefix = "stream_write"
 	stopKeyPrefix  = "stream_stop"
 )
-
-type StreamErrorHandler func(err error)
-
-var defaultStreamErrorHandler StreamErrorHandler = func(err error) {
-}
-
-type StreamHandler func(w io.Writer) bool
 
 type config struct {
 	rdb        *redis.Client
@@ -96,7 +90,7 @@ func (s *SSEClient) SetHeaders(w http.ResponseWriter) {
 func (s *SSEClient) WriteMessage(ctx context.Context, writer io.Writer, streamID, msg string) (bool, error) {
 	// 检查写入是否被停止
 	stopKey := s.buildStopKey(streamID)
-	stopped, err := s.storage.Get(ctx, stopKey)
+	stopped, err := s.storage.Exist(ctx, stopKey)
 	if err != nil {
 		return false, fmt.Errorf("failed to get write stop signal, err: %v, key:%s", err, stopKey)
 	}
@@ -127,9 +121,62 @@ func (s *SSEClient) WriteMessage(ctx context.Context, writer io.Writer, streamID
 }
 
 // ReadMessages 读取指定流的消息
-func (s *SSEClient) ReadMessages(ctx context.Context, streamID string) ([]string, error) {
+func (s *SSEClient) ReadMessages(ctx context.Context, streamID string) (string, []string, error) {
 	key := s.buildWriteKey(streamID)
 	return s.storage.ReadMessages(ctx, key)
+}
+
+// BlockRead 阻塞读取指定流的消息，返回 bool 表示是否读取结束，true-读取结束，false-未结束
+func (s *SSEClient) BlockRead(ctx context.Context, writer io.Writer, streamID string, latestID string) (bool, int, error) {
+	writeKey := s.buildWriteKey(streamID)
+	stopKey := s.buildStopKey(streamID)
+	var timeoutCount atomic.Int32
+	var affectedRows atomic.Int32
+	maxTimeout := 3
+	nextID := latestID
+	for {
+		stopped, err := s.storage.Exist(ctx, stopKey)
+		if err != nil {
+			return false, 0, fmt.Errorf("failed to get write stop signal, err: %v, key:%s", err, stopKey)
+		}
+		if stopped {
+			return true, int(affectedRows.Load()), nil
+		}
+
+		if timeoutCount.Load() >= int32(maxTimeout) {
+			return true, int(affectedRows.Load()), nil
+		}
+		select {
+		case <-ctx.Done():
+			return true, int(affectedRows.Load()), nil
+		default:
+
+			msgID, msg, err := s.storage.ReadAfterID(ctx, writeKey, nextID)
+			if err != nil {
+				return false, int(affectedRows.Load()), err
+			}
+			if msgID == "" {
+				timeoutCount.Add(1)
+				continue
+			}
+
+			// 立即写入前端响应流
+			if writer != nil {
+				if _, err := writer.Write([]byte(msg)); err != nil {
+					return false, int(affectedRows.Load()), fmt.Errorf("failed to write to response writer: %w", err)
+				}
+				// 尝试刷新响应流
+				if flusher, ok := writer.(http.Flusher); ok {
+					flusher.Flush()
+				} else {
+					return false, int(affectedRows.Load()), fmt.Errorf("failed to flush response writer, key:%s", writeKey)
+				}
+			}
+			nextID = msgID
+			affectedRows.Add(1)
+			timeoutCount.Store(0)
+		}
+	}
 }
 
 // Stop 停止指定流的写入操作
@@ -147,7 +194,7 @@ func (s *SSEClient) Stop(ctx context.Context, streamID string) error {
 
 func (s *SSEClient) GetStopSignal(ctx context.Context, streamID string) (bool, error) {
 	key := s.buildStopKey(streamID)
-	return s.storage.Get(ctx, key)
+	return s.storage.Exist(ctx, key)
 }
 
 // Close 写入完成时关闭相关资源
