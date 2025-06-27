@@ -1,65 +1,72 @@
 
-## 使用说明
+# sseclient
 
-### 流式返回
+# 使用说明
+
+## 使用示例
 ``` go
-func StreamChat(ctx *gin.Context) {
-	// 设置 SSE 响应头
-	sseClient := sseclient.New(sseclient.WithRedisClient(rdb))
+package main
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/morehao/golib/glog"
+	"github.com/morehao/golib/gutils"
+	"github.com/ygpkg/yg-go/apis/sseclient"
+)
+
+func Chat(ctx *gin.Context) {
+	questionID := "202506261643"
+	sseClient := sseclient.New(sseclient.WithRedisClient(rdb), sseclient.WithExpiration(time.Minute*5))
 	sseClient.SetHeaders(ctx.Writer)
-
-	question := "世界上海拔排名前十的山峰"
-	sysPrompt := "请简单给出排名即可"
-	messages := []openai.ChatCompletionMessageParamUnion{
-		openai.SystemMessage(sysPrompt),
-		openai.UserMessage(question),
-	}
-
-	params := openai.ChatCompletionNewParams{
-		Messages: messages,
-		Seed:     openai.Int(0),
-		Model:    LLMModel,
-	}
-
-	// 创建流式请求
-	stream := llmClient.Chat.Completions.NewStreaming(ctx, params)
-	acc := openai.ChatCompletionAccumulator{}
-	ctx.SSEvent("start", "start")
-	ctx.Writer.Flush()
-	for stream.Next() {
-		chunk := stream.Current()
-
-		acc.AddChunk(chunk)
-
-		// 若本轮 chunk 含有 Content 增量，则输出
-		if len(chunk.Choices) > 0 && chunk.Choices[0].Delta.Content != "" {
-			content := chunk.Choices[0].Delta.Content
-			stopped, err := sseClient.WriteMessage(ctx, ctx.Writer, question, content)
-			if err != nil {
-				glog.Errorf(ctx, "[StreamChat] WriteMessage failed: %v", err)
-				return
-			} else if stopped {
-				return
-			}
+	var writeCount int
+	for i := 0; i < 100; i++ {
+		msg := time.Now().Format(time.RFC3339)
+		msg = fmt.Sprintf("id: %d, message: %s\n", writeCount, msg)
+		if stoped, err := sseClient.WriteMessage(ctx, ctx.Writer, questionID, msg); err != nil {
+			glog.Errorf(ctx, "[Chat] WriteMessage failed: %v", err)
+			return
+		} else if stoped {
+			return
 		}
-
-		// 判断是否拒绝生成（如违反政策）
-		if refusal, ok := acc.JustFinishedRefusal(); ok {
-			ctx.SSEvent("refusal", refusal)
-			ctx.Writer.Flush()
-		}
+		writeCount++
+		time.Sleep(500 * time.Millisecond)
 	}
 }
-```
 
-### 停止流写入和返回
-``` go
 func StopChat(ctx *gin.Context) {
 	questionID := "202506261643"
-	sseCache := sseclient.New(sseclient.WithRedisClient(rdb))
-	if err := sseCache.Stop(ctx, questionID); err != nil {
-		glog.Errorf(ctx, "[StopChat] sseCache.Stop failed, err: %v", err)
+	sseClient := sseclient.New(sseclient.WithRedisClient(rdb))
+	if err := sseClient.Stop(ctx, questionID); err != nil {
+		glog.Errorf(ctx, "[StopChat] sseClient.Stop failed, err: %v", err)
 	}
 	glog.Infof(ctx, "[StopChat] completed")
 }
+
+func GetMessage(ctx *gin.Context) {
+	questionID := "202506261643"
+	sseClient := sseclient.New(sseclient.WithRedisClient(rdb))
+	latestID, historyMessages, getHistoryMessageErr := sseClient.ReadMessages(ctx, questionID)
+	if getHistoryMessageErr != nil {
+		glog.Errorf(ctx, "[GetMessage] sseClient.ReadMessages failed, err: %v", getHistoryMessageErr)
+	}
+	glog.Infof(ctx, "[GetMessage] latestID: %s, historyMessages: %v", latestID, gutils.ToJsonString(historyMessages))
+
+	// 发送历史消息
+	if err := sseClient.SendEvent(ctx.Writer, fmt.Sprintf("history: %s\n", gutils.ToJsonString(historyMessages))); err != nil {
+		glog.Errorf(ctx, "[GetMessage] sseClient.SendEvent failed, err: %v", err)
+	}
+
+	// 阻塞读取剩余消息
+	done, affectedRaw, readErr := sseClient.BlockRead(ctx, ctx.Writer, questionID, latestID)
+	if readErr != nil {
+		glog.Errorf(ctx, "[GetMessage] sseClient.BlockRead failed, err: %v", readErr)
+	}
+	glog.Infof(ctx, "[GetMessage] affectedRaw: %d, done: %v", affectedRaw, done)
+	glog.Infof(ctx, "[GetMessage] completed")
+
+}
+
 ```
