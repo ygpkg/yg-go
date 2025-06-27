@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -48,10 +47,7 @@ func WithExpiration(expiration time.Duration) Option {
 
 // SSEClient SSE客户端管理器
 type SSEClient struct {
-	// 存储接口
-	storage Cache
-	ch      chan string
-	once    sync.Once
+	storage Cache // 存储接口
 	config  *config
 }
 
@@ -74,7 +70,6 @@ func New(opts ...Option) *SSEClient {
 	cache := &SSEClient{
 		config:  cfg,
 		storage: storage,
-		ch:      make(chan string, 100),
 	}
 
 	return cache
@@ -103,21 +98,26 @@ func (s *SSEClient) WriteMessage(ctx context.Context, writer io.Writer, streamID
 		return false, err
 	}
 
-	// 立即写入前端响应流
-	if writer != nil {
-		if _, err := writer.Write([]byte(msg)); err != nil {
-			return false, fmt.Errorf("failed to write to response writer: %w", err)
-		}
-
-		// 尝试刷新响应流
-		if flusher, ok := writer.(http.Flusher); ok {
-			flusher.Flush()
-		} else {
-			return false, fmt.Errorf("failed to flush response writer, key:%s", writeKey)
-		}
+	if err := s.SendEvent(writer, msg); err != nil {
+		return false, err
 	}
 
 	return false, nil
+}
+
+func (s *SSEClient) SendEvent(writer io.Writer, msg string) error {
+	if writer == nil {
+		return fmt.Errorf("response writer is nil")
+	}
+	if _, err := writer.Write([]byte(msg)); err != nil {
+		return fmt.Errorf("failed to write to response writer: %v", err)
+	}
+	if flusher, ok := writer.(http.Flusher); ok {
+		flusher.Flush()
+	} else {
+		return fmt.Errorf("failed to flush response writer, msg:%s", msg)
+	}
+	return nil
 }
 
 // ReadMessages 读取指定流的消息
@@ -160,17 +160,8 @@ func (s *SSEClient) BlockRead(ctx context.Context, writer io.Writer, streamID st
 				continue
 			}
 
-			// 立即写入前端响应流
-			if writer != nil {
-				if _, err := writer.Write([]byte(msg)); err != nil {
-					return false, int(affectedRows.Load()), fmt.Errorf("failed to write to response writer: %w", err)
-				}
-				// 尝试刷新响应流
-				if flusher, ok := writer.(http.Flusher); ok {
-					flusher.Flush()
-				} else {
-					return false, int(affectedRows.Load()), fmt.Errorf("failed to flush response writer, key:%s", writeKey)
-				}
+			if err := s.SendEvent(writer, msg); err != nil {
+				return false, int(affectedRows.Load()), err
 			}
 			nextID = msgID
 			affectedRows.Add(1)
@@ -199,9 +190,6 @@ func (s *SSEClient) GetStopSignal(ctx context.Context, streamID string) (bool, e
 
 // Close 写入完成时关闭相关资源
 func (s *SSEClient) Close(ctx context.Context, streamID string) error {
-	s.once.Do(func() {
-		close(s.ch)
-	})
 	key := s.buildWriteKey(streamID)
 	if err := s.storage.Delete(ctx, key); err != nil {
 		return fmt.Errorf("failed to delete stop signal, err: %v, key:%s", err, key)
