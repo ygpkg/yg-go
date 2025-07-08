@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/ygpkg/yg-go/apis/constants"
 	"github.com/ygpkg/yg-go/apis/runtime"
 	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/metrics"
 )
 
 const (
@@ -18,18 +21,14 @@ const (
 )
 
 // Logger .
-func Logger() gin.HandlerFunc {
+func Logger(whitelist ...string) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		reqid := ctx.GetString(constants.CtxKeyRequestID)
 
 		logs.SetContextFields(ctx, "reqid", reqid)
-		currReq := fmt.Sprintf("%s %s", ctx.Request.Method, ctx.FullPath())
-		for _, whitelistItem := range []string{
-			"POST /apis/zmdevice/v1/ping",
-			"POST /apis/zmdevice/v1/task_logs",
-			"POST /apis/p/zmrobot.KeepTaskHeartbeat",
-		} {
-			if whitelistItem == currReq {
+		currReq := ctx.FullPath()
+		for _, whitelistItem := range whitelist {
+			if strings.HasSuffix(currReq, whitelistItem) {
 				ctx.Next()
 				return
 			}
@@ -45,7 +44,11 @@ func Logger() gin.HandlerFunc {
 		start := time.Now()
 		ctx.Next()
 		cost := time.Since(start)
-
+		metrics.Histogram("request_latency_seconds").
+			With(prometheus.Labels{
+				"uri":  ctx.Request.URL.Path,
+				"code": fmt.Sprint(ctx.Writer.Status()),
+			}).Observe(cost.Seconds())
 		if ctx.Writer.Status() >= 400 && ctx.Writer.Status() != 401 {
 			logs.LoggerFromContext(ctx).Errorw(fmt.Sprint(ctx.Writer.Status()),
 				"method", ctx.Request.Method,

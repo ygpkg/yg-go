@@ -86,7 +86,7 @@ func (svr *Router) GinEngine() *gin.Engine {
 func (svr *Router) router() {
 	svr.eng.Use(middleware.CORS())
 	svr.eng.Use(middleware.CustomerHeader())
-	svr.eng.Use(middleware.Logger())
+	svr.eng.Use(middleware.Logger(".Ping", "metrics"))
 	svr.eng.Use(middleware.Recovery())
 	svr.eng.Use(middleware.LoginStatus())
 	svr.eng.Use(svr.Inject)
