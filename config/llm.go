@@ -25,5 +25,4 @@ type LLMModelConfig struct {
 	APIKEY    string `json:"api_key" yaml:"api_key"`
 	BaseURL   string `json:"base_url" yaml:"base_url"`
 	ModelName string `json:"model_name" yaml:"model_name"`
-	Prompt    string `json:"prompt" yaml:"prompt"`
 }
