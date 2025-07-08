@@ -48,7 +48,8 @@ func Logger(whitelist ...string) gin.HandlerFunc {
 			With(prometheus.Labels{
 				"uri":  ctx.Request.URL.Path,
 				"code": fmt.Sprint(ctx.Writer.Status()),
-			}).Observe(cost.Seconds())
+			}).Buckets(0.1, 0.3, 0.5, 1, 3, 5, 10, 30, 60, 300).
+			Observe(cost.Seconds())
 		if ctx.Writer.Status() >= 400 && ctx.Writer.Status() != 401 {
 			logs.LoggerFromContext(ctx).Errorw(fmt.Sprint(ctx.Writer.Status()),
 				"method", ctx.Request.Method,
