@@ -9,12 +9,14 @@ import (
 )
 
 type redisCache struct {
-	rdb *redis.Client
+	rdb          *redis.Client
+	blockTimeout time.Duration
 }
 
-func newRedisCache(rdb *redis.Client) *redisCache {
+func newRedisCache(rdb *redis.Client, blockTimeout time.Duration) *redisCache {
 	return &redisCache{
-		rdb: rdb,
+		rdb:          rdb,
+		blockTimeout: blockTimeout,
 	}
 }
 
@@ -72,7 +74,7 @@ func (r *redisCache) ReadMessages(ctx context.Context, key string) (string, []st
 func (r *redisCache) ReadAfterID(ctx context.Context, key, id string) (string, string, error) {
 	res, err := r.rdb.XRead(ctx, &redis.XReadArgs{
 		Streams: []string{key, id},
-		Block:   time.Millisecond * 200,
+		Block:   r.blockTimeout,
 		Count:   1,
 	}).Result()
 	if err != nil {

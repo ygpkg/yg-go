@@ -12,15 +12,16 @@ import (
 )
 
 const (
-	defaultExpiration = 30 * time.Minute
-
-	writeKeyPrefix = "stream_write"
-	stopKeyPrefix  = "stream_stop"
+	defaultExpiration   = 30 * time.Minute
+	defaultBlockTimeout = 300 * time.Millisecond
+	writeKeyPrefix      = "stream_write"
+	stopKeyPrefix       = "stream_stop"
 )
 
 type config struct {
-	rdb        *redis.Client
-	expiration time.Duration
+	rdb          *redis.Client
+	expiration   time.Duration
+	blockTimeout time.Duration
 }
 
 type Option interface {
@@ -44,6 +45,11 @@ func WithExpiration(expiration time.Duration) Option {
 		cfg.expiration = expiration
 	})
 }
+func WithBlockTimeout(blockTimeout time.Duration) Option {
+	return configFunc(func(cfg *config) {
+		cfg.blockTimeout = blockTimeout
+	})
+}
 
 // SSEClient SSE客户端管理器
 type SSEClient struct {
@@ -54,7 +60,8 @@ type SSEClient struct {
 // New 创建SSE客户端实例
 func New(opts ...Option) *SSEClient {
 	cfg := &config{
-		expiration: defaultExpiration,
+		expiration:   defaultExpiration,
+		blockTimeout: defaultBlockTimeout,
 	}
 	for _, opt := range opts {
 		opt.apply(cfg)
@@ -62,7 +69,7 @@ func New(opts ...Option) *SSEClient {
 
 	var storage Cache
 	if cfg.rdb != nil {
-		storage = newRedisCache(cfg.rdb)
+		storage = newRedisCache(cfg.rdb, cfg.blockTimeout)
 	} else {
 		storage = newMemoryCache(writeKeyPrefix, stopKeyPrefix)
 	}
