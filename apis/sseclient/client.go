@@ -12,16 +12,18 @@ import (
 )
 
 const (
-	defaultExpiration   = 30 * time.Minute
-	defaultBlockTimeout = 300 * time.Millisecond
-	writeKeyPrefix      = "stream_write"
-	stopKeyPrefix       = "stream_stop"
+	defaultExpiration    = 30 * time.Minute
+	defaultBlockTimeout  = 300 * time.Millisecond
+	defaultBlockMaxRetry = 3
+	writeKeyPrefix       = "stream_write"
+	stopKeyPrefix        = "stream_stop"
 )
 
 type config struct {
-	rdb          *redis.Client
-	expiration   time.Duration
-	blockTimeout time.Duration
+	rdb           *redis.Client
+	expiration    time.Duration
+	blockTimeout  time.Duration
+	blockMaxRetry int
 }
 
 type Option interface {
@@ -51,6 +53,12 @@ func WithBlockTimeout(blockTimeout time.Duration) Option {
 	})
 }
 
+func WithBlockMaxRetry(blockMaxRetry int) Option {
+	return configFunc(func(cfg *config) {
+		cfg.blockMaxRetry = blockMaxRetry
+	})
+}
+
 // SSEClient SSE客户端管理器
 type SSEClient struct {
 	storage Cache // 存储接口
@@ -60,11 +68,17 @@ type SSEClient struct {
 // New 创建SSE客户端实例
 func New(opts ...Option) *SSEClient {
 	cfg := &config{
-		expiration:   defaultExpiration,
-		blockTimeout: defaultBlockTimeout,
+		expiration:    defaultExpiration,
+		blockTimeout:  defaultBlockTimeout,
+		blockMaxRetry: defaultBlockMaxRetry,
 	}
 	for _, opt := range opts {
 		opt.apply(cfg)
+	}
+
+	// 不建议超出默认值，防止连接池被耗尽，时间尽可能短，防止阻塞时间过长
+	if cfg.blockTimeout > defaultBlockTimeout {
+		cfg.blockTimeout = defaultBlockTimeout
 	}
 
 	var storage Cache
@@ -139,8 +153,8 @@ func (s *SSEClient) BlockRead(ctx context.Context, writer io.Writer, streamID st
 	stopKey := s.buildStopKey(streamID)
 	var timeoutCount atomic.Int32
 	var affectedRows atomic.Int32
-	maxTimeout := 3
 	nextID := latestID
+
 	for {
 		stopped, err := s.storage.Exist(ctx, stopKey)
 		if err != nil {
@@ -150,7 +164,7 @@ func (s *SSEClient) BlockRead(ctx context.Context, writer io.Writer, streamID st
 			return true, int(affectedRows.Load()), nil
 		}
 
-		if timeoutCount.Load() >= int32(maxTimeout) {
+		if timeoutCount.Load() >= int32(s.config.blockMaxRetry) {
 			return true, int(affectedRows.Load()), nil
 		}
 		select {

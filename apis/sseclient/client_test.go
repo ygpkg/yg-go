@@ -43,7 +43,7 @@ func TestBlockRead(t *testing.T) {
 		Password: "",
 		DB:       0,
 	})
-	client := New(WithRedisClient(rdb), WithExpiration(60*time.Second))
+	client := New(WithRedisClient(rdb), WithExpiration(60*time.Second),WithBlockMaxRetry(10),WithBlockTimeout(time.Hour))
 	ended, affectedRows, err := client.BlockRead(context.Background(), nil, "202506262238", "1750952999597-0")
 	assert.Nil(t, err)
 	assert.True(t, ended)
