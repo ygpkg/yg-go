@@ -9,22 +9,24 @@ import (
 	"time"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 )
 
 // ScrollConfig 滚动查询配置
 type ScrollConfig struct {
-	Size       int           // 每批返回的文档数量，默认1000
-	ScrollTime time.Duration // 滚动上下文保持时间，默认5分钟
-	Timeout    time.Duration // 请求超时时间，默认30秒
+	ScrollSize      int                          // 每批返回的文档数量，默认1000
+	ScrollTime      time.Duration                // 滚动上下文保持时间，默认5分钟
+	RespectMaxTotal bool                         // 是否限制总返回数，默认启用
+	SearchOptions   []func(*esapi.SearchRequest) // 额外ES搜索请求配置函数列表
 }
 
 // ScrollOption 配置选项函数
 type ScrollOption func(*ScrollConfig)
 
-// WithSize 设置每批返回的文档数量
-func WithSize(size int) ScrollOption {
+// WithScrollSize 设置滚动批次大小
+func WithScrollSize(size int) ScrollOption {
 	return func(c *ScrollConfig) {
-		c.Size = size
+		c.ScrollSize = size
 	}
 }
 
@@ -35,19 +37,27 @@ func WithScrollTime(scrollTime time.Duration) ScrollOption {
 	}
 }
 
-// WithTimeout 设置请求超时时间
-func WithTimeout(timeout time.Duration) ScrollOption {
+// WithRespectMaxTotal 设置是否限制最大总返回数
+func WithRespectMaxTotal(enable bool) ScrollOption {
 	return func(c *ScrollConfig) {
-		c.Timeout = timeout
+		c.RespectMaxTotal = enable
+	}
+}
+
+// WithSearchOptions 设置额外的 esapi.SearchRequest 配置函数
+func WithSearchOptions(opts ...func(*esapi.SearchRequest)) ScrollOption {
+	return func(c *ScrollConfig) {
+		c.SearchOptions = append(c.SearchOptions, opts...)
 	}
 }
 
 // defaultScrollConfig 返回默认配置
 func defaultScrollConfig() ScrollConfig {
 	return ScrollConfig{
-		Size:       1000,
-		ScrollTime: 5 * time.Minute,
-		Timeout:    30 * time.Second,
+		ScrollSize:      1000,
+		ScrollTime:      5 * time.Minute,
+		RespectMaxTotal: true,
+		SearchOptions:   nil,
 	}
 }
 
@@ -83,52 +93,65 @@ func NewScrollSearch(client *elasticsearch.Client) *ScrollSearch {
 	}
 }
 
-// ScrollAll 执行完整的滚动查询，将结果填充到dest中
-// index: 索引名称，必填
-// dest: 必须是指向切片的指针，例如: &[]User{}
-// queryBody: 查询的JSON字符串
-// 注意：如要限制总结果数，请在queryBody中使用"size"参数，而不是WithSize选项
-// WithSize选项只控制每次滚动返回的批次大小
-func (c *ScrollSearch) ScrollAll(ctx context.Context, index string, queryBody string, dest interface{}, opts ...ScrollOption) error {
-	// 验证索引名称
+// ScrollAll 执行完整滚动查询
+// index: 索引名
+// queryBody: 查询DSL字符串
+// totalSize: 期望获取的总文档数，必填
+// dest: 结果切片指针
+// opts: 滚动配置选项
+func (c *ScrollSearch) ScrollAll(
+	ctx context.Context,
+	index string,
+	queryBody string,
+	totalSize int,
+	dest interface{},
+	opts ...ScrollOption,
+) error {
 	if index == "" {
 		return fmt.Errorf("索引名称不能为空")
 	}
+	if totalSize <= 0 {
+		return fmt.Errorf("totalSize必须大于0")
+	}
 
-	// 应用配置选项
 	config := defaultScrollConfig()
 	for _, opt := range opts {
 		opt(&config)
 	}
 
-	// 验证dest参数
+	// 如果 ScrollSize 大于 totalSize，以 totalSize 为准
+	if config.ScrollSize > totalSize {
+		config.ScrollSize = totalSize
+	}
+
 	destValue := reflect.ValueOf(dest)
-	if destValue.Kind() != reflect.Ptr {
+	if destValue.Kind() != reflect.Ptr || destValue.Elem().Kind() != reflect.Slice {
 		return fmt.Errorf("dest必须是指向切片的指针")
 	}
-
 	sliceValue := destValue.Elem()
-	if sliceValue.Kind() != reflect.Slice {
-		return fmt.Errorf("dest必须是指向切片的指针")
-	}
-
-	// 获取切片元素类型
 	elemType := sliceValue.Type().Elem()
 
+	// 构造 SearchRequest 并应用配置函数
+	req := esapi.SearchRequest{
+		Index:  []string{index},
+		Scroll: config.ScrollTime,
+		Size:   &config.ScrollSize,
+		Body:   strings.NewReader(queryBody),
+	}
+	for _, fn := range config.SearchOptions {
+		fn(&req)
+	}
+
 	// 执行初始搜索
-	result, err := c.initialSearch(ctx, index, queryBody, config)
+	result, err := c.initialSearch(ctx, &req)
 	if err != nil {
 		return fmt.Errorf("初始搜索失败: %w", err)
 	}
 
 	scrollID := result.ScrollID
-	fmt.Printf("初始查询返回 %d 条记录，scrollID: %s\n", len(result.Hits.Hits), scrollID)
-
 	defer func() {
-		// 清理滚动上下文
 		if scrollID != "" {
-			c.clearScroll(context.Background(), scrollID)
-			fmt.Println("已清理滚动上下文")
+			c.clearScroll(ctx, scrollID)
 		}
 	}()
 
@@ -136,14 +159,22 @@ func (c *ScrollSearch) ScrollAll(ctx context.Context, index string, queryBody st
 
 	// 处理初始结果
 	if len(result.Hits.Hits) > 0 {
-		if err := c.appendHitsToSlice(result.Hits.Hits, sliceValue, elemType); err != nil {
-			return fmt.Errorf("转换初始结果失败: %w", err)
+		batchCount := len(result.Hits.Hits)
+		if config.RespectMaxTotal && totalProcessed+batchCount > totalSize {
+			batchCount = totalSize - totalProcessed
 		}
-		totalProcessed += len(result.Hits.Hits)
-		fmt.Printf("已处理 %d 条记录\n", totalProcessed)
+		if batchCount > 0 {
+			if err := c.appendHitsToSlice(result.Hits.Hits[:batchCount], sliceValue, elemType); err != nil {
+				return fmt.Errorf("转换初始结果失败: %w", err)
+			}
+			totalProcessed += batchCount
+		}
+		if config.RespectMaxTotal && totalProcessed >= totalSize {
+			return nil
+		}
 	}
 
-	// 继续滚动查询，直到没有更多数据
+	// 继续滚动查询
 	for len(result.Hits.Hits) > 0 {
 		select {
 		case <-ctx.Done():
@@ -155,70 +186,52 @@ func (c *ScrollSearch) ScrollAll(ctx context.Context, index string, queryBody st
 		if err != nil {
 			return fmt.Errorf("继续滚动查询失败: %w", err)
 		}
-
-		// 更新scrollID（每次scroll请求后ES可能返回新的scrollID）
 		if result.ScrollID != "" {
 			scrollID = result.ScrollID
 		}
 
-		fmt.Printf("滚动查询返回 %d 条记录，scrollID: %s\n", len(result.Hits.Hits), scrollID)
+		batchCount := len(result.Hits.Hits)
+		if config.RespectMaxTotal && totalProcessed+batchCount > totalSize {
+			batchCount = totalSize - totalProcessed
+		}
 
-		if len(result.Hits.Hits) > 0 {
-			if err := c.appendHitsToSlice(result.Hits.Hits, sliceValue, elemType); err != nil {
+		if batchCount > 0 {
+			if err := c.appendHitsToSlice(result.Hits.Hits[:batchCount], sliceValue, elemType); err != nil {
 				return fmt.Errorf("转换滚动结果失败: %w", err)
 			}
-			totalProcessed += len(result.Hits.Hits)
-			fmt.Printf("已处理 %d 条记录\n", totalProcessed)
+			totalProcessed += batchCount
+		}
+
+		if config.RespectMaxTotal && totalProcessed >= totalSize {
+			return nil
 		}
 	}
 
-	fmt.Printf("滚动查询完成，总共处理 %d 条记录\n", totalProcessed)
 	return nil
 }
 
-// appendHitsToSlice 将hits追加到目标切片中
 func (c *ScrollSearch) appendHitsToSlice(hits []json.RawMessage, sliceValue reflect.Value, elemType reflect.Type) error {
 	for _, hit := range hits {
-		// 解析hit结构，提取_source
 		var hitDoc struct {
 			Source json.RawMessage `json:"_source"`
 			ID     string          `json:"_id"`
 			Index  string          `json:"_index"`
 			Type   string          `json:"_type"`
 		}
-
 		if err := json.Unmarshal(hit, &hitDoc); err != nil {
 			return fmt.Errorf("解析hit失败: %w", err)
 		}
-
-		// 创建目标类型的新实例
 		newItem := reflect.New(elemType)
-
-		// 将_source数据解析到新实例中
 		if err := json.Unmarshal(hitDoc.Source, newItem.Interface()); err != nil {
 			return fmt.Errorf("转换为目标类型失败: %w", err)
 		}
-
-		// 追加到切片中（解引用指针）
 		sliceValue.Set(reflect.Append(sliceValue, newItem.Elem()))
 	}
-
 	return nil
 }
 
-// initialSearch 执行初始搜索
-func (c *ScrollSearch) initialSearch(ctx context.Context, index string, queryBody string, config ScrollConfig) (*scrollResult, error) {
-
-	ctx, cancel := context.WithTimeout(ctx, config.Timeout)
-	defer cancel()
-
-	res, err := c.client.Search(
-		c.client.Search.WithContext(ctx),
-		c.client.Search.WithIndex(index),
-		c.client.Search.WithBody(strings.NewReader(queryBody)),
-		c.client.Search.WithScroll(config.ScrollTime),
-		c.client.Search.WithSize(config.Size),
-	)
+func (c *ScrollSearch) initialSearch(ctx context.Context, req *esapi.SearchRequest) (*scrollResult, error) {
+	res, err := req.Do(ctx, c.client)
 	if err != nil {
 		return nil, err
 	}
@@ -232,16 +245,10 @@ func (c *ScrollSearch) initialSearch(ctx context.Context, index string, queryBod
 	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("解析搜索结果失败: %w", err)
 	}
-
 	return &result, nil
 }
 
-// continueScroll 继续滚动查询
 func (c *ScrollSearch) continueScroll(ctx context.Context, scrollID string, config ScrollConfig) (*scrollResult, error) {
-
-	ctx, cancel := context.WithTimeout(ctx, config.Timeout)
-	defer cancel()
-
 	res, err := c.client.Scroll(
 		c.client.Scroll.WithContext(ctx),
 		c.client.Scroll.WithScrollID(scrollID),
@@ -260,11 +267,9 @@ func (c *ScrollSearch) continueScroll(ctx context.Context, scrollID string, conf
 	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("解析滚动结果失败: %w", err)
 	}
-
 	return &result, nil
 }
 
-// clearScroll 清理滚动上下文
 func (c *ScrollSearch) clearScroll(ctx context.Context, scrollID string) {
 	res, err := c.client.ClearScroll(
 		c.client.ClearScroll.WithContext(ctx),

@@ -36,17 +36,22 @@ func TestScrollAll(t *testing.T) {
 	ctx := context.Background()
 
 	queryDSL := `{
-		"size": 20,
 		"query": {
 			"match_all": {}
 		}
 	}`
+
 	err := NewScrollSearch(client).ScrollAll(ctx,
 		"accounts",
 		queryDSL,
+		20,
 		&accounts, // 传入指向切片的指针
-		WithSize(5),
+		WithScrollSize(5),
 		WithScrollTime(1*time.Minute),
+		WithRespectMaxTotal(true),
+		WithSearchOptions(
+			client.Search.WithPreference("123123"),
+		),
 	)
 	assert.Nil(t, err)
 	var accountNumberList []int64
@@ -54,4 +59,5 @@ func TestScrollAll(t *testing.T) {
 		accountNumberList = append(accountNumberList, account.AccountNumber)
 	}
 	t.Log(accountNumberList)
+	t.Log(len(accounts))
 }

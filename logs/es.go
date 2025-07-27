@@ -39,7 +39,7 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 
 	// 获取查询的 HTTP method 和路径
 	method := req.Method
-	path := req.URL.Path
+	path := fmt.Sprintf("%s?%s", req.URL.Path, req.URL.RawQuery)
 	ralCodeKey := "ralcode"
 	realCode := res.StatusCode
 
