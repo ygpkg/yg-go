@@ -26,7 +26,7 @@ func TestScrollAll(t *testing.T) {
 
 	cfg := config.ESConfig{
 		Addresses:     []string{"http://localhost:9200"},
-		SlowThreshold: time.Millisecond,
+		SlowThreshold: time.Minute,
 	}
 	client, initErr := InitES(cfg)
 	assert.Nil(t, initErr)
@@ -38,17 +38,20 @@ func TestScrollAll(t *testing.T) {
 	queryDSL := `{
 		"query": {
 			"match_all": {}
-		}
+		},
+		"sort": [
+			{ "account_number": { "order": "asc" } }
+		],
+		"size": 20
 	}`
 
 	err := NewScrollSearch(client).ScrollAll(ctx,
 		"accounts",
 		queryDSL,
-		20,
 		&accounts, // 传入指向切片的指针
 		WithScrollSize(5),
 		WithScrollTime(1*time.Minute),
-		WithRespectMaxTotal(true),
+		WithTotal(25),
 		WithSearchOptions(
 			client.Search.WithPreference("123123"),
 		),

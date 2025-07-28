@@ -14,16 +14,16 @@ import (
 
 // ScrollConfig 滚动查询配置
 type ScrollConfig struct {
-	ScrollSize      int                          // 每批返回的文档数量，默认1000
-	ScrollTime      time.Duration                // 滚动上下文保持时间，默认5分钟
-	RespectMaxTotal bool                         // 是否限制总返回数，默认启用
-	SearchOptions   []func(*esapi.SearchRequest) // 额外ES搜索请求配置函数列表
+	ScrollSize    int                          // 每批返回的文档数量，默认1000
+	ScrollTime    time.Duration                // 滚动上下文保持时间，默认5分钟
+	Total         int                          // 是否限制总返回数，默认启用
+	SearchOptions []func(*esapi.SearchRequest) // 额外ES搜索请求配置函数列表
 }
 
 // ScrollOption 配置选项函数
 type ScrollOption func(*ScrollConfig)
 
-// WithScrollSize 设置滚动批次大小
+// WithScrollSize 设置滚动批次大小，如果 query 中有 size 设置，则按 query 中的值设置
 func WithScrollSize(size int) ScrollOption {
 	return func(c *ScrollConfig) {
 		c.ScrollSize = size
@@ -37,10 +37,10 @@ func WithScrollTime(scrollTime time.Duration) ScrollOption {
 	}
 }
 
-// WithRespectMaxTotal 设置是否限制最大总返回数
-func WithRespectMaxTotal(enable bool) ScrollOption {
+// WithTotal 设置是否限制最大总返回数
+func WithTotal(total int) ScrollOption {
 	return func(c *ScrollConfig) {
-		c.RespectMaxTotal = enable
+		c.Total = total
 	}
 }
 
@@ -54,10 +54,9 @@ func WithSearchOptions(opts ...func(*esapi.SearchRequest)) ScrollOption {
 // defaultScrollConfig 返回默认配置
 func defaultScrollConfig() ScrollConfig {
 	return ScrollConfig{
-		ScrollSize:      1000,
-		ScrollTime:      5 * time.Minute,
-		RespectMaxTotal: true,
-		SearchOptions:   nil,
+		ScrollSize:    100,
+		ScrollTime:    5 * time.Minute,
+		SearchOptions: nil,
 	}
 }
 
@@ -96,22 +95,18 @@ func NewScrollSearch(client *elasticsearch.Client) *ScrollSearch {
 // ScrollAll 执行完整滚动查询
 // index: 索引名
 // queryBody: 查询DSL字符串
-// totalSize: 期望获取的总文档数，必填
+// config.Total: 期望获取的总文档数，必填
 // dest: 结果切片指针
 // opts: 滚动配置选项
 func (c *ScrollSearch) ScrollAll(
 	ctx context.Context,
 	index string,
 	queryBody string,
-	totalSize int,
 	dest interface{},
 	opts ...ScrollOption,
 ) error {
 	if index == "" {
 		return fmt.Errorf("索引名称不能为空")
-	}
-	if totalSize <= 0 {
-		return fmt.Errorf("totalSize必须大于0")
 	}
 
 	config := defaultScrollConfig()
@@ -119,9 +114,12 @@ func (c *ScrollSearch) ScrollAll(
 		opt(&config)
 	}
 
-	// 如果 ScrollSize 大于 totalSize，以 totalSize 为准
-	if config.ScrollSize > totalSize {
-		config.ScrollSize = totalSize
+	querySize := c.getSizeFromDSL(queryBody)
+
+	scrollSize := config.ScrollSize
+
+	if querySize > 0 {
+		scrollSize = querySize
 	}
 
 	destValue := reflect.ValueOf(dest)
@@ -135,7 +133,7 @@ func (c *ScrollSearch) ScrollAll(
 	req := esapi.SearchRequest{
 		Index:  []string{index},
 		Scroll: config.ScrollTime,
-		Size:   &config.ScrollSize,
+		Size:   &scrollSize,
 		Body:   strings.NewReader(queryBody),
 	}
 	for _, fn := range config.SearchOptions {
@@ -147,6 +145,8 @@ func (c *ScrollSearch) ScrollAll(
 	if err != nil {
 		return fmt.Errorf("初始搜索失败: %w", err)
 	}
+
+	fmt.Println("initial search done, len:", len(result.Hits.Hits))
 
 	scrollID := result.ScrollID
 	defer func() {
@@ -160,8 +160,8 @@ func (c *ScrollSearch) ScrollAll(
 	// 处理初始结果
 	if len(result.Hits.Hits) > 0 {
 		batchCount := len(result.Hits.Hits)
-		if config.RespectMaxTotal && totalProcessed+batchCount > totalSize {
-			batchCount = totalSize - totalProcessed
+		if config.Total > 0 && totalProcessed+batchCount > config.Total {
+			batchCount = config.Total - totalProcessed
 		}
 		if batchCount > 0 {
 			if err := c.appendHitsToSlice(result.Hits.Hits[:batchCount], sliceValue, elemType); err != nil {
@@ -169,7 +169,7 @@ func (c *ScrollSearch) ScrollAll(
 			}
 			totalProcessed += batchCount
 		}
-		if config.RespectMaxTotal && totalProcessed >= totalSize {
+		if config.Total > 0 && totalProcessed >= config.Total {
 			return nil
 		}
 	}
@@ -191,8 +191,9 @@ func (c *ScrollSearch) ScrollAll(
 		}
 
 		batchCount := len(result.Hits.Hits)
-		if config.RespectMaxTotal && totalProcessed+batchCount > totalSize {
-			batchCount = totalSize - totalProcessed
+		fmt.Println("continue scroll batch count: ", batchCount)
+		if config.Total > 0 && totalProcessed+batchCount > config.Total {
+			batchCount = config.Total - totalProcessed
 		}
 
 		if batchCount > 0 {
@@ -202,7 +203,7 @@ func (c *ScrollSearch) ScrollAll(
 			totalProcessed += batchCount
 		}
 
-		if config.RespectMaxTotal && totalProcessed >= totalSize {
+		if config.Total > 0 && totalProcessed >= config.Total {
 			return nil
 		}
 	}
@@ -279,4 +280,17 @@ func (c *ScrollSearch) clearScroll(ctx context.Context, scrollID string) {
 		return
 	}
 	defer res.Body.Close()
+}
+
+func (c *ScrollSearch) getSizeFromDSL(dsl string) int {
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(dsl), &parsed); err != nil {
+		return 0
+	}
+
+	if sizeVal, ok := parsed["size"].(float64); ok {
+		return int(sizeVal)
+	}
+
+	return 0
 }
