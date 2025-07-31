@@ -126,7 +126,7 @@ func (svr *Router) ListAllRouters() {
 }
 
 func (svr *Router) HandleDoc(model string) {
-	svr.pgr.GET(model+".docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	svr.pgr.GET(model+".docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.InstanceName(model)))
 }
 
 // P .
