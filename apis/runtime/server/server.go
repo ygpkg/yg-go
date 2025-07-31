@@ -31,22 +31,28 @@ type Router struct {
 	Prefix string
 	pgr    *gin.RouterGroup
 
-	routerMap map[string]interface{}
+	routerMap   map[string]interface{}
+	routeGroups map[string]*gin.RouterGroup
 
 	*authInjectors
 }
 
 // NewRouter .
-func NewRouter(apiPrefix string) *Router {
-	if apiPrefix == "" {
+func NewRouter(prefixes ...string) *Router {
+	var apiPrefix string
+	if len(prefixes) == 0 {
 		apiPrefix = PrefixAPIV3
-		logs.Warnf("apiPrefix is empty, use default: %v", apiPrefix)
+		logs.Warnf("apiPrefix is empty, use default: %s", apiPrefix)
+		prefixes = []string{apiPrefix}
+	} else {
+		apiPrefix = prefixes[0]
 	}
 	svr := &Router{
-		eng:       gin.New(),
-		lc:        lifecycle.Std(),
-		Prefix:    apiPrefix,
-		routerMap: map[string]interface{}{},
+		eng:         gin.New(),
+		lc:          lifecycle.Std(),
+		Prefix:      apiPrefix,
+		routerMap:   map[string]interface{}{},
+		routeGroups: map[string]*gin.RouterGroup{},
 		authInjectors: &authInjectors{
 			injectors: map[string]auth.InjectorFunc{},
 			defaultInjector: func(ctx *gin.Context, ls *auth.LoginStatus) (err error) {
@@ -59,6 +65,10 @@ func NewRouter(apiPrefix string) *Router {
 	}
 
 	svr.router()
+	for _, p := range prefixes {
+		svr.routeGroups[p] = svr.eng.Group(p)
+
+	}
 
 	svr.pgr = svr.eng.Group(apiPrefix)
 
@@ -99,19 +109,28 @@ func (svr *Router) router() {
 // Any .
 func (svr *Router) Any(action string, hdrs ...interface{}) {
 	svr.routerMap[action] = nil
-	P(svr.pgr.Any, action, hdrs...)
+	for _, pg := range svr.routeGroups {
+		P(pg.Any, action, hdrs...)
+	}
+	// P(svr.pgr.Any, action, hdrs...)
 }
 
 // P .
 func (svr *Router) P(action string, hdrs ...interface{}) {
 	svr.routerMap[action] = nil
-	P(svr.pgr.POST, action, hdrs...)
+	for _, pg := range svr.routeGroups {
+		P(pg.POST, action, hdrs...)
+	}
+	// P(svr.pgr.POST, action, hdrs...)
 }
 
 // G .
 func (svr *Router) G(action string, hdrs ...interface{}) {
 	svr.routerMap[action] = nil
-	P(svr.pgr.GET, action, hdrs...)
+	for _, pg := range svr.routeGroups {
+		P(pg.GET, action, hdrs...)
+	}
+	// P(svr.pgr.GET, action, hdrs...)
 }
 
 // ListAllRouters 列出所有路由
@@ -126,7 +145,9 @@ func (svr *Router) ListAllRouters() {
 }
 
 func (svr *Router) HandleDoc(model string) {
-	svr.pgr.GET(model+".docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.InstanceName(model)))
+	for _, pg := range svr.routeGroups {
+		pg.GET(model+".docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.InstanceName(model)))
+	}
 }
 
 // P .
