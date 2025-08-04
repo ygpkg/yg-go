@@ -25,27 +25,59 @@ type MethodFunc func(relativePath string, handlers ...gin.HandlerFunc) gin.IRout
 
 // Router .
 type Router struct {
-	eng    *gin.Engine
-	l      net.Listener
-	lc     *lifecycle.LifeCycle
-	Prefix string
-	pgr    *gin.RouterGroup
+	eng      *gin.Engine
+	l        net.Listener
+	lc       *lifecycle.LifeCycle
+	Prefix   string
+	prefixes []string
+	pgr      *gin.RouterGroup
 
 	routerMap   map[string]interface{}
 	routeGroups map[string]*gin.RouterGroup
 
+	deployMode string
+
 	*authInjectors
 }
 
+type RouterOption func(*Router)
+
+func WithPrefixes(prefixes []string) RouterOption {
+	return func(svr *Router) {
+		if svr == nil {
+			return
+		}
+
+		uniquePrefixes := make(map[string]struct{})
+
+		if svr.Prefix != "" {
+			uniquePrefixes[svr.Prefix] = struct{}{}
+		}
+
+		for _, p := range prefixes {
+			if p != "" {
+				uniquePrefixes[p] = struct{}{}
+			}
+		}
+
+		svr.prefixes = make([]string, 0, len(uniquePrefixes))
+		for p := range uniquePrefixes {
+			svr.prefixes = append(svr.prefixes, p)
+		}
+	}
+}
+
+func WithDeployMode(deployMode string) RouterOption {
+	return func(svr *Router) {
+		svr.deployMode = deployMode
+	}
+}
+
 // NewRouter .
-func NewRouter(prefixes ...string) *Router {
-	var apiPrefix string
-	if len(prefixes) == 0 {
+func NewRouter(apiPrefix string, opts ...RouterOption) *Router {
+	if apiPrefix == "" {
+		logs.Warnf("apiPrefix is empty, use default: %v", apiPrefix)
 		apiPrefix = PrefixAPIV3
-		logs.Warnf("apiPrefix is empty, use default: %s", apiPrefix)
-		prefixes = []string{apiPrefix}
-	} else {
-		apiPrefix = prefixes[0]
 	}
 	svr := &Router{
 		eng:         gin.New(),
@@ -60,12 +92,17 @@ func NewRouter(prefixes ...string) *Router {
 			},
 		},
 	}
+
+	for _, opt := range opts {
+		opt(svr)
+	}
+
 	if config.Conf().MainConf.Env != "test" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
 	svr.router()
-	for _, p := range prefixes {
+	for _, p := range svr.prefixes {
 		svr.routeGroups[p] = svr.eng.Group(p)
 
 	}
@@ -97,6 +134,9 @@ func (svr *Router) router() {
 	svr.eng.Use(middleware.CORS())
 	svr.eng.Use(middleware.CustomerHeader())
 	svr.eng.Use(middleware.Logger(".Ping", "metrics"))
+	if svr.deployMode != "" {
+		svr.eng.Use(middleware.LicenseCheck())
+	}
 	svr.eng.Use(middleware.Recovery())
 	svr.eng.Use(middleware.LoginStatus())
 	svr.eng.Use(svr.Inject)
