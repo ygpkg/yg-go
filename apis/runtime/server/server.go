@@ -97,6 +97,10 @@ func NewRouter(apiPrefix string, opts ...RouterOption) *Router {
 		opt(svr)
 	}
 
+	if len(svr.prefixes) == 0 {
+		svr.prefixes = []string{svr.Prefix}
+	}
+
 	if config.Conf().MainConf.Env != "test" {
 		gin.SetMode(gin.ReleaseMode)
 	}
