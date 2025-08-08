@@ -264,6 +264,10 @@ func (tc *TencentCos) CopyDir(storagePath, dest string) error {
 	}
 }
 
+func (tc *TencentCos) UploadDirectory(localDirPath, destDir string) ([]string, error) {
+	return nil, fmt.Errorf("UploadDirectory not implemented for TencentCos")
+}
+
 // isDirectory 检查路径是否为文件夹
 func (tc *TencentCos) isDirectory(storagePath string) (bool, error) {
 	// 尝试获取对象信息

@@ -34,6 +34,7 @@ type Storager interface {
 	// Stat(name string) (*FileInfo, error)
 	DeleteFile(storagePath string) error
 	CopyDir(storagePath, dest string) error
+	UploadDirectory(localDirPath, destDir string) ([]string, error)
 }
 
 // InitDB .
@@ -84,6 +85,8 @@ func NewStorage(purpose string) (Storager, error) {
 		s, err = NewTencentCos(*cfg.Tencent, cfg.StorageOption)
 	} else if cfg.Minoss != nil {
 		s, err = NewMinFs(*cfg.Minoss, cfg.StorageOption)
+	} else if cfg.S3 != nil {
+		s, err = NewS3Fs(*cfg.S3, cfg.StorageOption)
 	} else {
 		return nil, fmt.Errorf("not found useful remote storage config")
 	}

@@ -15,7 +15,7 @@ type authInjectors struct {
 
 func (ai *authInjectors) AuthInject(issuer string, injector auth.InjectorFunc) {
 	if _, ok := ai.injectors[issuer]; ok {
-		panic("injector issuer is already exists")
+		logs.Warnf("injector issuer is already exists: %s", issuer)
 	}
 	logs.Infof("register auth injector: %s", issuer)
 	ai.injectors[issuer] = injector

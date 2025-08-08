@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"testing"
@@ -99,7 +99,7 @@ func TestMinBucketClient_ReadFile(t *testing.T) {
 	if err != nil {
 		t.Logf(err.Error())
 	}
-	data, _ := ioutil.ReadAll(file)
+	data, _ := io.ReadAll(file)
 	fmt.Println(string(data))
 }
 

@@ -1,6 +1,10 @@
 package validate
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 // TestPhone ...
 func TestPhone(t *testing.T) {
@@ -71,4 +75,18 @@ func TestLetterNumber(t *testing.T) {
 			t.Errorf("LetterNumber check failed, %v should %v", num, isErr)
 		}
 	}
+}
+
+func TestIsValidStruct(t *testing.T) {
+	type st struct {
+		Name string `validate:"required" label:"姓名"`
+		Age  int    `validate:"required"`
+	}
+	data := st{
+		Name: "",
+		Age:  18,
+	}
+	err := IsValidStruct(data, false)
+	assert.Nil(t, err)
+	t.Log(err.Error())
 }

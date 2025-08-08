@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/url"
 	"path"
 	"strings"
@@ -14,6 +15,8 @@ import (
 	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
 )
+
+var _ Storager = (*MinFs)(nil)
 
 // MinFs .
 type MinFs struct {
@@ -64,7 +67,7 @@ func (mfs *MinFs) Save(ctx context.Context, fi *FileInfo, r io.Reader) error {
 	}
 	// 上传一条记录
 	_, err := mfs.client.PutObject(mfs.ctx, mfs.mfsCfg.Bucket, fi.StoragePath, r, fi.Size, minio.PutObjectOptions{
-		ContentType: fi.FileExt,
+		ContentType: mime.TypeByExtension(fi.FileExt),
 	})
 
 	if err != nil {
@@ -143,6 +146,9 @@ func (mfs *MinFs) CopyDir(storagePath, dest string) error {
 		// 复制文件
 		return mfs.copyObject(storagePath, dest)
 	}
+}
+func (mfs *MinFs) UploadDirectory(localDirPath, destDir string) ([]string, error) {
+	return nil, fmt.Errorf("UploadDirectory not implemented for MinFs")
 }
 
 // isDirectory 检查路径是否为文件夹
