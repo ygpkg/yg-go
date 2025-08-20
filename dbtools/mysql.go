@@ -113,6 +113,14 @@ func DB(name string) *gorm.DB {
 	return db
 }
 
+// DBExists 判断数据库是否存在
+func DBExists(name string) bool {
+	dbsLocker.RLock()
+	defer dbsLocker.RUnlock()
+	_, ok := dbs[name]
+	return ok
+}
+
 func Std() *gorm.DB {
 	return DB("default")
 }
