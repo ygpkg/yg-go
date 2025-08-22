@@ -52,6 +52,10 @@ func (c *Cache) TTL(key string) time.Duration {
 func (c *Cache) Get(key string) (string, error) {
 	result, err := c.client.Get(context.Background(), key).Result()
 	if err != nil {
+		if err == redis.Nil {
+			logs.Warnf("redis_cache call Get failed,err=%v", err)
+			return "", err
+		}
 		logs.Errorf("redis_cache call Get failed,err=%v", err)
 		return "", err
 	}
