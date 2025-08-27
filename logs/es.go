@@ -98,7 +98,7 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 	}
 	fields = append(fields, zap.Int("rows", affectedRows))
 
-	if realCode != 200 {
+	if realCode != 200 && realCode != 201 {
 		e.l.With(fields...).Error(dslBody)
 	} else {
 		e.l.With(fields...).Debug(dslBody)
