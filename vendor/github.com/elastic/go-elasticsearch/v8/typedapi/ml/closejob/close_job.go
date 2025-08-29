@@ -15,13 +15,27 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Closes one or more anomaly detection jobs. A job can be opened and closed
-// multiple times throughout its lifecycle.
+// Close anomaly detection jobs.
+//
+// A job can be opened and closed multiple times throughout its lifecycle. A
+// closed job cannot receive data or perform analysis operations, but you can
+// still explore and navigate results.
+// When you close a job, it runs housekeeping tasks such as pruning the model
+// history, flushing buffers, calculating final results and persisting the model
+// snapshots. Depending upon the size of the job, it could take several minutes
+// to close and the equivalent time to re-open. After it is closed, the job has
+// a minimal overhead on the cluster except for maintaining its meta data.
+// Therefore it is a best practice to close jobs that are no longer required to
+// process data.
+// If you close an anomaly detection job whose datafeed is running, the request
+// first tries to stop the datafeed. This behavior is equivalent to calling stop
+// datafeed API with the same timeout and force parameters as the close job
+// request.
+// When a datafeed that has a specified end date stops, it automatically closes
+// its associated job.
 package closejob
 
 import (
@@ -30,12 +44,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 const (
@@ -52,14 +68,19 @@ type CloseJob struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
-	req *Request
-	raw json.RawMessage
+	req      *Request
+	deferred []func(request *Request) error
+	buf      *gobytes.Buffer
 
 	paramSet int
 
 	jobid string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewCloseJob type alias for index.
@@ -71,22 +92,45 @@ func NewCloseJobFunc(tp elastictransport.Interface) NewCloseJob {
 	return func(jobid string) *CloseJob {
 		n := New(tp)
 
-		n.JobId(jobid)
+		n._jobid(jobid)
 
 		return n
 	}
 }
 
-// Closes one or more anomaly detection jobs. A job can be opened and closed
-// multiple times throughout its lifecycle.
+// Close anomaly detection jobs.
 //
-// https://www.elastic.co/guide/en/elasticsearch/reference/{branch}/ml-close-job.html
+// A job can be opened and closed multiple times throughout its lifecycle. A
+// closed job cannot receive data or perform analysis operations, but you can
+// still explore and navigate results.
+// When you close a job, it runs housekeeping tasks such as pruning the model
+// history, flushing buffers, calculating final results and persisting the model
+// snapshots. Depending upon the size of the job, it could take several minutes
+// to close and the equivalent time to re-open. After it is closed, the job has
+// a minimal overhead on the cluster except for maintaining its meta data.
+// Therefore it is a best practice to close jobs that are no longer required to
+// process data.
+// If you close an anomaly detection job whose datafeed is running, the request
+// first tries to stop the datafeed. This behavior is equivalent to calling stop
+// datafeed API with the same timeout and force parameters as the close job
+// request.
+// When a datafeed that has a specified end date stops, it automatically closes
+// its associated job.
+//
+// https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-close-job.html
 func New(tp elastictransport.Interface) *CloseJob {
 	r := &CloseJob{
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+
+		buf: gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -94,7 +138,7 @@ func New(tp elastictransport.Interface) *CloseJob {
 
 // Raw takes a json payload as input which is then passed to the http.Request
 // If specified Raw takes precedence on Request method.
-func (r *CloseJob) Raw(raw json.RawMessage) *CloseJob {
+func (r *CloseJob) Raw(raw io.Reader) *CloseJob {
 	r.raw = raw
 
 	return r
@@ -116,9 +160,17 @@ func (r *CloseJob) HttpRequest(ctx context.Context) (*http.Request, error) {
 
 	var err error
 
-	if r.raw != nil {
-		r.buf.Write(r.raw)
-	} else if r.req != nil {
+	if len(r.deferred) > 0 {
+		for _, f := range r.deferred {
+			deferredErr := f(r.req)
+			if deferredErr != nil {
+				return nil, deferredErr
+			}
+		}
+	}
+
+	if r.raw == nil && r.req != nil {
+
 		data, err := json.Marshal(r.req)
 
 		if err != nil {
@@ -126,6 +178,11 @@ func (r *CloseJob) HttpRequest(ctx context.Context) (*http.Request, error) {
 		}
 
 		r.buf.Write(data)
+
+	}
+
+	if r.buf.Len() > 0 {
+		r.raw = r.buf
 	}
 
 	r.path.Scheme = "http"
@@ -138,6 +195,9 @@ func (r *CloseJob) HttpRequest(ctx context.Context) (*http.Request, error) {
 		path.WriteString("anomaly_detectors")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "jobid", r.jobid)
+		}
 		path.WriteString(r.jobid)
 		path.WriteString("/")
 		path.WriteString("_close")
@@ -153,15 +213,15 @@ func (r *CloseJob) HttpRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
 
 	if req.Header.Get("Content-Type") == "" {
-		if r.buf.Len() > 0 {
+		if r.raw != nil {
 			req.Header.Set("Content-Type", "application/vnd.elasticsearch+json;compatible-with=8")
 		}
 	}
@@ -177,19 +237,100 @@ func (r *CloseJob) HttpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r CloseJob) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r CloseJob) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "ml.close_job")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "ml.close_job")
+		if reader := instrument.RecordRequestBody(ctx, "ml.close_job", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ml.close_job")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the CloseJob query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the CloseJob query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
+}
+
+// Do runs the request through the transport, handle the response and returns a closejob.Response
+func (r CloseJob) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ml.close_job")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
 }
 
 // Header set a key, value pair in the CloseJob headers map.
@@ -205,47 +346,86 @@ func (r *CloseJob) Header(key, value string) *CloseJob {
 // jobs, or a wildcard expression. You can close all jobs by using `_all` or by
 // specifying `*` as the job identifier.
 // API Name: jobid
-func (r *CloseJob) JobId(v string) *CloseJob {
+func (r *CloseJob) _jobid(jobid string) *CloseJob {
 	r.paramSet |= jobidMask
-	r.jobid = v
+	r.jobid = jobid
 
 	return r
 }
 
-// AllowNoMatch Specifies what to do when the request: contains wildcard expressions and
-// there are no jobs that match; contains the  `_all` string or no identifiers
-// and there are no matches; or contains wildcard expressions and there are only
-// partial matches. By default, it returns an empty jobs array when there are no
-// matches and the subset of results when there are partial matches.
-// If `false`, the request returns a 404 status code when there are no matches
-// or only partial matches.
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *CloseJob) ErrorTrace(errortrace bool) *CloseJob {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *CloseJob) FilterPath(filterpaths ...string) *CloseJob {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *CloseJob) Human(human bool) *CloseJob {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *CloseJob) Pretty(pretty bool) *CloseJob {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
+
+	return r
+}
+
+// AllowNoMatch Refer to the description for the `allow_no_match` query parameter.
 // API name: allow_no_match
-func (r *CloseJob) AllowNoMatch(b bool) *CloseJob {
-	r.values.Set("allow_no_match", strconv.FormatBool(b))
+func (r *CloseJob) AllowNoMatch(allownomatch bool) *CloseJob {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.AllowNoMatch = &allownomatch
 
 	return r
 }
 
-// Force Use to close a failed job, or to forcefully close a job which has not
-// responded to its initial close request; the request returns without
-// performing the associated actions such as flushing buffers and persisting the
-// model snapshots.
-// If you want the job to be in a consistent state after the close job API
-// returns, do not set to `true`. This parameter should be used only in
-// situations where the job has already failed or where you are not interested
-// in results the job might have recently produced or might produce in the
-// future.
+// Force Refer to the descriptiion for the `force` query parameter.
 // API name: force
-func (r *CloseJob) Force(b bool) *CloseJob {
-	r.values.Set("force", strconv.FormatBool(b))
+func (r *CloseJob) Force(force bool) *CloseJob {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Force = &force
 
 	return r
 }
 
-// Timeout Controls the time to wait until a job has closed.
+// Timeout Refer to the description for the `timeout` query parameter.
 // API name: timeout
-func (r *CloseJob) Timeout(value string) *CloseJob {
-	r.values.Set("timeout", value)
+func (r *CloseJob) Timeout(duration types.Duration) *CloseJob {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Timeout = duration
 
 	return r
 }

@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // FetchProfile type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_global/search/_types/profile.ts#L139-L146
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_global/search/_types/profile.ts#L230-L237
 type FetchProfile struct {
 	Breakdown   FetchProfileBreakdown `json:"breakdown"`
 	Children    []FetchProfile        `json:"children,omitempty"`
@@ -32,6 +39,70 @@ type FetchProfile struct {
 	Description string                `json:"description"`
 	TimeInNanos int64                 `json:"time_in_nanos"`
 	Type        string                `json:"type"`
+}
+
+func (s *FetchProfile) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "breakdown":
+			if err := dec.Decode(&s.Breakdown); err != nil {
+				return fmt.Errorf("%s | %w", "Breakdown", err)
+			}
+
+		case "children":
+			if err := dec.Decode(&s.Children); err != nil {
+				return fmt.Errorf("%s | %w", "Children", err)
+			}
+
+		case "debug":
+			if err := dec.Decode(&s.Debug); err != nil {
+				return fmt.Errorf("%s | %w", "Debug", err)
+			}
+
+		case "description":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Description", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Description = o
+
+		case "time_in_nanos":
+			if err := dec.Decode(&s.TimeInNanos); err != nil {
+				return fmt.Errorf("%s | %w", "TimeInNanos", err)
+			}
+
+		case "type":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Type", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Type = o
+
+		}
+	}
+	return nil
 }
 
 // NewFetchProfile returns a FetchProfile.

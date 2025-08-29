@@ -15,41 +15,29 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 // Package useragentproperty
 package useragentproperty
 
 import "strings"
 
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ingest/_types/Processors.ts#L77-L88
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ingest/_types/Processors.ts#L547-L553
 type UserAgentProperty struct {
 	Name string
 }
 
 var (
-	NAME = UserAgentProperty{"NAME"}
+	Name = UserAgentProperty{"name"}
 
-	MAJOR = UserAgentProperty{"MAJOR"}
+	Os = UserAgentProperty{"os"}
 
-	MINOR = UserAgentProperty{"MINOR"}
+	Device = UserAgentProperty{"device"}
 
-	PATCH = UserAgentProperty{"PATCH"}
+	Original = UserAgentProperty{"original"}
 
-	OS = UserAgentProperty{"OS"}
-
-	OSNAME = UserAgentProperty{"OS_NAME"}
-
-	OSMAJOR = UserAgentProperty{"OS_MAJOR"}
-
-	OSMINOR = UserAgentProperty{"OS_MINOR"}
-
-	DEVICE = UserAgentProperty{"DEVICE"}
-
-	BUILD = UserAgentProperty{"BUILD"}
+	Version = UserAgentProperty{"version"}
 )
 
 func (u UserAgentProperty) MarshalText() (text []byte, err error) {
@@ -57,28 +45,18 @@ func (u UserAgentProperty) MarshalText() (text []byte, err error) {
 }
 
 func (u *UserAgentProperty) UnmarshalText(text []byte) error {
-	switch strings.ToLower(string(text)) {
+	switch strings.ReplaceAll(strings.ToLower(string(text)), "\"", "") {
 
-	case "NAME":
-		*u = NAME
-	case "MAJOR":
-		*u = MAJOR
-	case "MINOR":
-		*u = MINOR
-	case "PATCH":
-		*u = PATCH
-	case "OS":
-		*u = OS
-	case "OS_NAME":
-		*u = OSNAME
-	case "OS_MAJOR":
-		*u = OSMAJOR
-	case "OS_MINOR":
-		*u = OSMINOR
-	case "DEVICE":
-		*u = DEVICE
-	case "BUILD":
-		*u = BUILD
+	case "name":
+		*u = Name
+	case "os":
+		*u = Os
+	case "device":
+		*u = Device
+	case "original":
+		*u = Original
+	case "version":
+		*u = Version
 	default:
 		*u = UserAgentProperty{string(text)}
 	}

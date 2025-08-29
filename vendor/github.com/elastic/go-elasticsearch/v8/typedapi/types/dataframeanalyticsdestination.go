@@ -15,16 +15,22 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+)
+
 // DataframeAnalyticsDestination type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/_types/DataframeAnalytics.ts#L77-L82
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/_types/DataframeAnalytics.ts#L77-L82
 type DataframeAnalyticsDestination struct {
 	// Index Defines the destination index to store the results of the data frame
 	// analytics job.
@@ -32,6 +38,36 @@ type DataframeAnalyticsDestination struct {
 	// ResultsField Defines the name of the field in which to store the results of the analysis.
 	// Defaults to `ml`.
 	ResultsField *string `json:"results_field,omitempty"`
+}
+
+func (s *DataframeAnalyticsDestination) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "index":
+			if err := dec.Decode(&s.Index); err != nil {
+				return fmt.Errorf("%s | %w", "Index", err)
+			}
+
+		case "results_field":
+			if err := dec.Decode(&s.ResultsField); err != nil {
+				return fmt.Errorf("%s | %w", "ResultsField", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewDataframeAnalyticsDestination returns a DataframeAnalyticsDestination.

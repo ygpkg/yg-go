@@ -1,6 +1,6 @@
 # swag
 
-🌍 *[English](README.md) ∙ [简体中文](README_zh-CN.md)*
+🌍 *[English](README.md) ∙ [简体中文](README_zh-CN.md) ∙ [Português](README_pt.md)*
 
 <img align="right" width="180px" src="https://raw.githubusercontent.com/swaggo/swag/master/assets/swaggo.png">
 
@@ -31,7 +31,8 @@ Swag converts Go annotations to Swagger Documentation 2.0. We've created a varie
 	- [User defined structure with an array type](#user-defined-structure-with-an-array-type)
 	- [Function scoped struct declaration](#function-scoped-struct-declaration)
 	- [Model composition in response](#model-composition-in-response)
-	- [Add a headers in response](#add-a-headers-in-response)
+        - [Add request headers](#add-request-headers)
+	- [Add response headers](#add-response-headers)
 	- [Use multiple path params](#use-multiple-path-params)
 	- [Example value of struct](#example-value-of-struct)
 	- [SchemaExample of body](#schemaexample-of-body)
@@ -44,17 +45,23 @@ Swag converts Go annotations to Swagger Documentation 2.0. We've created a varie
 	- [How to use security annotations](#how-to-use-security-annotations)
 	- [Add a description for enum items](#add-a-description-for-enum-items)
 	- [Generate only specific docs file types](#generate-only-specific-docs-file-types)
+    - [How to use Go generic types](#how-to-use-generics)
 - [About the Project](#about-the-project)
 
 ## Getting started
 
 1. Add comments to your API source code, See [Declarative Comments Format](#declarative-comments-format).
 
-2. Download swag by using:
+2. Install swag by using:
 ```sh
 go install github.com/swaggo/swag/cmd/swag@latest
 ```
-To build from source you need [Go](https://golang.org/dl/) (1.17 or newer).
+To build from source you need [Go](https://golang.org/dl/) (1.19 or newer).
+
+Alternatively you can run the docker image:
+```sh
+docker run --rm -v $(pwd):/code ghcr.io/swaggo/swag:latest
+```
 
 Or download a pre-compiled binary from the [release page](https://github.com/swaggo/swag/releases).
 
@@ -64,6 +71,9 @@ swag init
 ```
 
   Make sure to import the generated `docs/docs.go` so that your specific configuration gets `init`'ed. If your General API annotations do not live in `main.go`, you can let swag know with `-g` flag.
+  ```go
+  import _ "example-module-name/docs"
+  ```
   ```sh
   swag init -g http/api.go
   ```
@@ -94,6 +104,7 @@ OPTIONS:
    --outputTypes value, --ot value        Output types of generated files (docs.go, swagger.json, swagger.yaml) like go,json,yaml (default: "go,json,yaml")
    --parseVendor                          Parse go files in 'vendor' folder, disabled by default (default: false)
    --parseDependency, --pd                Parse go files inside dependency folder, disabled by default (default: false)
+   --parseDependencyLevel, --pdl          Enhancement of '--parseDependency', parse go files inside dependency folder, 0 disabled, 1 only parse models, 2 only parse operations, 3 parse all (default: 0)
    --markdownFiles value, --md value      Parse folder containing markdown files to use as description, disabled by default
    --codeExampleFiles value, --cef value  Parse folder containing code example files to use for the x-codeSamples extension, disabled by default
    --parseInternal                        Parse go files in internal packages, disabled by default (default: false)
@@ -104,7 +115,10 @@ OPTIONS:
    --overridesFile value                  File to read global type overrides from. (default: ".swaggo")
    --parseGoList                          Parse dependency via 'go list' (default: true)
    --tags value, -t value                 A comma-separated list of tags to filter the APIs for which the documentation is generated.Special case if the tag is prefixed with the '!' character then the APIs with that tag will be excluded
+   --templateDelims value, --td value     Provide custom delimiters for Go template generation. The format is leftDelim,rightDelim. For example: "[[,]]"
    --collectionFormat value, --cf value   Set default collection format (default: "csv")
+   --state value                          Initial state for the state machine (default: ""), @HostState in root file, @State in other files
+   --parseFuncBody                        Parse API info within body of functions in go files, disabled by default (default: false)
    --help, -h                             show help (default: false)
 ```
 
@@ -141,6 +155,7 @@ OPTIONS:
 
 Find the example source code [here](https://github.com/swaggo/swag/tree/master/example/celler).
 
+Finish the steps in [Getting started](#getting-started)
 1. After using `swag init` to generate Swagger 2.0 docs, import the following packages:
 ```go
 import "github.com/swaggo/gin-swagger" // gin-swagger middleware
@@ -405,6 +420,7 @@ When a short string in your documentation is insufficient, or you need images, c
 | description.markdown  | A short description of the application. Parsed from the api.md file. This is an alternative to @description    |// @description.markdown No value needed, this parses the description from api.md         																 |
 | tag.name    | Name of a tag.| // @tag.name This is the name of the tag                     |
 | tag.description.markdown   | Description of the tag this is an alternative to tag.description. The description will be read from a file named like tagname.md  | // @tag.description.markdown         |
+| tag.x-name  | The extension key, must be start by x- and take only string value | // @x-example-key value |
 
 
 ## API Operation
@@ -413,25 +429,26 @@ When a short string in your documentation is insufficient, or you need images, c
 [celler/controller](https://github.com/swaggo/swag/tree/master/example/celler/controller)
 
 
-| annotation  | description                                                                                                                |
-|-------------|----------------------------------------------------------------------------------------------------------------------------|
-| description | A verbose explanation of the operation behavior.                                                                           |
-| description.markdown     |  A short description of the application. The description will be read from a file.  E.g. `@description.markdown details` will load `details.md`| // @description.file endpoint.description.markdown  |
-| id          | A unique string used to identify the operation. Must be unique among all API operations.                                   |
-| tags        | A list of tags to each API operation that separated by commas.                                                             |
-| summary     | A short summary of what the operation does.                                                                                |
-| accept      | A list of MIME types the APIs can consume. Note that Accept only affects operations with a request body, such as POST, PUT and PATCH.  Value MUST be as described under [Mime Types](#mime-types).                     |
-| produce     | A list of MIME types the APIs can produce. Value MUST be as described under [Mime Types](#mime-types).                     |
-| param       | Parameters that separated by spaces. `param name`,`param type`,`data type`,`is mandatory?`,`comment` `attribute(optional)` |
-| security    | [Security](#security) to each API operation.                                                                               |
-| success     | Success response that separated by spaces. `return code or default`,`{param type}`,`data type`,`comment`                   |
-| failure     | Failure response that separated by spaces. `return code or default`,`{param type}`,`data type`,`comment`                    |
-| response    | As same as `success` and `failure` |
-| header      | Header in response that separated by spaces. `return code`,`{param type}`,`data type`,`comment`                            |
-| router      | Path definition that separated by spaces. `path`,`[httpMethod]`                                                            |
-| x-name      | The extension key, must be start by x- and take only json value.                                                           |
-| x-codeSample      | Optional Markdown usage. take `file` as parameter. This will then search for a file named like the summary in the given folder.                                      |
-| deprecated  | Mark endpoint as deprecated.                                                                                               |
+| annotation           | description                                                                                                                                                                                       |
+|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| description          | A verbose explanation of the operation behavior.                                                                                                                                                  |
+| description.markdown | A short description of the application. The description will be read from a file.  E.g. `@description.markdown details` will load `details.md`                                                    | // @description.file endpoint.description.markdown  |
+| id                   | A unique string used to identify the operation. Must be unique among all API operations.                                                                                                          |
+| tags                 | A list of tags to each API operation that separated by commas.                                                                                                                                    |
+| summary              | A short summary of what the operation does.                                                                                                                                                       |
+| accept               | A list of MIME types the APIs can consume. Note that Accept only affects operations with a request body, such as POST, PUT and PATCH.  Value MUST be as described under [Mime Types](#mime-types). |
+| produce              | A list of MIME types the APIs can produce. Value MUST be as described under [Mime Types](#mime-types).                                                                                            |
+| param                | Parameters that separated by spaces. `param name`,`param type`,`data type`,`is mandatory?`,`comment` `attribute(optional)`                                                                        |
+| security             | [Security](#security) to each API operation.                                                                                                                                                      |
+| success              | Success response that separated by spaces. `return code or default`,`{param type}`,`data type`,`comment`                                                                                          |
+| failure              | Failure response that separated by spaces. `return code or default`,`{param type}`,`data type`,`comment`                                                                                          |
+| response             | As same as `success` and `failure`                                                                                                                                                                |
+| header               | Header in response that separated by spaces. `return code`,`{param type}`,`data type`,`comment`                                                                                                   |
+| router               | Path definition that separated by spaces. `path`,`[httpMethod]`                                                                                                                                   |
+| deprecatedrouter     | As same as router, but deprecated.                                                                                                                                                     |
+| x-name               | The extension key, must be start by x- and take only json value.                                                                                                                                  |
+| x-codeSample         | Optional Markdown usage. take `file` as parameter. This will then search for a file named like the summary in the given folder.                                                                   |
+| deprecated           | Mark endpoint as deprecated.                                                                                                                                                                      |
 
 
 
@@ -454,6 +471,7 @@ Besides that, `swag` also accepts aliases for some MIME Types as follows:
 | png                   | image/png                         |
 | jpeg                  | image/jpeg                        |
 | gif                   | image/gif                         |
+| event-stream          | text/event-stream                 |
 
 
 
@@ -523,6 +541,7 @@ type Foo struct {
 Field Name | Type | Description
 ---|:---:|---
 <a name="validate"></a>validate | `string` | 	Determines the validation for the parameter. Possible values are: `required,optional`.
+<a name="json"></a>json | `string` | JSON tag options. The `omitempty` option will mark the field as not required.
 <a name="parameterDefault"></a>default | * | Declares the value of the parameter that the server will use if none is provided, for example a "count" to control the number of results per page might default to 100 if not supplied by the client in the request. (Note: "default" has no meaning for required parameters.)  See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-6.2. Unlike JSON Schema this value MUST conform to the defined [`type`](#parameterType) for this parameter.
 <a name="parameterMaximum"></a>maximum | `number` | See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.1.2.
 <a name="parameterMinimum"></a>minimum | `number` | See https://tools.ietf.org/html/draft-fge-json-schema-validation-00#section-5.1.3.
@@ -632,7 +651,14 @@ type DeepObject struct { //in `proto` package
 }
 @success 200 {object} jsonresult.JSONResult{data1=proto.Order{data=proto.DeepObject},data2=[]proto.Order{data=[]proto.DeepObject}} "desc"
 ```
-### Add a headers in response
+### Add request headers
+
+```go
+// @Param        X-MyHeader	  header    string    true   	"MyHeader must be set for valid response"
+// @Param        X-API-VERSION    header    string    true   	"API version eg.: 1.0"
+```
+
+### Add response headers
 
 ```go
 // @Success      200              {string}  string    "ok"
@@ -873,18 +899,48 @@ Each API operation.
 // @Security ApiKeyAuth
 ```
 
-Make it AND condition
+Make it OR condition
 
 ```go
 // @Security ApiKeyAuth
 // @Security OAuth2Application[write, admin]
 ```
 
-Make it OR condition
+Make it AND condition
 
 ```go
-// @Security ApiKeyAuth || firebase
-// @Security OAuth2Application[write, admin] || APIKeyAuth
+// @Security ApiKeyAuth && firebase
+// @Security OAuth2Application[write, admin] && APIKeyAuth
+```
+
+### Generate enum types from enum constants
+
+You can generate enums from ordered constants. Each enum variant can have a comment, an override name, or both. This works with both iota-defined and manually defined constants.
+
+```go
+type Difficulty string
+
+const (
+	Easy   Difficulty = "easy" // You can add a comment to the enum variant.
+	Medium Difficulty = "medium" // @name MediumDifficulty
+	Hard   Difficulty = "hard" // @name HardDifficulty You can have a name override and a comment.
+)
+
+type Class int
+
+const (
+	First Class = iota // @name FirstClass
+	Second // Name override and comment rules apply here just as above.
+	Third // @name ThirdClass This one has a name override and a comment.
+)
+
+// There is no need to add `enums:"..."` to the fields, it is automatically generated from the ordered consts.
+type Quiz struct {
+	Difficulty Difficulty
+	Class Class
+	Questions []string
+	Answers []string
+}
 ```
 
 
@@ -907,6 +963,42 @@ By default `swag` command generates Swagger specification in three different fil
 - swagger.yaml
 
 If you would like to limit a set of file types which should be generated you can use `--outputTypes` (short `-ot`) flag. Default value is `go,json,yaml` - output types separated with comma. To limit output only to `go` and `yaml` files, you would write `go,yaml`. With complete command that would be `swag init --outputTypes go,yaml`.
+
+### How to use Generics
+
+```go
+// @Success 200 {object} web.GenericNestedResponse[types.Post]
+// @Success 204 {object} web.GenericNestedResponse[types.Post, Types.AnotherOne]
+// @Success 201 {object} web.GenericNestedResponse[web.GenericInnerType[types.Post]]
+func GetPosts(w http.ResponseWriter, r *http.Request) {
+	_ = web.GenericNestedResponse[types.Post]{}
+}
+```
+See [this file](https://github.com/swaggo/swag/blob/master/testdata/generics_nested/api/api.go) for more details
+and other examples.
+
+### Change the default Go Template action delimiters
+[#980](https://github.com/swaggo/swag/issues/980)
+[#1177](https://github.com/swaggo/swag/issues/1177)
+
+If your swagger annotations or struct fields contain "{{" or "}}", the template generation will most likely fail, as these are the default delimiters for [go templates](https://pkg.go.dev/text/template#Template.Delims).
+
+To make the generation work properly, you can change the default delimiters with `-td`. For example:
+```console
+swag init -g http/api.go -td "[[,]]"
+```
+The new delimiter is a string with the format "`<left delimiter>`,`<right delimiter>`".
+
+### Parse Internal and Dependency Packages
+
+If the struct is defined in a dependency package, use `--parseDependency`.
+
+If the struct is defined in your main project, use `--parseInternal`.
+
+if you want to include both internal and from dependencies use both flags
+```
+swag init --parseDependency --parseInternal
+```
 
 ## About the Project
 This project was inspired by [yvasiyarov/swagger](https://github.com/yvasiyarov/swagger) but we simplified the usage and added support a variety of [web frameworks](#supported-web-frameworks). Gopher image source is [tenntenn/gopher-stickers](https://github.com/tenntenn/gopher-stickers). It has licenses [creative commons licensing](http://creativecommons.org/licenses/by/3.0/deed.en).

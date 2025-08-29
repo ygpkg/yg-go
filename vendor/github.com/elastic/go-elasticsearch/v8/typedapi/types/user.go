@@ -15,24 +15,102 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // User type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/security/_types/User.ts#L23-L31
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/security/_types/User.ts#L23-L31
 type User struct {
-	Email      string                 `json:"email,omitempty"`
-	Enabled    bool                   `json:"enabled"`
-	FullName   string                 `json:"full_name,omitempty"`
-	Metadata   map[string]interface{} `json:"metadata"`
-	ProfileUid *string                `json:"profile_uid,omitempty"`
-	Roles      []string               `json:"roles"`
-	Username   string                 `json:"username"`
+	Email      *string  `json:"email,omitempty"`
+	Enabled    bool     `json:"enabled"`
+	FullName   *string  `json:"full_name,omitempty"`
+	Metadata   Metadata `json:"metadata"`
+	ProfileUid *string  `json:"profile_uid,omitempty"`
+	Roles      []string `json:"roles"`
+	Username   string   `json:"username"`
+}
+
+func (s *User) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "email":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Email", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Email = &o
+
+		case "enabled":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Enabled", err)
+				}
+				s.Enabled = value
+			case bool:
+				s.Enabled = v
+			}
+
+		case "full_name":
+			if err := dec.Decode(&s.FullName); err != nil {
+				return fmt.Errorf("%s | %w", "FullName", err)
+			}
+
+		case "metadata":
+			if err := dec.Decode(&s.Metadata); err != nil {
+				return fmt.Errorf("%s | %w", "Metadata", err)
+			}
+
+		case "profile_uid":
+			if err := dec.Decode(&s.ProfileUid); err != nil {
+				return fmt.Errorf("%s | %w", "ProfileUid", err)
+			}
+
+		case "roles":
+			if err := dec.Decode(&s.Roles); err != nil {
+				return fmt.Errorf("%s | %w", "Roles", err)
+			}
+
+		case "username":
+			if err := dec.Decode(&s.Username); err != nil {
+				return fmt.Errorf("%s | %w", "Username", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewUser returns a User.

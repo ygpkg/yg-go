@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ygpkg/yg-go/apis/apiobj"
 	"github.com/ygpkg/yg-go/dbtools"
-	"github.com/ygpkg/yg-go/license"
+	"github.com/ygpkg/yg-go/licensetool"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 )

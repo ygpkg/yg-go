@@ -15,14 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"strings"
 )
 
@@ -32,6 +31,11 @@ func newCatHelpFunc(t Transport) CatHelp {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -45,9 +49,6 @@ type CatHelp func(o ...func(*CatHelpRequest)) (*Response, error)
 
 // CatHelpRequest configures the Cat Help API request.
 type CatHelpRequest struct {
-	Help *bool
-	S    []string
-
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -56,15 +57,26 @@ type CatHelpRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r CatHelpRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r CatHelpRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "cat.help")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -73,14 +85,6 @@ func (r CatHelpRequest) Do(ctx context.Context, transport Transport) (*Response,
 	path.WriteString("/_cat")
 
 	params = make(map[string]string)
-
-	if r.Help != nil {
-		params["help"] = strconv.FormatBool(*r.Help)
-	}
-
-	if len(r.S) > 0 {
-		params["s"] = strings.Join(r.S, ",")
-	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -100,6 +104,9 @@ func (r CatHelpRequest) Do(ctx context.Context, transport Transport) (*Response,
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -127,8 +134,17 @@ func (r CatHelpRequest) Do(ctx context.Context, transport Transport) (*Response,
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "cat.help")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "cat.help")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -145,20 +161,6 @@ func (r CatHelpRequest) Do(ctx context.Context, transport Transport) (*Response,
 func (f CatHelp) WithContext(v context.Context) func(*CatHelpRequest) {
 	return func(r *CatHelpRequest) {
 		r.ctx = v
-	}
-}
-
-// WithHelp - return help information.
-func (f CatHelp) WithHelp(v bool) func(*CatHelpRequest) {
-	return func(r *CatHelpRequest) {
-		r.Help = &v
-	}
-}
-
-// WithS - comma-separated list of column names or column aliases to sort by.
-func (f CatHelp) WithS(v ...string) func(*CatHelpRequest) {
-	return func(r *CatHelpRequest) {
-		r.S = v
 	}
 }
 

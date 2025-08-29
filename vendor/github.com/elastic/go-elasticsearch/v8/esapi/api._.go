@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0 (5d47733): DO NOT EDIT
+// Code generated from specification version 8.19.0 (de1d79b): DO NOT EDIT
 
 package esapi
 
@@ -43,102 +43,213 @@ type API struct {
 	Watcher     *Watcher
 	XPack       *XPack
 
-	AutoscalingDeleteAutoscalingPolicy AutoscalingDeleteAutoscalingPolicy
-	AutoscalingGetAutoscalingCapacity  AutoscalingGetAutoscalingCapacity
-	AutoscalingGetAutoscalingPolicy    AutoscalingGetAutoscalingPolicy
-	AutoscalingPutAutoscalingPolicy    AutoscalingPutAutoscalingPolicy
-	Bulk                               Bulk
-	ClearScroll                        ClearScroll
-	ClosePointInTime                   ClosePointInTime
-	Count                              Count
-	Create                             Create
-	DanglingIndicesDeleteDanglingIndex DanglingIndicesDeleteDanglingIndex
-	DanglingIndicesImportDanglingIndex DanglingIndicesImportDanglingIndex
-	DanglingIndicesListDanglingIndices DanglingIndicesListDanglingIndices
-	DeleteByQuery                      DeleteByQuery
-	DeleteByQueryRethrottle            DeleteByQueryRethrottle
-	Delete                             Delete
-	DeleteScript                       DeleteScript
-	EnrichDeletePolicy                 EnrichDeletePolicy
-	EnrichExecutePolicy                EnrichExecutePolicy
-	EnrichGetPolicy                    EnrichGetPolicy
-	EnrichPutPolicy                    EnrichPutPolicy
-	EnrichStats                        EnrichStats
-	EqlDelete                          EqlDelete
-	EqlGet                             EqlGet
-	EqlGetStatus                       EqlGetStatus
-	EqlSearch                          EqlSearch
-	Exists                             Exists
-	ExistsSource                       ExistsSource
-	Explain                            Explain
-	FeaturesGetFeatures                FeaturesGetFeatures
-	FeaturesResetFeatures              FeaturesResetFeatures
-	FieldCaps                          FieldCaps
-	FleetGlobalCheckpoints             FleetGlobalCheckpoints
-	FleetMsearch                       FleetMsearch
-	FleetSearch                        FleetSearch
-	Get                                Get
-	GetScriptContext                   GetScriptContext
-	GetScriptLanguages                 GetScriptLanguages
-	GetScript                          GetScript
-	GetSource                          GetSource
-	GraphExplore                       GraphExplore
-	Index                              Index
-	Info                               Info
-	KnnSearch                          KnnSearch
-	LogstashDeletePipeline             LogstashDeletePipeline
-	LogstashGetPipeline                LogstashGetPipeline
-	LogstashPutPipeline                LogstashPutPipeline
-	Mget                               Mget
-	Msearch                            Msearch
-	MsearchTemplate                    MsearchTemplate
-	Mtermvectors                       Mtermvectors
-	OpenPointInTime                    OpenPointInTime
-	Ping                               Ping
-	PutScript                          PutScript
-	RankEval                           RankEval
-	Reindex                            Reindex
-	ReindexRethrottle                  ReindexRethrottle
-	RenderSearchTemplate               RenderSearchTemplate
-	ScriptsPainlessExecute             ScriptsPainlessExecute
-	Scroll                             Scroll
-	SearchMvt                          SearchMvt
-	Search                             Search
-	SearchShards                       SearchShards
-	SearchTemplate                     SearchTemplate
-	SearchableSnapshotsCacheStats      SearchableSnapshotsCacheStats
-	SearchableSnapshotsClearCache      SearchableSnapshotsClearCache
-	SearchableSnapshotsMount           SearchableSnapshotsMount
-	SearchableSnapshotsStats           SearchableSnapshotsStats
-	SemanticSearch                     SemanticSearch
-	ShutdownDeleteNode                 ShutdownDeleteNode
-	ShutdownGetNode                    ShutdownGetNode
-	ShutdownPutNode                    ShutdownPutNode
-	SlmDeleteLifecycle                 SlmDeleteLifecycle
-	SlmExecuteLifecycle                SlmExecuteLifecycle
-	SlmExecuteRetention                SlmExecuteRetention
-	SlmGetLifecycle                    SlmGetLifecycle
-	SlmGetStats                        SlmGetStats
-	SlmGetStatus                       SlmGetStatus
-	SlmPutLifecycle                    SlmPutLifecycle
-	SlmStart                           SlmStart
-	SlmStop                            SlmStop
-	TermsEnum                          TermsEnum
-	Termvectors                        Termvectors
-	TextStructureFindStructure         TextStructureFindStructure
-	TransformDeleteTransform           TransformDeleteTransform
-	TransformGetTransform              TransformGetTransform
-	TransformGetTransformStats         TransformGetTransformStats
-	TransformPreviewTransform          TransformPreviewTransform
-	TransformPutTransform              TransformPutTransform
-	TransformResetTransform            TransformResetTransform
-	TransformStartTransform            TransformStartTransform
-	TransformStopTransform             TransformStopTransform
-	TransformUpdateTransform           TransformUpdateTransform
-	TransformUpgradeTransforms         TransformUpgradeTransforms
-	UpdateByQuery                      UpdateByQuery
-	UpdateByQueryRethrottle            UpdateByQueryRethrottle
-	Update                             Update
+	AutoscalingDeleteAutoscalingPolicy            AutoscalingDeleteAutoscalingPolicy
+	AutoscalingGetAutoscalingCapacity             AutoscalingGetAutoscalingCapacity
+	AutoscalingGetAutoscalingPolicy               AutoscalingGetAutoscalingPolicy
+	AutoscalingPutAutoscalingPolicy               AutoscalingPutAutoscalingPolicy
+	Bulk                                          Bulk
+	Capabilities                                  Capabilities
+	ClearScroll                                   ClearScroll
+	ClosePointInTime                              ClosePointInTime
+	ConnectorCheckIn                              ConnectorCheckIn
+	ConnectorDelete                               ConnectorDelete
+	ConnectorGet                                  ConnectorGet
+	ConnectorLastSync                             ConnectorLastSync
+	ConnectorList                                 ConnectorList
+	ConnectorPost                                 ConnectorPost
+	ConnectorPut                                  ConnectorPut
+	ConnectorSecretDelete                         ConnectorSecretDelete
+	ConnectorSecretGet                            ConnectorSecretGet
+	ConnectorSecretPost                           ConnectorSecretPost
+	ConnectorSecretPut                            ConnectorSecretPut
+	ConnectorSyncJobCancel                        ConnectorSyncJobCancel
+	ConnectorSyncJobCheckIn                       ConnectorSyncJobCheckIn
+	ConnectorSyncJobClaim                         ConnectorSyncJobClaim
+	ConnectorSyncJobDelete                        ConnectorSyncJobDelete
+	ConnectorSyncJobError                         ConnectorSyncJobError
+	ConnectorSyncJobGet                           ConnectorSyncJobGet
+	ConnectorSyncJobList                          ConnectorSyncJobList
+	ConnectorSyncJobPost                          ConnectorSyncJobPost
+	ConnectorSyncJobUpdateStats                   ConnectorSyncJobUpdateStats
+	ConnectorUpdateAPIKeyDocumentID               ConnectorUpdateAPIKeyDocumentID
+	ConnectorUpdateActiveFiltering                ConnectorUpdateActiveFiltering
+	ConnectorUpdateConfiguration                  ConnectorUpdateConfiguration
+	ConnectorUpdateError                          ConnectorUpdateError
+	ConnectorUpdateFeatures                       ConnectorUpdateFeatures
+	ConnectorUpdateFiltering                      ConnectorUpdateFiltering
+	ConnectorUpdateFilteringValidation            ConnectorUpdateFilteringValidation
+	ConnectorUpdateIndexName                      ConnectorUpdateIndexName
+	ConnectorUpdateName                           ConnectorUpdateName
+	ConnectorUpdateNative                         ConnectorUpdateNative
+	ConnectorUpdatePipeline                       ConnectorUpdatePipeline
+	ConnectorUpdateScheduling                     ConnectorUpdateScheduling
+	ConnectorUpdateServiceDocumentType            ConnectorUpdateServiceDocumentType
+	ConnectorUpdateStatus                         ConnectorUpdateStatus
+	Count                                         Count
+	Create                                        Create
+	DanglingIndicesDeleteDanglingIndex            DanglingIndicesDeleteDanglingIndex
+	DanglingIndicesImportDanglingIndex            DanglingIndicesImportDanglingIndex
+	DanglingIndicesListDanglingIndices            DanglingIndicesListDanglingIndices
+	DeleteByQuery                                 DeleteByQuery
+	DeleteByQueryRethrottle                       DeleteByQueryRethrottle
+	Delete                                        Delete
+	DeleteScript                                  DeleteScript
+	EnrichDeletePolicy                            EnrichDeletePolicy
+	EnrichExecutePolicy                           EnrichExecutePolicy
+	EnrichGetPolicy                               EnrichGetPolicy
+	EnrichPutPolicy                               EnrichPutPolicy
+	EnrichStats                                   EnrichStats
+	EqlDelete                                     EqlDelete
+	EqlGet                                        EqlGet
+	EqlGetStatus                                  EqlGetStatus
+	EqlSearch                                     EqlSearch
+	EsqlAsyncQueryDelete                          EsqlAsyncQueryDelete
+	EsqlAsyncQueryGet                             EsqlAsyncQueryGet
+	EsqlAsyncQuery                                EsqlAsyncQuery
+	EsqlAsyncQueryStop                            EsqlAsyncQueryStop
+	EsqlQuery                                     EsqlQuery
+	Exists                                        Exists
+	ExistsSource                                  ExistsSource
+	Explain                                       Explain
+	FeaturesGetFeatures                           FeaturesGetFeatures
+	FeaturesResetFeatures                         FeaturesResetFeatures
+	FieldCaps                                     FieldCaps
+	FleetDeleteSecret                             FleetDeleteSecret
+	FleetGetSecret                                FleetGetSecret
+	FleetGlobalCheckpoints                        FleetGlobalCheckpoints
+	FleetMsearch                                  FleetMsearch
+	FleetPostSecret                               FleetPostSecret
+	FleetSearch                                   FleetSearch
+	Get                                           Get
+	GetScriptContext                              GetScriptContext
+	GetScriptLanguages                            GetScriptLanguages
+	GetScript                                     GetScript
+	GetSource                                     GetSource
+	GraphExplore                                  GraphExplore
+	HealthReport                                  HealthReport
+	Index                                         Index
+	InferenceChatCompletionUnified                InferenceChatCompletionUnified
+	InferenceCompletion                           InferenceCompletion
+	InferenceDelete                               InferenceDelete
+	InferenceGet                                  InferenceGet
+	InferenceInference                            InferenceInference
+	InferencePutAlibabacloud                      InferencePutAlibabacloud
+	InferencePutAmazonbedrock                     InferencePutAmazonbedrock
+	InferencePutAmazonsagemaker                   InferencePutAmazonsagemaker
+	InferencePutAnthropic                         InferencePutAnthropic
+	InferencePutAzureaistudio                     InferencePutAzureaistudio
+	InferencePutAzureopenai                       InferencePutAzureopenai
+	InferencePutCohere                            InferencePutCohere
+	InferencePutCustom                            InferencePutCustom
+	InferencePutDeepseek                          InferencePutDeepseek
+	InferencePutElasticsearch                     InferencePutElasticsearch
+	InferencePutElser                             InferencePutElser
+	InferencePutGoogleaistudio                    InferencePutGoogleaistudio
+	InferencePutGooglevertexai                    InferencePutGooglevertexai
+	InferencePutHuggingFace                       InferencePutHuggingFace
+	InferencePutJinaai                            InferencePutJinaai
+	InferencePutMistral                           InferencePutMistral
+	InferencePutOpenai                            InferencePutOpenai
+	InferencePut                                  InferencePut
+	InferencePutVoyageai                          InferencePutVoyageai
+	InferencePutWatsonx                           InferencePutWatsonx
+	InferenceRerank                               InferenceRerank
+	InferenceSparseEmbedding                      InferenceSparseEmbedding
+	InferenceStreamCompletion                     InferenceStreamCompletion
+	InferenceTextEmbedding                        InferenceTextEmbedding
+	InferenceUpdate                               InferenceUpdate
+	Info                                          Info
+	KnnSearch                                     KnnSearch
+	LogstashDeletePipeline                        LogstashDeletePipeline
+	LogstashGetPipeline                           LogstashGetPipeline
+	LogstashPutPipeline                           LogstashPutPipeline
+	Mget                                          Mget
+	Msearch                                       Msearch
+	MsearchTemplate                               MsearchTemplate
+	Mtermvectors                                  Mtermvectors
+	OpenPointInTime                               OpenPointInTime
+	Ping                                          Ping
+	ProfilingFlamegraph                           ProfilingFlamegraph
+	ProfilingStacktraces                          ProfilingStacktraces
+	ProfilingStatus                               ProfilingStatus
+	ProfilingTopnFunctions                        ProfilingTopnFunctions
+	PutScript                                     PutScript
+	QueryRulesDeleteRule                          QueryRulesDeleteRule
+	QueryRulesDeleteRuleset                       QueryRulesDeleteRuleset
+	QueryRulesGetRule                             QueryRulesGetRule
+	QueryRulesGetRuleset                          QueryRulesGetRuleset
+	QueryRulesListRulesets                        QueryRulesListRulesets
+	QueryRulesPutRule                             QueryRulesPutRule
+	QueryRulesPutRuleset                          QueryRulesPutRuleset
+	QueryRulesTest                                QueryRulesTest
+	RankEval                                      RankEval
+	Reindex                                       Reindex
+	ReindexRethrottle                             ReindexRethrottle
+	RenderSearchTemplate                          RenderSearchTemplate
+	ScriptsPainlessExecute                        ScriptsPainlessExecute
+	Scroll                                        Scroll
+	SearchApplicationDeleteBehavioralAnalytics    SearchApplicationDeleteBehavioralAnalytics
+	SearchApplicationDelete                       SearchApplicationDelete
+	SearchApplicationGetBehavioralAnalytics       SearchApplicationGetBehavioralAnalytics
+	SearchApplicationGet                          SearchApplicationGet
+	SearchApplicationList                         SearchApplicationList
+	SearchApplicationPostBehavioralAnalyticsEvent SearchApplicationPostBehavioralAnalyticsEvent
+	SearchApplicationPutBehavioralAnalytics       SearchApplicationPutBehavioralAnalytics
+	SearchApplicationPut                          SearchApplicationPut
+	SearchApplicationRenderQuery                  SearchApplicationRenderQuery
+	SearchApplicationSearch                       SearchApplicationSearch
+	SearchMvt                                     SearchMvt
+	Search                                        Search
+	SearchShards                                  SearchShards
+	SearchTemplate                                SearchTemplate
+	SearchableSnapshotsCacheStats                 SearchableSnapshotsCacheStats
+	SearchableSnapshotsClearCache                 SearchableSnapshotsClearCache
+	SearchableSnapshotsMount                      SearchableSnapshotsMount
+	SearchableSnapshotsStats                      SearchableSnapshotsStats
+	ShutdownDeleteNode                            ShutdownDeleteNode
+	ShutdownGetNode                               ShutdownGetNode
+	ShutdownPutNode                               ShutdownPutNode
+	SimulateIngest                                SimulateIngest
+	SlmDeleteLifecycle                            SlmDeleteLifecycle
+	SlmExecuteLifecycle                           SlmExecuteLifecycle
+	SlmExecuteRetention                           SlmExecuteRetention
+	SlmGetLifecycle                               SlmGetLifecycle
+	SlmGetStats                                   SlmGetStats
+	SlmGetStatus                                  SlmGetStatus
+	SlmPutLifecycle                               SlmPutLifecycle
+	SlmStart                                      SlmStart
+	SlmStop                                       SlmStop
+	StreamsLogsDisable                            StreamsLogsDisable
+	StreamsLogsEnable                             StreamsLogsEnable
+	StreamsStatus                                 StreamsStatus
+	SynonymsDeleteSynonym                         SynonymsDeleteSynonym
+	SynonymsDeleteSynonymRule                     SynonymsDeleteSynonymRule
+	SynonymsGetSynonym                            SynonymsGetSynonym
+	SynonymsGetSynonymRule                        SynonymsGetSynonymRule
+	SynonymsGetSynonymsSets                       SynonymsGetSynonymsSets
+	SynonymsPutSynonym                            SynonymsPutSynonym
+	SynonymsPutSynonymRule                        SynonymsPutSynonymRule
+	TermsEnum                                     TermsEnum
+	Termvectors                                   Termvectors
+	TextStructureFindFieldStructure               TextStructureFindFieldStructure
+	TextStructureFindMessageStructure             TextStructureFindMessageStructure
+	TextStructureFindStructure                    TextStructureFindStructure
+	TextStructureTestGrokPattern                  TextStructureTestGrokPattern
+	TransformDeleteTransform                      TransformDeleteTransform
+	TransformGetNodeStats                         TransformGetNodeStats
+	TransformGetTransform                         TransformGetTransform
+	TransformGetTransformStats                    TransformGetTransformStats
+	TransformPreviewTransform                     TransformPreviewTransform
+	TransformPutTransform                         TransformPutTransform
+	TransformResetTransform                       TransformResetTransform
+	TransformScheduleNowTransform                 TransformScheduleNowTransform
+	TransformStartTransform                       TransformStartTransform
+	TransformStopTransform                        TransformStopTransform
+	TransformUpdateTransform                      TransformUpdateTransform
+	TransformUpgradeTransforms                    TransformUpgradeTransforms
+	UpdateByQuery                                 UpdateByQuery
+	UpdateByQueryRethrottle                       UpdateByQueryRethrottle
+	Update                                        Update
 }
 
 // Cat contains the Cat APIs
@@ -180,6 +291,7 @@ type Cluster struct {
 	GetComponentTemplate         ClusterGetComponentTemplate
 	GetSettings                  ClusterGetSettings
 	Health                       ClusterHealth
+	Info                         ClusterInfo
 	PendingTasks                 ClusterPendingTasks
 	PostVotingConfigExclusions   ClusterPostVotingConfigExclusions
 	PutComponentTemplate         ClusterPutComponentTemplate
@@ -192,70 +304,91 @@ type Cluster struct {
 
 // Indices contains the Indices APIs
 type Indices struct {
-	AddBlock              IndicesAddBlock
-	Analyze               IndicesAnalyze
-	ClearCache            IndicesClearCache
-	Clone                 IndicesClone
-	Close                 IndicesClose
-	CreateDataStream      IndicesCreateDataStream
-	Create                IndicesCreate
-	DataStreamsStats      IndicesDataStreamsStats
-	DeleteAlias           IndicesDeleteAlias
-	DeleteDataStream      IndicesDeleteDataStream
-	DeleteIndexTemplate   IndicesDeleteIndexTemplate
-	Delete                IndicesDelete
-	DeleteTemplate        IndicesDeleteTemplate
-	DiskUsage             IndicesDiskUsage
-	Downsample            IndicesDownsample
-	ExistsAlias           IndicesExistsAlias
-	ExistsIndexTemplate   IndicesExistsIndexTemplate
-	Exists                IndicesExists
-	ExistsTemplate        IndicesExistsTemplate
-	FieldUsageStats       IndicesFieldUsageStats
-	Flush                 IndicesFlush
-	Forcemerge            IndicesForcemerge
-	GetAlias              IndicesGetAlias
-	GetDataStream         IndicesGetDataStream
-	GetFieldMapping       IndicesGetFieldMapping
-	GetIndexTemplate      IndicesGetIndexTemplate
-	GetMapping            IndicesGetMapping
-	Get                   IndicesGet
-	GetSettings           IndicesGetSettings
-	GetTemplate           IndicesGetTemplate
-	MigrateToDataStream   IndicesMigrateToDataStream
-	ModifyDataStream      IndicesModifyDataStream
-	Open                  IndicesOpen
-	PromoteDataStream     IndicesPromoteDataStream
-	PutAlias              IndicesPutAlias
-	PutIndexTemplate      IndicesPutIndexTemplate
-	PutMapping            IndicesPutMapping
-	PutSettings           IndicesPutSettings
-	PutTemplate           IndicesPutTemplate
-	Recovery              IndicesRecovery
-	Refresh               IndicesRefresh
-	ReloadSearchAnalyzers IndicesReloadSearchAnalyzers
-	ResolveIndex          IndicesResolveIndex
-	Rollover              IndicesRollover
-	Segments              IndicesSegments
-	ShardStores           IndicesShardStores
-	Shrink                IndicesShrink
-	SimulateIndexTemplate IndicesSimulateIndexTemplate
-	SimulateTemplate      IndicesSimulateTemplate
-	Split                 IndicesSplit
-	Stats                 IndicesStats
-	Unfreeze              IndicesUnfreeze
-	UpdateAliases         IndicesUpdateAliases
-	ValidateQuery         IndicesValidateQuery
+	AddBlock                IndicesAddBlock
+	Analyze                 IndicesAnalyze
+	CancelMigrateReindex    IndicesCancelMigrateReindex
+	ClearCache              IndicesClearCache
+	Clone                   IndicesClone
+	Close                   IndicesClose
+	CreateDataStream        IndicesCreateDataStream
+	CreateFrom              IndicesCreateFrom
+	Create                  IndicesCreate
+	DataStreamsStats        IndicesDataStreamsStats
+	DeleteAlias             IndicesDeleteAlias
+	DeleteDataLifecycle     IndicesDeleteDataLifecycle
+	DeleteDataStreamOptions IndicesDeleteDataStreamOptions
+	DeleteDataStream        IndicesDeleteDataStream
+	DeleteIndexTemplate     IndicesDeleteIndexTemplate
+	Delete                  IndicesDelete
+	DeleteTemplate          IndicesDeleteTemplate
+	DiskUsage               IndicesDiskUsage
+	Downsample              IndicesDownsample
+	ExistsAlias             IndicesExistsAlias
+	ExistsIndexTemplate     IndicesExistsIndexTemplate
+	Exists                  IndicesExists
+	ExistsTemplate          IndicesExistsTemplate
+	ExplainDataLifecycle    IndicesExplainDataLifecycle
+	FieldUsageStats         IndicesFieldUsageStats
+	Flush                   IndicesFlush
+	Forcemerge              IndicesForcemerge
+	GetAlias                IndicesGetAlias
+	GetDataLifecycle        IndicesGetDataLifecycle
+	GetDataLifecycleStats   IndicesGetDataLifecycleStats
+	GetDataStreamOptions    IndicesGetDataStreamOptions
+	GetDataStream           IndicesGetDataStream
+	GetDataStreamSettings   IndicesGetDataStreamSettings
+	GetFieldMapping         IndicesGetFieldMapping
+	GetIndexTemplate        IndicesGetIndexTemplate
+	GetMapping              IndicesGetMapping
+	GetMigrateReindexStatus IndicesGetMigrateReindexStatus
+	Get                     IndicesGet
+	GetSettings             IndicesGetSettings
+	GetTemplate             IndicesGetTemplate
+	MigrateReindex          IndicesMigrateReindex
+	MigrateToDataStream     IndicesMigrateToDataStream
+	ModifyDataStream        IndicesModifyDataStream
+	Open                    IndicesOpen
+	PromoteDataStream       IndicesPromoteDataStream
+	PutAlias                IndicesPutAlias
+	PutDataLifecycle        IndicesPutDataLifecycle
+	PutDataStreamOptions    IndicesPutDataStreamOptions
+	PutDataStreamSettings   IndicesPutDataStreamSettings
+	PutIndexTemplate        IndicesPutIndexTemplate
+	PutMapping              IndicesPutMapping
+	PutSettings             IndicesPutSettings
+	PutTemplate             IndicesPutTemplate
+	Recovery                IndicesRecovery
+	Refresh                 IndicesRefresh
+	ReloadSearchAnalyzers   IndicesReloadSearchAnalyzers
+	ResolveCluster          IndicesResolveCluster
+	ResolveIndex            IndicesResolveIndex
+	Rollover                IndicesRollover
+	Segments                IndicesSegments
+	ShardStores             IndicesShardStores
+	Shrink                  IndicesShrink
+	SimulateIndexTemplate   IndicesSimulateIndexTemplate
+	SimulateTemplate        IndicesSimulateTemplate
+	Split                   IndicesSplit
+	Stats                   IndicesStats
+	Unfreeze                IndicesUnfreeze
+	UpdateAliases           IndicesUpdateAliases
+	ValidateQuery           IndicesValidateQuery
 }
 
 // Ingest contains the Ingest APIs
 type Ingest struct {
-	DeletePipeline IngestDeletePipeline
-	GeoIPStats     IngestGeoIPStats
-	GetPipeline    IngestGetPipeline
-	ProcessorGrok  IngestProcessorGrok
-	PutPipeline    IngestPutPipeline
-	Simulate       IngestSimulate
+	DeleteGeoipDatabase      IngestDeleteGeoipDatabase
+	DeleteIPLocationDatabase IngestDeleteIPLocationDatabase
+	DeletePipeline           IngestDeletePipeline
+	GeoIPStats               IngestGeoIPStats
+	GetGeoipDatabase         IngestGetGeoipDatabase
+	GetIPLocationDatabase    IngestGetIPLocationDatabase
+	GetPipeline              IngestGetPipeline
+	ProcessorGrok            IngestProcessorGrok
+	PutGeoipDatabase         IngestPutGeoipDatabase
+	PutIPLocationDatabase    IngestPutIPLocationDatabase
+	PutPipeline              IngestPutPipeline
+	Simulate                 IngestSimulate
 }
 
 // Nodes contains the Nodes APIs
@@ -275,18 +408,19 @@ type Remote struct {
 
 // Snapshot contains the Snapshot APIs
 type Snapshot struct {
-	CleanupRepository SnapshotCleanupRepository
-	Clone             SnapshotClone
-	CreateRepository  SnapshotCreateRepository
-	Create            SnapshotCreate
-	DeleteRepository  SnapshotDeleteRepository
-	Delete            SnapshotDelete
-	GetRepository     SnapshotGetRepository
-	Get               SnapshotGet
-	RepositoryAnalyze SnapshotRepositoryAnalyze
-	Restore           SnapshotRestore
-	Status            SnapshotStatus
-	VerifyRepository  SnapshotVerifyRepository
+	CleanupRepository         SnapshotCleanupRepository
+	Clone                     SnapshotClone
+	CreateRepository          SnapshotCreateRepository
+	Create                    SnapshotCreate
+	DeleteRepository          SnapshotDeleteRepository
+	Delete                    SnapshotDelete
+	GetRepository             SnapshotGetRepository
+	Get                       SnapshotGet
+	RepositoryAnalyze         SnapshotRepositoryAnalyze
+	RepositoryVerifyIntegrity SnapshotRepositoryVerifyIntegrity
+	Restore                   SnapshotRestore
+	Status                    SnapshotStatus
+	VerifyRepository          SnapshotVerifyRepository
 }
 
 // Tasks contains the Tasks APIs
@@ -452,6 +586,8 @@ type Rollup struct {
 type Security struct {
 	ActivateUserProfile         SecurityActivateUserProfile
 	Authenticate                SecurityAuthenticate
+	BulkDeleteRole              SecurityBulkDeleteRole
+	BulkPutRole                 SecurityBulkPutRole
 	BulkUpdateAPIKeys           SecurityBulkUpdateAPIKeys
 	ChangePassword              SecurityChangePassword
 	ClearAPIKeyCache            SecurityClearAPIKeyCache
@@ -460,7 +596,9 @@ type Security struct {
 	ClearCachedRoles            SecurityClearCachedRoles
 	ClearCachedServiceTokens    SecurityClearCachedServiceTokens
 	CreateAPIKey                SecurityCreateAPIKey
+	CreateCrossClusterAPIKey    SecurityCreateCrossClusterAPIKey
 	CreateServiceToken          SecurityCreateServiceToken
+	DelegatePki                 SecurityDelegatePki
 	DeletePrivileges            SecurityDeletePrivileges
 	DeleteRoleMapping           SecurityDeleteRoleMapping
 	DeleteRole                  SecurityDeleteRole
@@ -479,6 +617,7 @@ type Security struct {
 	GetRole                     SecurityGetRole
 	GetServiceAccounts          SecurityGetServiceAccounts
 	GetServiceCredentials       SecurityGetServiceCredentials
+	GetSettings                 SecurityGetSettings
 	GetToken                    SecurityGetToken
 	GetUserPrivileges           SecurityGetUserPrivileges
 	GetUserProfile              SecurityGetUserProfile
@@ -496,6 +635,8 @@ type Security struct {
 	PutRole                     SecurityPutRole
 	PutUser                     SecurityPutUser
 	QueryAPIKeys                SecurityQueryAPIKeys
+	QueryRole                   SecurityQueryRole
+	QueryUser                   SecurityQueryUser
 	SamlAuthenticate            SecuritySamlAuthenticate
 	SamlCompleteLogout          SecuritySamlCompleteLogout
 	SamlInvalidate              SecuritySamlInvalidate
@@ -504,6 +645,8 @@ type Security struct {
 	SamlServiceProviderMetadata SecuritySamlServiceProviderMetadata
 	SuggestUserProfiles         SecuritySuggestUserProfiles
 	UpdateAPIKey                SecurityUpdateAPIKey
+	UpdateCrossClusterAPIKey    SecurityUpdateCrossClusterAPIKey
+	UpdateSettings              SecurityUpdateSettings
 	UpdateUserProfileData       SecurityUpdateUserProfileData
 }
 
@@ -529,12 +672,14 @@ type Watcher struct {
 	DeactivateWatch WatcherDeactivateWatch
 	DeleteWatch     WatcherDeleteWatch
 	ExecuteWatch    WatcherExecuteWatch
+	GetSettings     WatcherGetSettings
 	GetWatch        WatcherGetWatch
 	PutWatch        WatcherPutWatch
 	QueryWatches    WatcherQueryWatches
 	Start           WatcherStart
 	Stats           WatcherStats
 	Stop            WatcherStop
+	UpdateSettings  WatcherUpdateSettings
 }
 
 // XPack contains the XPack APIs
@@ -551,8 +696,43 @@ func New(t Transport) *API {
 		AutoscalingGetAutoscalingPolicy:    newAutoscalingGetAutoscalingPolicyFunc(t),
 		AutoscalingPutAutoscalingPolicy:    newAutoscalingPutAutoscalingPolicyFunc(t),
 		Bulk:                               newBulkFunc(t),
+		Capabilities:                       newCapabilitiesFunc(t),
 		ClearScroll:                        newClearScrollFunc(t),
 		ClosePointInTime:                   newClosePointInTimeFunc(t),
+		ConnectorCheckIn:                   newConnectorCheckInFunc(t),
+		ConnectorDelete:                    newConnectorDeleteFunc(t),
+		ConnectorGet:                       newConnectorGetFunc(t),
+		ConnectorLastSync:                  newConnectorLastSyncFunc(t),
+		ConnectorList:                      newConnectorListFunc(t),
+		ConnectorPost:                      newConnectorPostFunc(t),
+		ConnectorPut:                       newConnectorPutFunc(t),
+		ConnectorSecretDelete:              newConnectorSecretDeleteFunc(t),
+		ConnectorSecretGet:                 newConnectorSecretGetFunc(t),
+		ConnectorSecretPost:                newConnectorSecretPostFunc(t),
+		ConnectorSecretPut:                 newConnectorSecretPutFunc(t),
+		ConnectorSyncJobCancel:             newConnectorSyncJobCancelFunc(t),
+		ConnectorSyncJobCheckIn:            newConnectorSyncJobCheckInFunc(t),
+		ConnectorSyncJobClaim:              newConnectorSyncJobClaimFunc(t),
+		ConnectorSyncJobDelete:             newConnectorSyncJobDeleteFunc(t),
+		ConnectorSyncJobError:              newConnectorSyncJobErrorFunc(t),
+		ConnectorSyncJobGet:                newConnectorSyncJobGetFunc(t),
+		ConnectorSyncJobList:               newConnectorSyncJobListFunc(t),
+		ConnectorSyncJobPost:               newConnectorSyncJobPostFunc(t),
+		ConnectorSyncJobUpdateStats:        newConnectorSyncJobUpdateStatsFunc(t),
+		ConnectorUpdateAPIKeyDocumentID:    newConnectorUpdateAPIKeyDocumentIDFunc(t),
+		ConnectorUpdateActiveFiltering:     newConnectorUpdateActiveFilteringFunc(t),
+		ConnectorUpdateConfiguration:       newConnectorUpdateConfigurationFunc(t),
+		ConnectorUpdateError:               newConnectorUpdateErrorFunc(t),
+		ConnectorUpdateFeatures:            newConnectorUpdateFeaturesFunc(t),
+		ConnectorUpdateFiltering:           newConnectorUpdateFilteringFunc(t),
+		ConnectorUpdateFilteringValidation: newConnectorUpdateFilteringValidationFunc(t),
+		ConnectorUpdateIndexName:           newConnectorUpdateIndexNameFunc(t),
+		ConnectorUpdateName:                newConnectorUpdateNameFunc(t),
+		ConnectorUpdateNative:              newConnectorUpdateNativeFunc(t),
+		ConnectorUpdatePipeline:            newConnectorUpdatePipelineFunc(t),
+		ConnectorUpdateScheduling:          newConnectorUpdateSchedulingFunc(t),
+		ConnectorUpdateServiceDocumentType: newConnectorUpdateServiceDocumentTypeFunc(t),
+		ConnectorUpdateStatus:              newConnectorUpdateStatusFunc(t),
 		Count:                              newCountFunc(t),
 		Create:                             newCreateFunc(t),
 		DanglingIndicesDeleteDanglingIndex: newDanglingIndicesDeleteDanglingIndexFunc(t),
@@ -571,14 +751,22 @@ func New(t Transport) *API {
 		EqlGet:                             newEqlGetFunc(t),
 		EqlGetStatus:                       newEqlGetStatusFunc(t),
 		EqlSearch:                          newEqlSearchFunc(t),
+		EsqlAsyncQueryDelete:               newEsqlAsyncQueryDeleteFunc(t),
+		EsqlAsyncQueryGet:                  newEsqlAsyncQueryGetFunc(t),
+		EsqlAsyncQuery:                     newEsqlAsyncQueryFunc(t),
+		EsqlAsyncQueryStop:                 newEsqlAsyncQueryStopFunc(t),
+		EsqlQuery:                          newEsqlQueryFunc(t),
 		Exists:                             newExistsFunc(t),
 		ExistsSource:                       newExistsSourceFunc(t),
 		Explain:                            newExplainFunc(t),
 		FeaturesGetFeatures:                newFeaturesGetFeaturesFunc(t),
 		FeaturesResetFeatures:              newFeaturesResetFeaturesFunc(t),
 		FieldCaps:                          newFieldCapsFunc(t),
+		FleetDeleteSecret:                  newFleetDeleteSecretFunc(t),
+		FleetGetSecret:                     newFleetGetSecretFunc(t),
 		FleetGlobalCheckpoints:             newFleetGlobalCheckpointsFunc(t),
 		FleetMsearch:                       newFleetMsearchFunc(t),
+		FleetPostSecret:                    newFleetPostSecretFunc(t),
 		FleetSearch:                        newFleetSearchFunc(t),
 		Get:                                newGetFunc(t),
 		GetScriptContext:                   newGetScriptContextFunc(t),
@@ -586,7 +774,38 @@ func New(t Transport) *API {
 		GetScript:                          newGetScriptFunc(t),
 		GetSource:                          newGetSourceFunc(t),
 		GraphExplore:                       newGraphExploreFunc(t),
+		HealthReport:                       newHealthReportFunc(t),
 		Index:                              newIndexFunc(t),
+		InferenceChatCompletionUnified:     newInferenceChatCompletionUnifiedFunc(t),
+		InferenceCompletion:                newInferenceCompletionFunc(t),
+		InferenceDelete:                    newInferenceDeleteFunc(t),
+		InferenceGet:                       newInferenceGetFunc(t),
+		InferenceInference:                 newInferenceInferenceFunc(t),
+		InferencePutAlibabacloud:           newInferencePutAlibabacloudFunc(t),
+		InferencePutAmazonbedrock:          newInferencePutAmazonbedrockFunc(t),
+		InferencePutAmazonsagemaker:        newInferencePutAmazonsagemakerFunc(t),
+		InferencePutAnthropic:              newInferencePutAnthropicFunc(t),
+		InferencePutAzureaistudio:          newInferencePutAzureaistudioFunc(t),
+		InferencePutAzureopenai:            newInferencePutAzureopenaiFunc(t),
+		InferencePutCohere:                 newInferencePutCohereFunc(t),
+		InferencePutCustom:                 newInferencePutCustomFunc(t),
+		InferencePutDeepseek:               newInferencePutDeepseekFunc(t),
+		InferencePutElasticsearch:          newInferencePutElasticsearchFunc(t),
+		InferencePutElser:                  newInferencePutElserFunc(t),
+		InferencePutGoogleaistudio:         newInferencePutGoogleaistudioFunc(t),
+		InferencePutGooglevertexai:         newInferencePutGooglevertexaiFunc(t),
+		InferencePutHuggingFace:            newInferencePutHuggingFaceFunc(t),
+		InferencePutJinaai:                 newInferencePutJinaaiFunc(t),
+		InferencePutMistral:                newInferencePutMistralFunc(t),
+		InferencePutOpenai:                 newInferencePutOpenaiFunc(t),
+		InferencePut:                       newInferencePutFunc(t),
+		InferencePutVoyageai:               newInferencePutVoyageaiFunc(t),
+		InferencePutWatsonx:                newInferencePutWatsonxFunc(t),
+		InferenceRerank:                    newInferenceRerankFunc(t),
+		InferenceSparseEmbedding:           newInferenceSparseEmbeddingFunc(t),
+		InferenceStreamCompletion:          newInferenceStreamCompletionFunc(t),
+		InferenceTextEmbedding:             newInferenceTextEmbeddingFunc(t),
+		InferenceUpdate:                    newInferenceUpdateFunc(t),
 		Info:                               newInfoFunc(t),
 		KnnSearch:                          newKnnSearchFunc(t),
 		LogstashDeletePipeline:             newLogstashDeletePipelineFunc(t),
@@ -598,50 +817,87 @@ func New(t Transport) *API {
 		Mtermvectors:                       newMtermvectorsFunc(t),
 		OpenPointInTime:                    newOpenPointInTimeFunc(t),
 		Ping:                               newPingFunc(t),
+		ProfilingFlamegraph:                newProfilingFlamegraphFunc(t),
+		ProfilingStacktraces:               newProfilingStacktracesFunc(t),
+		ProfilingStatus:                    newProfilingStatusFunc(t),
+		ProfilingTopnFunctions:             newProfilingTopnFunctionsFunc(t),
 		PutScript:                          newPutScriptFunc(t),
+		QueryRulesDeleteRule:               newQueryRulesDeleteRuleFunc(t),
+		QueryRulesDeleteRuleset:            newQueryRulesDeleteRulesetFunc(t),
+		QueryRulesGetRule:                  newQueryRulesGetRuleFunc(t),
+		QueryRulesGetRuleset:               newQueryRulesGetRulesetFunc(t),
+		QueryRulesListRulesets:             newQueryRulesListRulesetsFunc(t),
+		QueryRulesPutRule:                  newQueryRulesPutRuleFunc(t),
+		QueryRulesPutRuleset:               newQueryRulesPutRulesetFunc(t),
+		QueryRulesTest:                     newQueryRulesTestFunc(t),
 		RankEval:                           newRankEvalFunc(t),
 		Reindex:                            newReindexFunc(t),
 		ReindexRethrottle:                  newReindexRethrottleFunc(t),
 		RenderSearchTemplate:               newRenderSearchTemplateFunc(t),
 		ScriptsPainlessExecute:             newScriptsPainlessExecuteFunc(t),
 		Scroll:                             newScrollFunc(t),
-		SearchMvt:                          newSearchMvtFunc(t),
-		Search:                             newSearchFunc(t),
-		SearchShards:                       newSearchShardsFunc(t),
-		SearchTemplate:                     newSearchTemplateFunc(t),
-		SearchableSnapshotsCacheStats:      newSearchableSnapshotsCacheStatsFunc(t),
-		SearchableSnapshotsClearCache:      newSearchableSnapshotsClearCacheFunc(t),
-		SearchableSnapshotsMount:           newSearchableSnapshotsMountFunc(t),
-		SearchableSnapshotsStats:           newSearchableSnapshotsStatsFunc(t),
-		SemanticSearch:                     newSemanticSearchFunc(t),
-		ShutdownDeleteNode:                 newShutdownDeleteNodeFunc(t),
-		ShutdownGetNode:                    newShutdownGetNodeFunc(t),
-		ShutdownPutNode:                    newShutdownPutNodeFunc(t),
-		SlmDeleteLifecycle:                 newSlmDeleteLifecycleFunc(t),
-		SlmExecuteLifecycle:                newSlmExecuteLifecycleFunc(t),
-		SlmExecuteRetention:                newSlmExecuteRetentionFunc(t),
-		SlmGetLifecycle:                    newSlmGetLifecycleFunc(t),
-		SlmGetStats:                        newSlmGetStatsFunc(t),
-		SlmGetStatus:                       newSlmGetStatusFunc(t),
-		SlmPutLifecycle:                    newSlmPutLifecycleFunc(t),
-		SlmStart:                           newSlmStartFunc(t),
-		SlmStop:                            newSlmStopFunc(t),
-		TermsEnum:                          newTermsEnumFunc(t),
-		Termvectors:                        newTermvectorsFunc(t),
-		TextStructureFindStructure:         newTextStructureFindStructureFunc(t),
-		TransformDeleteTransform:           newTransformDeleteTransformFunc(t),
-		TransformGetTransform:              newTransformGetTransformFunc(t),
-		TransformGetTransformStats:         newTransformGetTransformStatsFunc(t),
-		TransformPreviewTransform:          newTransformPreviewTransformFunc(t),
-		TransformPutTransform:              newTransformPutTransformFunc(t),
-		TransformResetTransform:            newTransformResetTransformFunc(t),
-		TransformStartTransform:            newTransformStartTransformFunc(t),
-		TransformStopTransform:             newTransformStopTransformFunc(t),
-		TransformUpdateTransform:           newTransformUpdateTransformFunc(t),
-		TransformUpgradeTransforms:         newTransformUpgradeTransformsFunc(t),
-		UpdateByQuery:                      newUpdateByQueryFunc(t),
-		UpdateByQueryRethrottle:            newUpdateByQueryRethrottleFunc(t),
-		Update:                             newUpdateFunc(t),
+		SearchApplicationDeleteBehavioralAnalytics:    newSearchApplicationDeleteBehavioralAnalyticsFunc(t),
+		SearchApplicationDelete:                       newSearchApplicationDeleteFunc(t),
+		SearchApplicationGetBehavioralAnalytics:       newSearchApplicationGetBehavioralAnalyticsFunc(t),
+		SearchApplicationGet:                          newSearchApplicationGetFunc(t),
+		SearchApplicationList:                         newSearchApplicationListFunc(t),
+		SearchApplicationPostBehavioralAnalyticsEvent: newSearchApplicationPostBehavioralAnalyticsEventFunc(t),
+		SearchApplicationPutBehavioralAnalytics:       newSearchApplicationPutBehavioralAnalyticsFunc(t),
+		SearchApplicationPut:                          newSearchApplicationPutFunc(t),
+		SearchApplicationRenderQuery:                  newSearchApplicationRenderQueryFunc(t),
+		SearchApplicationSearch:                       newSearchApplicationSearchFunc(t),
+		SearchMvt:                                     newSearchMvtFunc(t),
+		Search:                                        newSearchFunc(t),
+		SearchShards:                                  newSearchShardsFunc(t),
+		SearchTemplate:                                newSearchTemplateFunc(t),
+		SearchableSnapshotsCacheStats:                 newSearchableSnapshotsCacheStatsFunc(t),
+		SearchableSnapshotsClearCache:                 newSearchableSnapshotsClearCacheFunc(t),
+		SearchableSnapshotsMount:                      newSearchableSnapshotsMountFunc(t),
+		SearchableSnapshotsStats:                      newSearchableSnapshotsStatsFunc(t),
+		ShutdownDeleteNode:                            newShutdownDeleteNodeFunc(t),
+		ShutdownGetNode:                               newShutdownGetNodeFunc(t),
+		ShutdownPutNode:                               newShutdownPutNodeFunc(t),
+		SimulateIngest:                                newSimulateIngestFunc(t),
+		SlmDeleteLifecycle:                            newSlmDeleteLifecycleFunc(t),
+		SlmExecuteLifecycle:                           newSlmExecuteLifecycleFunc(t),
+		SlmExecuteRetention:                           newSlmExecuteRetentionFunc(t),
+		SlmGetLifecycle:                               newSlmGetLifecycleFunc(t),
+		SlmGetStats:                                   newSlmGetStatsFunc(t),
+		SlmGetStatus:                                  newSlmGetStatusFunc(t),
+		SlmPutLifecycle:                               newSlmPutLifecycleFunc(t),
+		SlmStart:                                      newSlmStartFunc(t),
+		SlmStop:                                       newSlmStopFunc(t),
+		StreamsLogsDisable:                            newStreamsLogsDisableFunc(t),
+		StreamsLogsEnable:                             newStreamsLogsEnableFunc(t),
+		StreamsStatus:                                 newStreamsStatusFunc(t),
+		SynonymsDeleteSynonym:                         newSynonymsDeleteSynonymFunc(t),
+		SynonymsDeleteSynonymRule:                     newSynonymsDeleteSynonymRuleFunc(t),
+		SynonymsGetSynonym:                            newSynonymsGetSynonymFunc(t),
+		SynonymsGetSynonymRule:                        newSynonymsGetSynonymRuleFunc(t),
+		SynonymsGetSynonymsSets:                       newSynonymsGetSynonymsSetsFunc(t),
+		SynonymsPutSynonym:                            newSynonymsPutSynonymFunc(t),
+		SynonymsPutSynonymRule:                        newSynonymsPutSynonymRuleFunc(t),
+		TermsEnum:                                     newTermsEnumFunc(t),
+		Termvectors:                                   newTermvectorsFunc(t),
+		TextStructureFindFieldStructure:               newTextStructureFindFieldStructureFunc(t),
+		TextStructureFindMessageStructure:             newTextStructureFindMessageStructureFunc(t),
+		TextStructureFindStructure:                    newTextStructureFindStructureFunc(t),
+		TextStructureTestGrokPattern:                  newTextStructureTestGrokPatternFunc(t),
+		TransformDeleteTransform:                      newTransformDeleteTransformFunc(t),
+		TransformGetNodeStats:                         newTransformGetNodeStatsFunc(t),
+		TransformGetTransform:                         newTransformGetTransformFunc(t),
+		TransformGetTransformStats:                    newTransformGetTransformStatsFunc(t),
+		TransformPreviewTransform:                     newTransformPreviewTransformFunc(t),
+		TransformPutTransform:                         newTransformPutTransformFunc(t),
+		TransformResetTransform:                       newTransformResetTransformFunc(t),
+		TransformScheduleNowTransform:                 newTransformScheduleNowTransformFunc(t),
+		TransformStartTransform:                       newTransformStartTransformFunc(t),
+		TransformStopTransform:                        newTransformStopTransformFunc(t),
+		TransformUpdateTransform:                      newTransformUpdateTransformFunc(t),
+		TransformUpgradeTransforms:                    newTransformUpgradeTransformsFunc(t),
+		UpdateByQuery:                                 newUpdateByQueryFunc(t),
+		UpdateByQueryRethrottle:                       newUpdateByQueryRethrottleFunc(t),
+		Update:                                        newUpdateFunc(t),
 		Cat: &Cat{
 			Aliases:              newCatAliasesFunc(t),
 			Allocation:           newCatAllocationFunc(t),
@@ -678,6 +934,7 @@ func New(t Transport) *API {
 			GetComponentTemplate:         newClusterGetComponentTemplateFunc(t),
 			GetSettings:                  newClusterGetSettingsFunc(t),
 			Health:                       newClusterHealthFunc(t),
+			Info:                         newClusterInfoFunc(t),
 			PendingTasks:                 newClusterPendingTasksFunc(t),
 			PostVotingConfigExclusions:   newClusterPostVotingConfigExclusionsFunc(t),
 			PutComponentTemplate:         newClusterPutComponentTemplateFunc(t),
@@ -688,68 +945,89 @@ func New(t Transport) *API {
 			Stats:                        newClusterStatsFunc(t),
 		},
 		Indices: &Indices{
-			AddBlock:              newIndicesAddBlockFunc(t),
-			Analyze:               newIndicesAnalyzeFunc(t),
-			ClearCache:            newIndicesClearCacheFunc(t),
-			Clone:                 newIndicesCloneFunc(t),
-			Close:                 newIndicesCloseFunc(t),
-			CreateDataStream:      newIndicesCreateDataStreamFunc(t),
-			Create:                newIndicesCreateFunc(t),
-			DataStreamsStats:      newIndicesDataStreamsStatsFunc(t),
-			DeleteAlias:           newIndicesDeleteAliasFunc(t),
-			DeleteDataStream:      newIndicesDeleteDataStreamFunc(t),
-			DeleteIndexTemplate:   newIndicesDeleteIndexTemplateFunc(t),
-			Delete:                newIndicesDeleteFunc(t),
-			DeleteTemplate:        newIndicesDeleteTemplateFunc(t),
-			DiskUsage:             newIndicesDiskUsageFunc(t),
-			Downsample:            newIndicesDownsampleFunc(t),
-			ExistsAlias:           newIndicesExistsAliasFunc(t),
-			ExistsIndexTemplate:   newIndicesExistsIndexTemplateFunc(t),
-			Exists:                newIndicesExistsFunc(t),
-			ExistsTemplate:        newIndicesExistsTemplateFunc(t),
-			FieldUsageStats:       newIndicesFieldUsageStatsFunc(t),
-			Flush:                 newIndicesFlushFunc(t),
-			Forcemerge:            newIndicesForcemergeFunc(t),
-			GetAlias:              newIndicesGetAliasFunc(t),
-			GetDataStream:         newIndicesGetDataStreamFunc(t),
-			GetFieldMapping:       newIndicesGetFieldMappingFunc(t),
-			GetIndexTemplate:      newIndicesGetIndexTemplateFunc(t),
-			GetMapping:            newIndicesGetMappingFunc(t),
-			Get:                   newIndicesGetFunc(t),
-			GetSettings:           newIndicesGetSettingsFunc(t),
-			GetTemplate:           newIndicesGetTemplateFunc(t),
-			MigrateToDataStream:   newIndicesMigrateToDataStreamFunc(t),
-			ModifyDataStream:      newIndicesModifyDataStreamFunc(t),
-			Open:                  newIndicesOpenFunc(t),
-			PromoteDataStream:     newIndicesPromoteDataStreamFunc(t),
-			PutAlias:              newIndicesPutAliasFunc(t),
-			PutIndexTemplate:      newIndicesPutIndexTemplateFunc(t),
-			PutMapping:            newIndicesPutMappingFunc(t),
-			PutSettings:           newIndicesPutSettingsFunc(t),
-			PutTemplate:           newIndicesPutTemplateFunc(t),
-			Recovery:              newIndicesRecoveryFunc(t),
-			Refresh:               newIndicesRefreshFunc(t),
-			ReloadSearchAnalyzers: newIndicesReloadSearchAnalyzersFunc(t),
-			ResolveIndex:          newIndicesResolveIndexFunc(t),
-			Rollover:              newIndicesRolloverFunc(t),
-			Segments:              newIndicesSegmentsFunc(t),
-			ShardStores:           newIndicesShardStoresFunc(t),
-			Shrink:                newIndicesShrinkFunc(t),
-			SimulateIndexTemplate: newIndicesSimulateIndexTemplateFunc(t),
-			SimulateTemplate:      newIndicesSimulateTemplateFunc(t),
-			Split:                 newIndicesSplitFunc(t),
-			Stats:                 newIndicesStatsFunc(t),
-			Unfreeze:              newIndicesUnfreezeFunc(t),
-			UpdateAliases:         newIndicesUpdateAliasesFunc(t),
-			ValidateQuery:         newIndicesValidateQueryFunc(t),
+			AddBlock:                newIndicesAddBlockFunc(t),
+			Analyze:                 newIndicesAnalyzeFunc(t),
+			CancelMigrateReindex:    newIndicesCancelMigrateReindexFunc(t),
+			ClearCache:              newIndicesClearCacheFunc(t),
+			Clone:                   newIndicesCloneFunc(t),
+			Close:                   newIndicesCloseFunc(t),
+			CreateDataStream:        newIndicesCreateDataStreamFunc(t),
+			CreateFrom:              newIndicesCreateFromFunc(t),
+			Create:                  newIndicesCreateFunc(t),
+			DataStreamsStats:        newIndicesDataStreamsStatsFunc(t),
+			DeleteAlias:             newIndicesDeleteAliasFunc(t),
+			DeleteDataLifecycle:     newIndicesDeleteDataLifecycleFunc(t),
+			DeleteDataStreamOptions: newIndicesDeleteDataStreamOptionsFunc(t),
+			DeleteDataStream:        newIndicesDeleteDataStreamFunc(t),
+			DeleteIndexTemplate:     newIndicesDeleteIndexTemplateFunc(t),
+			Delete:                  newIndicesDeleteFunc(t),
+			DeleteTemplate:          newIndicesDeleteTemplateFunc(t),
+			DiskUsage:               newIndicesDiskUsageFunc(t),
+			Downsample:              newIndicesDownsampleFunc(t),
+			ExistsAlias:             newIndicesExistsAliasFunc(t),
+			ExistsIndexTemplate:     newIndicesExistsIndexTemplateFunc(t),
+			Exists:                  newIndicesExistsFunc(t),
+			ExistsTemplate:          newIndicesExistsTemplateFunc(t),
+			ExplainDataLifecycle:    newIndicesExplainDataLifecycleFunc(t),
+			FieldUsageStats:         newIndicesFieldUsageStatsFunc(t),
+			Flush:                   newIndicesFlushFunc(t),
+			Forcemerge:              newIndicesForcemergeFunc(t),
+			GetAlias:                newIndicesGetAliasFunc(t),
+			GetDataLifecycle:        newIndicesGetDataLifecycleFunc(t),
+			GetDataLifecycleStats:   newIndicesGetDataLifecycleStatsFunc(t),
+			GetDataStreamOptions:    newIndicesGetDataStreamOptionsFunc(t),
+			GetDataStream:           newIndicesGetDataStreamFunc(t),
+			GetDataStreamSettings:   newIndicesGetDataStreamSettingsFunc(t),
+			GetFieldMapping:         newIndicesGetFieldMappingFunc(t),
+			GetIndexTemplate:        newIndicesGetIndexTemplateFunc(t),
+			GetMapping:              newIndicesGetMappingFunc(t),
+			GetMigrateReindexStatus: newIndicesGetMigrateReindexStatusFunc(t),
+			Get:                     newIndicesGetFunc(t),
+			GetSettings:             newIndicesGetSettingsFunc(t),
+			GetTemplate:             newIndicesGetTemplateFunc(t),
+			MigrateReindex:          newIndicesMigrateReindexFunc(t),
+			MigrateToDataStream:     newIndicesMigrateToDataStreamFunc(t),
+			ModifyDataStream:        newIndicesModifyDataStreamFunc(t),
+			Open:                    newIndicesOpenFunc(t),
+			PromoteDataStream:       newIndicesPromoteDataStreamFunc(t),
+			PutAlias:                newIndicesPutAliasFunc(t),
+			PutDataLifecycle:        newIndicesPutDataLifecycleFunc(t),
+			PutDataStreamOptions:    newIndicesPutDataStreamOptionsFunc(t),
+			PutDataStreamSettings:   newIndicesPutDataStreamSettingsFunc(t),
+			PutIndexTemplate:        newIndicesPutIndexTemplateFunc(t),
+			PutMapping:              newIndicesPutMappingFunc(t),
+			PutSettings:             newIndicesPutSettingsFunc(t),
+			PutTemplate:             newIndicesPutTemplateFunc(t),
+			Recovery:                newIndicesRecoveryFunc(t),
+			Refresh:                 newIndicesRefreshFunc(t),
+			ReloadSearchAnalyzers:   newIndicesReloadSearchAnalyzersFunc(t),
+			ResolveCluster:          newIndicesResolveClusterFunc(t),
+			ResolveIndex:            newIndicesResolveIndexFunc(t),
+			Rollover:                newIndicesRolloverFunc(t),
+			Segments:                newIndicesSegmentsFunc(t),
+			ShardStores:             newIndicesShardStoresFunc(t),
+			Shrink:                  newIndicesShrinkFunc(t),
+			SimulateIndexTemplate:   newIndicesSimulateIndexTemplateFunc(t),
+			SimulateTemplate:        newIndicesSimulateTemplateFunc(t),
+			Split:                   newIndicesSplitFunc(t),
+			Stats:                   newIndicesStatsFunc(t),
+			Unfreeze:                newIndicesUnfreezeFunc(t),
+			UpdateAliases:           newIndicesUpdateAliasesFunc(t),
+			ValidateQuery:           newIndicesValidateQueryFunc(t),
 		},
 		Ingest: &Ingest{
-			DeletePipeline: newIngestDeletePipelineFunc(t),
-			GeoIPStats:     newIngestGeoIPStatsFunc(t),
-			GetPipeline:    newIngestGetPipelineFunc(t),
-			ProcessorGrok:  newIngestProcessorGrokFunc(t),
-			PutPipeline:    newIngestPutPipelineFunc(t),
-			Simulate:       newIngestSimulateFunc(t),
+			DeleteGeoipDatabase:      newIngestDeleteGeoipDatabaseFunc(t),
+			DeleteIPLocationDatabase: newIngestDeleteIPLocationDatabaseFunc(t),
+			DeletePipeline:           newIngestDeletePipelineFunc(t),
+			GeoIPStats:               newIngestGeoIPStatsFunc(t),
+			GetGeoipDatabase:         newIngestGetGeoipDatabaseFunc(t),
+			GetIPLocationDatabase:    newIngestGetIPLocationDatabaseFunc(t),
+			GetPipeline:              newIngestGetPipelineFunc(t),
+			ProcessorGrok:            newIngestProcessorGrokFunc(t),
+			PutGeoipDatabase:         newIngestPutGeoipDatabaseFunc(t),
+			PutIPLocationDatabase:    newIngestPutIPLocationDatabaseFunc(t),
+			PutPipeline:              newIngestPutPipelineFunc(t),
+			Simulate:                 newIngestSimulateFunc(t),
 		},
 		Nodes: &Nodes{
 			ClearRepositoriesMeteringArchive: newNodesClearRepositoriesMeteringArchiveFunc(t),
@@ -762,18 +1040,19 @@ func New(t Transport) *API {
 		},
 		Remote: &Remote{},
 		Snapshot: &Snapshot{
-			CleanupRepository: newSnapshotCleanupRepositoryFunc(t),
-			Clone:             newSnapshotCloneFunc(t),
-			CreateRepository:  newSnapshotCreateRepositoryFunc(t),
-			Create:            newSnapshotCreateFunc(t),
-			DeleteRepository:  newSnapshotDeleteRepositoryFunc(t),
-			Delete:            newSnapshotDeleteFunc(t),
-			GetRepository:     newSnapshotGetRepositoryFunc(t),
-			Get:               newSnapshotGetFunc(t),
-			RepositoryAnalyze: newSnapshotRepositoryAnalyzeFunc(t),
-			Restore:           newSnapshotRestoreFunc(t),
-			Status:            newSnapshotStatusFunc(t),
-			VerifyRepository:  newSnapshotVerifyRepositoryFunc(t),
+			CleanupRepository:         newSnapshotCleanupRepositoryFunc(t),
+			Clone:                     newSnapshotCloneFunc(t),
+			CreateRepository:          newSnapshotCreateRepositoryFunc(t),
+			Create:                    newSnapshotCreateFunc(t),
+			DeleteRepository:          newSnapshotDeleteRepositoryFunc(t),
+			Delete:                    newSnapshotDeleteFunc(t),
+			GetRepository:             newSnapshotGetRepositoryFunc(t),
+			Get:                       newSnapshotGetFunc(t),
+			RepositoryAnalyze:         newSnapshotRepositoryAnalyzeFunc(t),
+			RepositoryVerifyIntegrity: newSnapshotRepositoryVerifyIntegrityFunc(t),
+			Restore:                   newSnapshotRestoreFunc(t),
+			Status:                    newSnapshotStatusFunc(t),
+			VerifyRepository:          newSnapshotVerifyRepositoryFunc(t),
 		},
 		Tasks: &Tasks{
 			Cancel: newTasksCancelFunc(t),
@@ -919,6 +1198,8 @@ func New(t Transport) *API {
 		Security: &Security{
 			ActivateUserProfile:         newSecurityActivateUserProfileFunc(t),
 			Authenticate:                newSecurityAuthenticateFunc(t),
+			BulkDeleteRole:              newSecurityBulkDeleteRoleFunc(t),
+			BulkPutRole:                 newSecurityBulkPutRoleFunc(t),
 			BulkUpdateAPIKeys:           newSecurityBulkUpdateAPIKeysFunc(t),
 			ChangePassword:              newSecurityChangePasswordFunc(t),
 			ClearAPIKeyCache:            newSecurityClearAPIKeyCacheFunc(t),
@@ -927,7 +1208,9 @@ func New(t Transport) *API {
 			ClearCachedRoles:            newSecurityClearCachedRolesFunc(t),
 			ClearCachedServiceTokens:    newSecurityClearCachedServiceTokensFunc(t),
 			CreateAPIKey:                newSecurityCreateAPIKeyFunc(t),
+			CreateCrossClusterAPIKey:    newSecurityCreateCrossClusterAPIKeyFunc(t),
 			CreateServiceToken:          newSecurityCreateServiceTokenFunc(t),
+			DelegatePki:                 newSecurityDelegatePkiFunc(t),
 			DeletePrivileges:            newSecurityDeletePrivilegesFunc(t),
 			DeleteRoleMapping:           newSecurityDeleteRoleMappingFunc(t),
 			DeleteRole:                  newSecurityDeleteRoleFunc(t),
@@ -946,6 +1229,7 @@ func New(t Transport) *API {
 			GetRole:                     newSecurityGetRoleFunc(t),
 			GetServiceAccounts:          newSecurityGetServiceAccountsFunc(t),
 			GetServiceCredentials:       newSecurityGetServiceCredentialsFunc(t),
+			GetSettings:                 newSecurityGetSettingsFunc(t),
 			GetToken:                    newSecurityGetTokenFunc(t),
 			GetUserPrivileges:           newSecurityGetUserPrivilegesFunc(t),
 			GetUserProfile:              newSecurityGetUserProfileFunc(t),
@@ -963,6 +1247,8 @@ func New(t Transport) *API {
 			PutRole:                     newSecurityPutRoleFunc(t),
 			PutUser:                     newSecurityPutUserFunc(t),
 			QueryAPIKeys:                newSecurityQueryAPIKeysFunc(t),
+			QueryRole:                   newSecurityQueryRoleFunc(t),
+			QueryUser:                   newSecurityQueryUserFunc(t),
 			SamlAuthenticate:            newSecuritySamlAuthenticateFunc(t),
 			SamlCompleteLogout:          newSecuritySamlCompleteLogoutFunc(t),
 			SamlInvalidate:              newSecuritySamlInvalidateFunc(t),
@@ -971,6 +1257,8 @@ func New(t Transport) *API {
 			SamlServiceProviderMetadata: newSecuritySamlServiceProviderMetadataFunc(t),
 			SuggestUserProfiles:         newSecuritySuggestUserProfilesFunc(t),
 			UpdateAPIKey:                newSecurityUpdateAPIKeyFunc(t),
+			UpdateCrossClusterAPIKey:    newSecurityUpdateCrossClusterAPIKeyFunc(t),
+			UpdateSettings:              newSecurityUpdateSettingsFunc(t),
 			UpdateUserProfileData:       newSecurityUpdateUserProfileDataFunc(t),
 		},
 		SQL: &SQL{
@@ -990,12 +1278,14 @@ func New(t Transport) *API {
 			DeactivateWatch: newWatcherDeactivateWatchFunc(t),
 			DeleteWatch:     newWatcherDeleteWatchFunc(t),
 			ExecuteWatch:    newWatcherExecuteWatchFunc(t),
+			GetSettings:     newWatcherGetSettingsFunc(t),
 			GetWatch:        newWatcherGetWatchFunc(t),
 			PutWatch:        newWatcherPutWatchFunc(t),
 			QueryWatches:    newWatcherQueryWatchesFunc(t),
 			Start:           newWatcherStartFunc(t),
 			Stats:           newWatcherStatsFunc(t),
 			Stop:            newWatcherStopFunc(t),
+			UpdateSettings:  newWatcherUpdateSettingsFunc(t),
 		},
 		XPack: &XPack{
 			Info:  newXPackInfoFunc(t),

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -34,6 +34,11 @@ func newBulkFunc(t Transport) Bulk {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -51,16 +56,19 @@ type BulkRequest struct {
 
 	Body io.Reader
 
-	Pipeline            string
-	Refresh             string
-	RequireAlias        *bool
-	Routing             string
-	Source              []string
-	SourceExcludes      []string
-	SourceIncludes      []string
-	Timeout             time.Duration
-	DocumentType        string
-	WaitForActiveShards string
+	IncludeSourceOnError  *bool
+	ListExecutedPipelines *bool
+	Pipeline              string
+	Refresh               string
+	RequireAlias          *bool
+	RequireDataStream     *bool
+	Routing               string
+	Source                []string
+	SourceExcludes        []string
+	SourceIncludes        []string
+	Timeout               time.Duration
+	DocumentType          string
+	WaitForActiveShards   string
 
 	Pretty     bool
 	Human      bool
@@ -70,15 +78,26 @@ type BulkRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r BulkRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r BulkRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "bulk")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -87,11 +106,22 @@ func (r BulkRequest) Do(ctx context.Context, transport Transport) (*Response, er
 	if r.Index != "" {
 		path.WriteString("/")
 		path.WriteString(r.Index)
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "index", r.Index)
+		}
 	}
 	path.WriteString("/")
 	path.WriteString("_bulk")
 
 	params = make(map[string]string)
+
+	if r.IncludeSourceOnError != nil {
+		params["include_source_on_error"] = strconv.FormatBool(*r.IncludeSourceOnError)
+	}
+
+	if r.ListExecutedPipelines != nil {
+		params["list_executed_pipelines"] = strconv.FormatBool(*r.ListExecutedPipelines)
+	}
 
 	if r.Pipeline != "" {
 		params["pipeline"] = r.Pipeline
@@ -103,6 +133,10 @@ func (r BulkRequest) Do(ctx context.Context, transport Transport) (*Response, er
 
 	if r.RequireAlias != nil {
 		params["require_alias"] = strconv.FormatBool(*r.RequireAlias)
+	}
+
+	if r.RequireDataStream != nil {
+		params["require_data_stream"] = strconv.FormatBool(*r.RequireDataStream)
 	}
 
 	if r.Routing != "" {
@@ -151,6 +185,9 @@ func (r BulkRequest) Do(ctx context.Context, transport Transport) (*Response, er
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -182,8 +219,20 @@ func (r BulkRequest) Do(ctx context.Context, transport Transport) (*Response, er
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "bulk")
+		if reader := instrument.RecordRequestBody(ctx, "bulk", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "bulk")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -210,6 +259,20 @@ func (f Bulk) WithIndex(v string) func(*BulkRequest) {
 	}
 }
 
+// WithIncludeSourceOnError - true or false if to include the document source in the error message in case of parsing errors. defaults to true..
+func (f Bulk) WithIncludeSourceOnError(v bool) func(*BulkRequest) {
+	return func(r *BulkRequest) {
+		r.IncludeSourceOnError = &v
+	}
+}
+
+// WithListExecutedPipelines - sets list_executed_pipelines for all incoming documents. defaults to unset (false).
+func (f Bulk) WithListExecutedPipelines(v bool) func(*BulkRequest) {
+	return func(r *BulkRequest) {
+		r.ListExecutedPipelines = &v
+	}
+}
+
 // WithPipeline - the pipeline ID to preprocess incoming documents with.
 func (f Bulk) WithPipeline(v string) func(*BulkRequest) {
 	return func(r *BulkRequest) {
@@ -228,6 +291,13 @@ func (f Bulk) WithRefresh(v string) func(*BulkRequest) {
 func (f Bulk) WithRequireAlias(v bool) func(*BulkRequest) {
 	return func(r *BulkRequest) {
 		r.RequireAlias = &v
+	}
+}
+
+// WithRequireDataStream - when true, requires the destination to be a data stream (existing or to-be-created). default is false.
+func (f Bulk) WithRequireDataStream(v bool) func(*BulkRequest) {
+	return func(r *BulkRequest) {
+		r.RequireDataStream = &v
 	}
 }
 

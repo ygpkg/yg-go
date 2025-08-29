@@ -15,22 +15,116 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // CoordinatorStats type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/enrich/stats/types.ts#L29-L35
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/enrich/stats/types.ts#L30-L36
 type CoordinatorStats struct {
 	ExecutedSearchesTotal int64  `json:"executed_searches_total"`
 	NodeId                string `json:"node_id"`
 	QueueSize             int    `json:"queue_size"`
 	RemoteRequestsCurrent int    `json:"remote_requests_current"`
 	RemoteRequestsTotal   int64  `json:"remote_requests_total"`
+}
+
+func (s *CoordinatorStats) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "executed_searches_total":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "ExecutedSearchesTotal", err)
+				}
+				s.ExecutedSearchesTotal = value
+			case float64:
+				f := int64(v)
+				s.ExecutedSearchesTotal = f
+			}
+
+		case "node_id":
+			if err := dec.Decode(&s.NodeId); err != nil {
+				return fmt.Errorf("%s | %w", "NodeId", err)
+			}
+
+		case "queue_size":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "QueueSize", err)
+				}
+				s.QueueSize = value
+			case float64:
+				f := int(v)
+				s.QueueSize = f
+			}
+
+		case "remote_requests_current":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "RemoteRequestsCurrent", err)
+				}
+				s.RemoteRequestsCurrent = value
+			case float64:
+				f := int(v)
+				s.RemoteRequestsCurrent = f
+			}
+
+		case "remote_requests_total":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "RemoteRequestsTotal", err)
+				}
+				s.RemoteRequestsTotal = value
+			case float64:
+				f := int64(v)
+				s.RemoteRequestsTotal = f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewCoordinatorStats returns a CoordinatorStats.

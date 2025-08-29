@@ -15,27 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 // NodeInfoSettings type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/nodes/info/types.ts#L68-L84
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/nodes/info/types.ts#L79-L95
 type NodeInfoSettings struct {
 	Action       *NodeInfoAction           `json:"action,omitempty"`
 	Bootstrap    *NodeInfoBootstrap        `json:"bootstrap,omitempty"`
-	Client       NodeInfoClient            `json:"client"`
+	Client       *NodeInfoClient           `json:"client,omitempty"`
 	Cluster      NodeInfoSettingsCluster   `json:"cluster"`
 	Discovery    *NodeInfoDiscover         `json:"discovery,omitempty"`
 	Http         NodeInfoSettingsHttp      `json:"http"`
 	Ingest       *NodeInfoSettingsIngest   `json:"ingest,omitempty"`
 	Network      *NodeInfoSettingsNetwork  `json:"network,omitempty"`
 	Node         NodeInfoSettingsNode      `json:"node"`
-	Path         NodeInfoPath              `json:"path"`
+	Path         *NodeInfoPath             `json:"path,omitempty"`
 	Repositories *NodeInfoRepositories     `json:"repositories,omitempty"`
 	Script       *NodeInfoScript           `json:"script,omitempty"`
 	Search       *NodeInfoSearch           `json:"search,omitempty"`

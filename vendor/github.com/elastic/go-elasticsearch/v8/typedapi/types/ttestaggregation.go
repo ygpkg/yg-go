@@ -15,10 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
@@ -28,13 +26,14 @@ import (
 
 // TTestAggregation type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/metric.ts#L153-L157
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/metric.ts#L326-L340
 type TTestAggregation struct {
-	A    *TestPopulation        `json:"a,omitempty"`
-	B    *TestPopulation        `json:"b,omitempty"`
-	Meta map[string]interface{} `json:"meta,omitempty"`
-	Name *string                `json:"name,omitempty"`
-	Type *ttesttype.TTestType   `json:"type,omitempty"`
+	// A Test population A.
+	A *TestPopulation `json:"a,omitempty"`
+	// B Test population B.
+	B *TestPopulation `json:"b,omitempty"`
+	// Type The type of test.
+	Type *ttesttype.TTestType `json:"type,omitempty"`
 }
 
 // NewTTestAggregation returns a TTestAggregation.

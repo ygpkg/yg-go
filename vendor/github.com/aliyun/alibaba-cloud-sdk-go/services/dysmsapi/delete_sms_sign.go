@@ -80,10 +80,10 @@ type DeleteSmsSignRequest struct {
 // DeleteSmsSignResponse is the response struct for api DeleteSmsSign
 type DeleteSmsSignResponse struct {
 	*responses.BaseResponse
-	RequestId string `json:"RequestId" xml:"RequestId"`
-	SignName  string `json:"SignName" xml:"SignName"`
 	Code      string `json:"Code" xml:"Code"`
 	Message   string `json:"Message" xml:"Message"`
+	RequestId string `json:"RequestId" xml:"RequestId"`
+	SignName  string `json:"SignName" xml:"SignName"`
 }
 
 // CreateDeleteSmsSignRequest creates a request to invoke DeleteSmsSign API
@@ -91,7 +91,7 @@ func CreateDeleteSmsSignRequest() (request *DeleteSmsSignRequest) {
 	request = &DeleteSmsSignRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "DeleteSmsSign", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "DeleteSmsSign", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

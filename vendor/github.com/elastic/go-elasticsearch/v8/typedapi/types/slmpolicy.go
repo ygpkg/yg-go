@@ -15,22 +15,81 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // SLMPolicy type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/slm/_types/SnapshotLifecycle.ts#L76-L82
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/slm/_types/SnapshotLifecycle.ts#L86-L92
 type SLMPolicy struct {
 	Config     *Configuration `json:"config,omitempty"`
 	Name       string         `json:"name"`
 	Repository string         `json:"repository"`
 	Retention  *Retention     `json:"retention,omitempty"`
 	Schedule   string         `json:"schedule"`
+}
+
+func (s *SLMPolicy) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "config":
+			if err := dec.Decode(&s.Config); err != nil {
+				return fmt.Errorf("%s | %w", "Config", err)
+			}
+
+		case "name":
+			if err := dec.Decode(&s.Name); err != nil {
+				return fmt.Errorf("%s | %w", "Name", err)
+			}
+
+		case "repository":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Repository", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Repository = o
+
+		case "retention":
+			if err := dec.Decode(&s.Retention); err != nil {
+				return fmt.Errorf("%s | %w", "Retention", err)
+			}
+
+		case "schedule":
+			if err := dec.Decode(&s.Schedule); err != nil {
+				return fmt.Errorf("%s | %w", "Schedule", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewSLMPolicy returns a SLMPolicy.

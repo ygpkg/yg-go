@@ -15,34 +15,162 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // CompletionSuggestOption type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_global/search/_types/suggester.ts#L73-L84
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_global/search/_types/suggester.ts#L73-L84
 type CompletionSuggestOption struct {
-	CollateMatch *bool                  `json:"collate_match,omitempty"`
-	Contexts     map[string][]Context   `json:"contexts,omitempty"`
-	Fields       map[string]interface{} `json:"fields,omitempty"`
-	Id_          *string                `json:"_id,omitempty"`
-	Index_       *string                `json:"_index,omitempty"`
-	Routing_     *string                `json:"_routing,omitempty"`
-	Score        *float64               `json:"score,omitempty"`
-	Score_       *float64               `json:"_score,omitempty"`
-	Source_      interface{}            `json:"_source,omitempty"`
-	Text         string                 `json:"text"`
+	CollateMatch *bool                      `json:"collate_match,omitempty"`
+	Contexts     map[string][]Context       `json:"contexts,omitempty"`
+	Fields       map[string]json.RawMessage `json:"fields,omitempty"`
+	Id_          *string                    `json:"_id,omitempty"`
+	Index_       *string                    `json:"_index,omitempty"`
+	Routing_     *string                    `json:"_routing,omitempty"`
+	Score        *Float64                   `json:"score,omitempty"`
+	Score_       *Float64                   `json:"_score,omitempty"`
+	Source_      json.RawMessage            `json:"_source,omitempty"`
+	Text         string                     `json:"text"`
+}
+
+func (s *CompletionSuggestOption) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "collate_match":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "CollateMatch", err)
+				}
+				s.CollateMatch = &value
+			case bool:
+				s.CollateMatch = &v
+			}
+
+		case "contexts":
+			if s.Contexts == nil {
+				s.Contexts = make(map[string][]Context, 0)
+			}
+			if err := dec.Decode(&s.Contexts); err != nil {
+				return fmt.Errorf("%s | %w", "Contexts", err)
+			}
+
+		case "fields":
+			if s.Fields == nil {
+				s.Fields = make(map[string]json.RawMessage, 0)
+			}
+			if err := dec.Decode(&s.Fields); err != nil {
+				return fmt.Errorf("%s | %w", "Fields", err)
+			}
+
+		case "_id":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Id_", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Id_ = &o
+
+		case "_index":
+			if err := dec.Decode(&s.Index_); err != nil {
+				return fmt.Errorf("%s | %w", "Index_", err)
+			}
+
+		case "_routing":
+			if err := dec.Decode(&s.Routing_); err != nil {
+				return fmt.Errorf("%s | %w", "Routing_", err)
+			}
+
+		case "score":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Score", err)
+				}
+				f := Float64(value)
+				s.Score = &f
+			case float64:
+				f := Float64(v)
+				s.Score = &f
+			}
+
+		case "_score":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Score_", err)
+				}
+				f := Float64(value)
+				s.Score_ = &f
+			case float64:
+				f := Float64(v)
+				s.Score_ = &f
+			}
+
+		case "_source":
+			if err := dec.Decode(&s.Source_); err != nil {
+				return fmt.Errorf("%s | %w", "Source_", err)
+			}
+
+		case "text":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Text", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Text = o
+
+		}
+	}
+	return nil
 }
 
 // NewCompletionSuggestOption returns a CompletionSuggestOption.
 func NewCompletionSuggestOption() *CompletionSuggestOption {
 	r := &CompletionSuggestOption{
-		Contexts: make(map[string][]Context, 0),
-		Fields:   make(map[string]interface{}, 0),
+		Contexts: make(map[string][]Context),
+		Fields:   make(map[string]json.RawMessage),
 	}
 
 	return r

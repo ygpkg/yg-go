@@ -15,21 +15,67 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+)
+
 // VerifyIndex type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/recovery/types.ts#L111-L116
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/recovery/types.ts#L111-L116
 type VerifyIndex struct {
-	CheckIndexTime         *Duration `json:"check_index_time,omitempty"`
-	CheckIndexTimeInMillis int64     `json:"check_index_time_in_millis"`
-	TotalTime              *Duration `json:"total_time,omitempty"`
-	TotalTimeInMillis      int64     `json:"total_time_in_millis"`
+	CheckIndexTime         Duration `json:"check_index_time,omitempty"`
+	CheckIndexTimeInMillis int64    `json:"check_index_time_in_millis"`
+	TotalTime              Duration `json:"total_time,omitempty"`
+	TotalTimeInMillis      int64    `json:"total_time_in_millis"`
+}
+
+func (s *VerifyIndex) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "check_index_time":
+			if err := dec.Decode(&s.CheckIndexTime); err != nil {
+				return fmt.Errorf("%s | %w", "CheckIndexTime", err)
+			}
+
+		case "check_index_time_in_millis":
+			if err := dec.Decode(&s.CheckIndexTimeInMillis); err != nil {
+				return fmt.Errorf("%s | %w", "CheckIndexTimeInMillis", err)
+			}
+
+		case "total_time":
+			if err := dec.Decode(&s.TotalTime); err != nil {
+				return fmt.Errorf("%s | %w", "TotalTime", err)
+			}
+
+		case "total_time_in_millis":
+			if err := dec.Decode(&s.TotalTimeInMillis); err != nil {
+				return fmt.Errorf("%s | %w", "TotalTimeInMillis", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewVerifyIndex returns a VerifyIndex.

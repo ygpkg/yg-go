@@ -15,18 +15,63 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // HdrMethod type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/metric.ts#L119-L121
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/metric.ts#L237-L242
 type HdrMethod struct {
+	// NumberOfSignificantValueDigits Specifies the resolution of values for the histogram in number of significant
+	// digits.
 	NumberOfSignificantValueDigits *int `json:"number_of_significant_value_digits,omitempty"`
+}
+
+func (s *HdrMethod) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "number_of_significant_value_digits":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "NumberOfSignificantValueDigits", err)
+				}
+				s.NumberOfSignificantValueDigits = &value
+			case float64:
+				f := int(v)
+				s.NumberOfSignificantValueDigits = &f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewHdrMethod returns a HdrMethod.

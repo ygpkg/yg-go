@@ -15,26 +15,85 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // SettingsSimilarityLmd type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/_types/IndexSettings.ts#L206-L209
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/_types/IndexSettings.ts#L222-L225
 type SettingsSimilarityLmd struct {
-	Mu   int    `json:"mu"`
-	Type string `json:"type,omitempty"`
+	Mu   *Float64 `json:"mu,omitempty"`
+	Type string   `json:"type,omitempty"`
+}
+
+func (s *SettingsSimilarityLmd) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "mu":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Mu", err)
+				}
+				f := Float64(value)
+				s.Mu = &f
+			case float64:
+				f := Float64(v)
+				s.Mu = &f
+			}
+
+		case "type":
+			if err := dec.Decode(&s.Type); err != nil {
+				return fmt.Errorf("%s | %w", "Type", err)
+			}
+
+		}
+	}
+	return nil
+}
+
+// MarshalJSON override marshalling to include literal value
+func (s SettingsSimilarityLmd) MarshalJSON() ([]byte, error) {
+	type innerSettingsSimilarityLmd SettingsSimilarityLmd
+	tmp := innerSettingsSimilarityLmd{
+		Mu:   s.Mu,
+		Type: s.Type,
+	}
+
+	tmp.Type = "LMDirichlet"
+
+	return json.Marshal(tmp)
 }
 
 // NewSettingsSimilarityLmd returns a SettingsSimilarityLmd.
 func NewSettingsSimilarityLmd() *SettingsSimilarityLmd {
 	r := &SettingsSimilarityLmd{}
-
-	r.Type = "LMDirichlet"
 
 	return r
 }

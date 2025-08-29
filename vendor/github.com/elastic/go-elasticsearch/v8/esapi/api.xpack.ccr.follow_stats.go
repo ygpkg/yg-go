@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -24,6 +24,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newCCRFollowStatsFunc(t Transport) CCRFollowStats {
@@ -32,6 +33,11 @@ func newCCRFollowStatsFunc(t Transport) CCRFollowStats {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -47,6 +53,8 @@ type CCRFollowStats func(index []string, o ...func(*CCRFollowStatsRequest)) (*Re
 type CCRFollowStatsRequest struct {
 	Index []string
 
+	Timeout time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -55,15 +63,26 @@ type CCRFollowStatsRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r CCRFollowStatsRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r CCRFollowStatsRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ccr.follow_stats")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -75,12 +94,19 @@ func (r CCRFollowStatsRequest) Do(ctx context.Context, transport Transport) (*Re
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(strings.Join(r.Index, ","))
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "index", strings.Join(r.Index, ","))
+	}
 	path.WriteString("/")
 	path.WriteString("_ccr")
 	path.WriteString("/")
 	path.WriteString("stats")
 
 	params = make(map[string]string)
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -100,6 +126,9 @@ func (r CCRFollowStatsRequest) Do(ctx context.Context, transport Transport) (*Re
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -127,8 +156,17 @@ func (r CCRFollowStatsRequest) Do(ctx context.Context, transport Transport) (*Re
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "ccr.follow_stats")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ccr.follow_stats")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -145,6 +183,13 @@ func (r CCRFollowStatsRequest) Do(ctx context.Context, transport Transport) (*Re
 func (f CCRFollowStats) WithContext(v context.Context) func(*CCRFollowStatsRequest) {
 	return func(r *CCRFollowStatsRequest) {
 		r.ctx = v
+	}
+}
+
+// WithTimeout - explicit operation timeout.
+func (f CCRFollowStats) WithTimeout(v time.Duration) func(*CCRFollowStatsRequest) {
+	return func(r *CCRFollowStatsRequest) {
+		r.Timeout = v
 	}
 }
 

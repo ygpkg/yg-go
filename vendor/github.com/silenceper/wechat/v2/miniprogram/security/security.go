@@ -1,6 +1,7 @@
 package security
 
 import (
+	context2 "context"
 	"fmt"
 	"strconv"
 
@@ -51,12 +52,7 @@ func (security *Security) MediaCheckAsyncV1(in *MediaCheckAsyncV1Request) (trace
 		TraceID string `json:"trace_id"`
 	}
 	err = util.DecodeWithError(response, &res, "MediaCheckAsyncV1")
-	if err != nil {
-		return
-	}
-
-	traceID = res.TraceID
-	return
+	return res.TraceID, err
 }
 
 // MediaCheckAsyncRequest 图片/音频异步校验请求参数
@@ -69,7 +65,12 @@ type MediaCheckAsyncRequest struct {
 
 // MediaCheckAsync 异步校验图片/音频是否含有违法违规内容
 func (security *Security) MediaCheckAsync(in *MediaCheckAsyncRequest) (traceID string, err error) {
-	accessToken, err := security.GetAccessToken()
+	return security.MediaCheckAsyncContext(context2.Background(), in)
+}
+
+// MediaCheckAsyncContext 异步校验图片/音频是否含有违法违规内容
+func (security *Security) MediaCheckAsyncContext(ctx context2.Context, in *MediaCheckAsyncRequest) (traceID string, err error) {
+	accessToken, err := security.GetAccessTokenContext(ctx)
 	if err != nil {
 		return
 	}
@@ -82,7 +83,7 @@ func (security *Security) MediaCheckAsync(in *MediaCheckAsyncRequest) (traceID s
 	req.Version = 2
 
 	uri := fmt.Sprintf(mediaCheckAsyncURL, accessToken)
-	response, err := util.PostJSON(uri, req)
+	response, err := util.PostJSONContext(ctx, uri, req)
 	if err != nil {
 		return
 	}
@@ -93,12 +94,7 @@ func (security *Security) MediaCheckAsync(in *MediaCheckAsyncRequest) (traceID s
 		TraceID string `json:"trace_id"`
 	}
 	err = util.DecodeWithError(response, &res, "MediaCheckAsync")
-	if err != nil {
-		return
-	}
-
-	traceID = res.TraceID
-	return
+	return res.TraceID, err
 }
 
 // ImageCheckV1 校验一张图片是否含有违法违规内容（同步）
@@ -232,7 +228,12 @@ func (security *Security) MsgCheckV1(content string) (res MsgCheckResponse, err 
 
 // MsgCheck 检查一段文本是否含有违法违规内容
 func (security *Security) MsgCheck(in *MsgCheckRequest) (res MsgCheckResponse, err error) {
-	accessToken, err := security.GetAccessToken()
+	return security.MsgCheckContext(context2.Background(), in)
+}
+
+// MsgCheckContext 检查一段文本是否含有违法违规内容
+func (security *Security) MsgCheckContext(ctx context2.Context, in *MsgCheckRequest) (res MsgCheckResponse, err error) {
+	accessToken, err := security.GetAccessTokenContext(ctx)
 	if err != nil {
 		return
 	}
@@ -245,7 +246,7 @@ func (security *Security) MsgCheck(in *MsgCheckRequest) (res MsgCheckResponse, e
 	req.Version = 2
 
 	uri := fmt.Sprintf(msgCheckURL, accessToken)
-	response, err := util.PostJSON(uri, req)
+	response, err := util.PostJSONContext(ctx, uri, req)
 	if err != nil {
 		return
 	}

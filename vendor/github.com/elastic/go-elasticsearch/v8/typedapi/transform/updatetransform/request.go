@@ -15,23 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package updatetransform
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"strconv"
 
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 // Request holds the request body struct for the package updatetransform
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/transform/update_transform/UpdateTransformRequest.ts#L31-L105
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/transform/update_transform/UpdateTransformRequest.ts#L31-L113
 type Request struct {
 
 	// Description Free text description of the transform.
@@ -42,12 +44,12 @@ type Request struct {
 	// transform is running continuously. Also determines the retry interval in
 	// the event of transient failures while the transform is searching or
 	// indexing. The minimum value is 1s and the maximum is 1h.
-	Frequency *types.Duration `json:"frequency,omitempty"`
+	Frequency types.Duration `json:"frequency,omitempty"`
 	// Meta_ Defines optional transform metadata.
-	Meta_ map[string]interface{} `json:"_meta,omitempty"`
+	Meta_ types.Metadata `json:"_meta,omitempty"`
 	// RetentionPolicy Defines a retention policy for the transform. Data that meets the defined
 	// criteria is deleted from the destination index.
-	RetentionPolicy types.RetentionPolicyContainer `json:"retention_policy,omitempty"`
+	RetentionPolicy *types.RetentionPolicyContainer `json:"retention_policy,omitempty"`
 	// Settings Defines optional transform settings.
 	Settings *types.Settings `json:"settings,omitempty"`
 	// Source The source of the data for the transform.
@@ -59,11 +61,12 @@ type Request struct {
 // NewRequest returns a Request
 func NewRequest() *Request {
 	r := &Request{}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 
@@ -72,4 +75,70 @@ func (rb *Request) FromJSON(data string) (*Request, error) {
 	}
 
 	return &req, nil
+}
+
+func (s *Request) UnmarshalJSON(data []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "description":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Description", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Description = &o
+
+		case "dest":
+			if err := dec.Decode(&s.Dest); err != nil {
+				return fmt.Errorf("%s | %w", "Dest", err)
+			}
+
+		case "frequency":
+			if err := dec.Decode(&s.Frequency); err != nil {
+				return fmt.Errorf("%s | %w", "Frequency", err)
+			}
+
+		case "_meta":
+			if err := dec.Decode(&s.Meta_); err != nil {
+				return fmt.Errorf("%s | %w", "Meta_", err)
+			}
+
+		case "retention_policy":
+			if err := dec.Decode(&s.RetentionPolicy); err != nil {
+				return fmt.Errorf("%s | %w", "RetentionPolicy", err)
+			}
+
+		case "settings":
+			if err := dec.Decode(&s.Settings); err != nil {
+				return fmt.Errorf("%s | %w", "Settings", err)
+			}
+
+		case "source":
+			if err := dec.Decode(&s.Source); err != nil {
+				return fmt.Errorf("%s | %w", "Source", err)
+			}
+
+		case "sync":
+			if err := dec.Decode(&s.Sync); err != nil {
+				return fmt.Errorf("%s | %w", "Sync", err)
+			}
+
+		}
+	}
+	return nil
 }

@@ -15,22 +15,118 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // Term type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_global/termvectors/types.ts#L34-L40
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_global/termvectors/types.ts#L34-L40
 type Term struct {
 	DocFreq  *int               `json:"doc_freq,omitempty"`
-	Score    *float64           `json:"score,omitempty"`
+	Score    *Float64           `json:"score,omitempty"`
 	TermFreq int                `json:"term_freq"`
 	Tokens   []TermVectorsToken `json:"tokens,omitempty"`
 	Ttf      *int               `json:"ttf,omitempty"`
+}
+
+func (s *Term) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "doc_freq":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "DocFreq", err)
+				}
+				s.DocFreq = &value
+			case float64:
+				f := int(v)
+				s.DocFreq = &f
+			}
+
+		case "score":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Score", err)
+				}
+				f := Float64(value)
+				s.Score = &f
+			case float64:
+				f := Float64(v)
+				s.Score = &f
+			}
+
+		case "term_freq":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "TermFreq", err)
+				}
+				s.TermFreq = value
+			case float64:
+				f := int(v)
+				s.TermFreq = f
+			}
+
+		case "tokens":
+			if err := dec.Decode(&s.Tokens); err != nil {
+				return fmt.Errorf("%s | %w", "Tokens", err)
+			}
+
+		case "ttf":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Ttf", err)
+				}
+				s.Ttf = &value
+			case float64:
+				f := int(v)
+				s.Ttf = &f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewTerm returns a Term.

@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // AnomalyExplanation type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/_types/Anomaly.ts#L75-L116
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/_types/Anomaly.ts#L157-L198
 type AnomalyExplanation struct {
 	// AnomalyCharacteristicsImpact Impact from the duration and magnitude of the detected anomaly relative to
 	// the historical average.
@@ -39,7 +46,7 @@ type AnomalyExplanation struct {
 	// IncompleteBucketPenalty If the bucket contains fewer samples than expected, the score is reduced.
 	IncompleteBucketPenalty *bool `json:"incomplete_bucket_penalty,omitempty"`
 	// LowerConfidenceBound Lower bound of the 95% confidence interval.
-	LowerConfidenceBound *float64 `json:"lower_confidence_bound,omitempty"`
+	LowerConfidenceBound *Float64 `json:"lower_confidence_bound,omitempty"`
 	// MultiBucketImpact Impact of the deviation between actual and typical values in the past 12
 	// buckets.
 	MultiBucketImpact *int `json:"multi_bucket_impact,omitempty"`
@@ -47,9 +54,181 @@ type AnomalyExplanation struct {
 	// bucket.
 	SingleBucketImpact *int `json:"single_bucket_impact,omitempty"`
 	// TypicalValue Typical (expected) value for this bucket.
-	TypicalValue *float64 `json:"typical_value,omitempty"`
+	TypicalValue *Float64 `json:"typical_value,omitempty"`
 	// UpperConfidenceBound Upper bound of the 95% confidence interval.
-	UpperConfidenceBound *float64 `json:"upper_confidence_bound,omitempty"`
+	UpperConfidenceBound *Float64 `json:"upper_confidence_bound,omitempty"`
+}
+
+func (s *AnomalyExplanation) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "anomaly_characteristics_impact":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "AnomalyCharacteristicsImpact", err)
+				}
+				s.AnomalyCharacteristicsImpact = &value
+			case float64:
+				f := int(v)
+				s.AnomalyCharacteristicsImpact = &f
+			}
+
+		case "anomaly_length":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "AnomalyLength", err)
+				}
+				s.AnomalyLength = &value
+			case float64:
+				f := int(v)
+				s.AnomalyLength = &f
+			}
+
+		case "anomaly_type":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "AnomalyType", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.AnomalyType = &o
+
+		case "high_variance_penalty":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "HighVariancePenalty", err)
+				}
+				s.HighVariancePenalty = &value
+			case bool:
+				s.HighVariancePenalty = &v
+			}
+
+		case "incomplete_bucket_penalty":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "IncompleteBucketPenalty", err)
+				}
+				s.IncompleteBucketPenalty = &value
+			case bool:
+				s.IncompleteBucketPenalty = &v
+			}
+
+		case "lower_confidence_bound":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "LowerConfidenceBound", err)
+				}
+				f := Float64(value)
+				s.LowerConfidenceBound = &f
+			case float64:
+				f := Float64(v)
+				s.LowerConfidenceBound = &f
+			}
+
+		case "multi_bucket_impact":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MultiBucketImpact", err)
+				}
+				s.MultiBucketImpact = &value
+			case float64:
+				f := int(v)
+				s.MultiBucketImpact = &f
+			}
+
+		case "single_bucket_impact":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "SingleBucketImpact", err)
+				}
+				s.SingleBucketImpact = &value
+			case float64:
+				f := int(v)
+				s.SingleBucketImpact = &f
+			}
+
+		case "typical_value":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "TypicalValue", err)
+				}
+				f := Float64(value)
+				s.TypicalValue = &f
+			case float64:
+				f := Float64(v)
+				s.TypicalValue = &f
+			}
+
+		case "upper_confidence_bound":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "UpperConfidenceBound", err)
+				}
+				f := Float64(value)
+				s.UpperConfidenceBound = &f
+			case float64:
+				f := Float64(v)
+				s.UpperConfidenceBound = &f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewAnomalyExplanation returns a AnomalyExplanation.

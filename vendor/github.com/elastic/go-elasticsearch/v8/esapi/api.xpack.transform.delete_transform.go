@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -33,6 +33,11 @@ func newTransformDeleteTransformFunc(t Transport) TransformDeleteTransform {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -48,8 +53,9 @@ type TransformDeleteTransform func(transform_id string, o ...func(*TransformDele
 type TransformDeleteTransformRequest struct {
 	TransformID string
 
-	Force   *bool
-	Timeout time.Duration
+	DeleteDestIndex *bool
+	Force           *bool
+	Timeout         time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -59,15 +65,26 @@ type TransformDeleteTransformRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r TransformDeleteTransformRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r TransformDeleteTransformRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "transform.delete_transform")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "DELETE"
 
@@ -77,8 +94,15 @@ func (r TransformDeleteTransformRequest) Do(ctx context.Context, transport Trans
 	path.WriteString("_transform")
 	path.WriteString("/")
 	path.WriteString(r.TransformID)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "transform_id", r.TransformID)
+	}
 
 	params = make(map[string]string)
+
+	if r.DeleteDestIndex != nil {
+		params["delete_dest_index"] = strconv.FormatBool(*r.DeleteDestIndex)
+	}
 
 	if r.Force != nil {
 		params["force"] = strconv.FormatBool(*r.Force)
@@ -106,6 +130,9 @@ func (r TransformDeleteTransformRequest) Do(ctx context.Context, transport Trans
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -133,8 +160,17 @@ func (r TransformDeleteTransformRequest) Do(ctx context.Context, transport Trans
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "transform.delete_transform")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "transform.delete_transform")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -151,6 +187,13 @@ func (r TransformDeleteTransformRequest) Do(ctx context.Context, transport Trans
 func (f TransformDeleteTransform) WithContext(v context.Context) func(*TransformDeleteTransformRequest) {
 	return func(r *TransformDeleteTransformRequest) {
 		r.ctx = v
+	}
+}
+
+// WithDeleteDestIndex - when `true`, the destination index is deleted together with the transform. the default value is `false`, meaning that the destination index will not be deleted..
+func (f TransformDeleteTransform) WithDeleteDestIndex(v bool) func(*TransformDeleteTransformRequest) {
+	return func(r *TransformDeleteTransformRequest) {
+		r.DeleteDestIndex = &v
 	}
 }
 

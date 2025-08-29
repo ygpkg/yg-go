@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newAutoscalingGetAutoscalingPolicyFunc(t Transport) AutoscalingGetAutoscalingPolicy {
@@ -31,6 +32,11 @@ func newAutoscalingGetAutoscalingPolicyFunc(t Transport) AutoscalingGetAutoscali
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -46,6 +52,8 @@ type AutoscalingGetAutoscalingPolicy func(name string, o ...func(*AutoscalingGet
 type AutoscalingGetAutoscalingPolicyRequest struct {
 	Name string
 
+	MasterTimeout time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -54,15 +62,26 @@ type AutoscalingGetAutoscalingPolicyRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r AutoscalingGetAutoscalingPolicyRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r AutoscalingGetAutoscalingPolicyRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "autoscaling.get_autoscaling_policy")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -74,8 +93,15 @@ func (r AutoscalingGetAutoscalingPolicyRequest) Do(ctx context.Context, transpor
 	path.WriteString("policy")
 	path.WriteString("/")
 	path.WriteString(r.Name)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "name", r.Name)
+	}
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -95,6 +121,9 @@ func (r AutoscalingGetAutoscalingPolicyRequest) Do(ctx context.Context, transpor
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -122,8 +151,17 @@ func (r AutoscalingGetAutoscalingPolicyRequest) Do(ctx context.Context, transpor
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "autoscaling.get_autoscaling_policy")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "autoscaling.get_autoscaling_policy")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -140,6 +178,13 @@ func (r AutoscalingGetAutoscalingPolicyRequest) Do(ctx context.Context, transpor
 func (f AutoscalingGetAutoscalingPolicy) WithContext(v context.Context) func(*AutoscalingGetAutoscalingPolicyRequest) {
 	return func(r *AutoscalingGetAutoscalingPolicyRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - timeout for processing on master node.
+func (f AutoscalingGetAutoscalingPolicy) WithMasterTimeout(v time.Duration) func(*AutoscalingGetAutoscalingPolicyRequest) {
+	return func(r *AutoscalingGetAutoscalingPolicyRequest) {
+		r.MasterTimeout = v
 	}
 }
 

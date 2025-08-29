@@ -81,9 +81,9 @@ type DeleteShortUrlRequest struct {
 // DeleteShortUrlResponse is the response struct for api DeleteShortUrl
 type DeleteShortUrlResponse struct {
 	*responses.BaseResponse
-	RequestId string `json:"RequestId" xml:"RequestId"`
 	Code      string `json:"Code" xml:"Code"`
 	Message   string `json:"Message" xml:"Message"`
+	RequestId string `json:"RequestId" xml:"RequestId"`
 }
 
 // CreateDeleteShortUrlRequest creates a request to invoke DeleteShortUrl API
@@ -91,7 +91,7 @@ func CreateDeleteShortUrlRequest() (request *DeleteShortUrlRequest) {
 	request = &DeleteShortUrlRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "DeleteShortUrl", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "DeleteShortUrl", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

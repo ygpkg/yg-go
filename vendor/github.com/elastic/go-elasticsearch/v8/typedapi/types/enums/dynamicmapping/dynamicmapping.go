@@ -15,17 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 // Package dynamicmapping
 package dynamicmapping
 
 import "strings"
 
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/mapping/dynamic-template.ts#L37-L46
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/mapping/dynamic-template.ts#L50-L59
 type DynamicMapping struct {
 	Name string
 }
@@ -40,12 +38,16 @@ var (
 	False = DynamicMapping{"false"}
 )
 
+func (d *DynamicMapping) UnmarshalJSON(data []byte) error {
+	return d.UnmarshalText(data)
+}
+
 func (d DynamicMapping) MarshalText() (text []byte, err error) {
 	return []byte(d.String()), nil
 }
 
 func (d *DynamicMapping) UnmarshalText(text []byte) error {
-	switch strings.ToLower(string(text)) {
+	switch strings.ReplaceAll(strings.ToLower(string(text)), "\"", "") {
 
 	case "strict":
 		*d = Strict

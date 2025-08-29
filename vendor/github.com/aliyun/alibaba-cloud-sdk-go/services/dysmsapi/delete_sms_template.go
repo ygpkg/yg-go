@@ -80,10 +80,10 @@ type DeleteSmsTemplateRequest struct {
 // DeleteSmsTemplateResponse is the response struct for api DeleteSmsTemplate
 type DeleteSmsTemplateResponse struct {
 	*responses.BaseResponse
-	RequestId    string `json:"RequestId" xml:"RequestId"`
-	TemplateCode string `json:"TemplateCode" xml:"TemplateCode"`
 	Code         string `json:"Code" xml:"Code"`
 	Message      string `json:"Message" xml:"Message"`
+	RequestId    string `json:"RequestId" xml:"RequestId"`
+	TemplateCode string `json:"TemplateCode" xml:"TemplateCode"`
 }
 
 // CreateDeleteSmsTemplateRequest creates a request to invoke DeleteSmsTemplate API
@@ -91,7 +91,7 @@ func CreateDeleteSmsTemplateRequest() (request *DeleteSmsTemplateRequest) {
 	request = &DeleteSmsTemplateRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "DeleteSmsTemplate", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "DeleteSmsTemplate", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

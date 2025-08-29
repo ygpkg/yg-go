@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // FetchProfileBreakdown type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_global/search/_types/profile.ts#L148-L157
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_global/search/_types/profile.ts#L239-L248
 type FetchProfileBreakdown struct {
 	LoadSource            *int `json:"load_source,omitempty"`
 	LoadSourceCount       *int `json:"load_source_count,omitempty"`
@@ -34,6 +41,154 @@ type FetchProfileBreakdown struct {
 	NextReaderCount       *int `json:"next_reader_count,omitempty"`
 	Process               *int `json:"process,omitempty"`
 	ProcessCount          *int `json:"process_count,omitempty"`
+}
+
+func (s *FetchProfileBreakdown) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "load_source":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "LoadSource", err)
+				}
+				s.LoadSource = &value
+			case float64:
+				f := int(v)
+				s.LoadSource = &f
+			}
+
+		case "load_source_count":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "LoadSourceCount", err)
+				}
+				s.LoadSourceCount = &value
+			case float64:
+				f := int(v)
+				s.LoadSourceCount = &f
+			}
+
+		case "load_stored_fields":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "LoadStoredFields", err)
+				}
+				s.LoadStoredFields = &value
+			case float64:
+				f := int(v)
+				s.LoadStoredFields = &f
+			}
+
+		case "load_stored_fields_count":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "LoadStoredFieldsCount", err)
+				}
+				s.LoadStoredFieldsCount = &value
+			case float64:
+				f := int(v)
+				s.LoadStoredFieldsCount = &f
+			}
+
+		case "next_reader":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "NextReader", err)
+				}
+				s.NextReader = &value
+			case float64:
+				f := int(v)
+				s.NextReader = &f
+			}
+
+		case "next_reader_count":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "NextReaderCount", err)
+				}
+				s.NextReaderCount = &value
+			case float64:
+				f := int(v)
+				s.NextReaderCount = &f
+			}
+
+		case "process":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Process", err)
+				}
+				s.Process = &value
+			case float64:
+				f := int(v)
+				s.Process = &f
+			}
+
+		case "process_count":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "ProcessCount", err)
+				}
+				s.ProcessCount = &value
+			case float64:
+				f := int(v)
+				s.ProcessCount = &f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewFetchProfileBreakdown returns a FetchProfileBreakdown.

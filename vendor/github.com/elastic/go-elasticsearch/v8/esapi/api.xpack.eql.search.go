@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -34,6 +34,11 @@ func newEqlSearchFunc(t Transport) EqlSearch {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -51,9 +56,15 @@ type EqlSearchRequest struct {
 
 	Body io.Reader
 
-	KeepAlive                time.Duration
-	KeepOnCompletion         *bool
-	WaitForCompletionTimeout time.Duration
+	AllowNoIndices              *bool
+	AllowPartialSearchResults   *bool
+	AllowPartialSequenceResults *bool
+	CcsMinimizeRoundtrips       *bool
+	ExpandWildcards             string
+	IgnoreUnavailable           *bool
+	KeepAlive                   time.Duration
+	KeepOnCompletion            *bool
+	WaitForCompletionTimeout    time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -63,15 +74,26 @@ type EqlSearchRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r EqlSearchRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r EqlSearchRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "eql.search")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -79,12 +101,39 @@ func (r EqlSearchRequest) Do(ctx context.Context, transport Transport) (*Respons
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(r.Index)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "index", r.Index)
+	}
 	path.WriteString("/")
 	path.WriteString("_eql")
 	path.WriteString("/")
 	path.WriteString("search")
 
 	params = make(map[string]string)
+
+	if r.AllowNoIndices != nil {
+		params["allow_no_indices"] = strconv.FormatBool(*r.AllowNoIndices)
+	}
+
+	if r.AllowPartialSearchResults != nil {
+		params["allow_partial_search_results"] = strconv.FormatBool(*r.AllowPartialSearchResults)
+	}
+
+	if r.AllowPartialSequenceResults != nil {
+		params["allow_partial_sequence_results"] = strconv.FormatBool(*r.AllowPartialSequenceResults)
+	}
+
+	if r.CcsMinimizeRoundtrips != nil {
+		params["ccs_minimize_roundtrips"] = strconv.FormatBool(*r.CcsMinimizeRoundtrips)
+	}
+
+	if r.ExpandWildcards != "" {
+		params["expand_wildcards"] = r.ExpandWildcards
+	}
+
+	if r.IgnoreUnavailable != nil {
+		params["ignore_unavailable"] = strconv.FormatBool(*r.IgnoreUnavailable)
+	}
 
 	if r.KeepAlive != 0 {
 		params["keep_alive"] = formatDuration(r.KeepAlive)
@@ -116,6 +165,9 @@ func (r EqlSearchRequest) Do(ctx context.Context, transport Transport) (*Respons
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -147,8 +199,20 @@ func (r EqlSearchRequest) Do(ctx context.Context, transport Transport) (*Respons
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "eql.search")
+		if reader := instrument.RecordRequestBody(ctx, "eql.search", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "eql.search")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -165,6 +229,48 @@ func (r EqlSearchRequest) Do(ctx context.Context, transport Transport) (*Respons
 func (f EqlSearch) WithContext(v context.Context) func(*EqlSearchRequest) {
 	return func(r *EqlSearchRequest) {
 		r.ctx = v
+	}
+}
+
+// WithAllowNoIndices - whether to ignore if a wildcard indices expression resolves into no concrete indices. (this includes `_all` string or when no indices have been specified).
+func (f EqlSearch) WithAllowNoIndices(v bool) func(*EqlSearchRequest) {
+	return func(r *EqlSearchRequest) {
+		r.AllowNoIndices = &v
+	}
+}
+
+// WithAllowPartialSearchResults - control whether the query should keep running in case of shard failures, and return partial results.
+func (f EqlSearch) WithAllowPartialSearchResults(v bool) func(*EqlSearchRequest) {
+	return func(r *EqlSearchRequest) {
+		r.AllowPartialSearchResults = &v
+	}
+}
+
+// WithAllowPartialSequenceResults - control whether a sequence query should return partial results or no results at all in case of shard failures. this option has effect only if [allow_partial_search_results] is true..
+func (f EqlSearch) WithAllowPartialSequenceResults(v bool) func(*EqlSearchRequest) {
+	return func(r *EqlSearchRequest) {
+		r.AllowPartialSequenceResults = &v
+	}
+}
+
+// WithCcsMinimizeRoundtrips - indicates whether network round-trips should be minimized as part of cross-cluster search requests execution.
+func (f EqlSearch) WithCcsMinimizeRoundtrips(v bool) func(*EqlSearchRequest) {
+	return func(r *EqlSearchRequest) {
+		r.CcsMinimizeRoundtrips = &v
+	}
+}
+
+// WithExpandWildcards - whether to expand wildcard expression to concrete indices that are open, closed or both..
+func (f EqlSearch) WithExpandWildcards(v string) func(*EqlSearchRequest) {
+	return func(r *EqlSearchRequest) {
+		r.ExpandWildcards = v
+	}
+}
+
+// WithIgnoreUnavailable - whether specified concrete indices should be ignored when unavailable (missing or closed).
+func (f EqlSearch) WithIgnoreUnavailable(v bool) func(*EqlSearchRequest) {
+	return func(r *EqlSearchRequest) {
+		r.IgnoreUnavailable = &v
 	}
 }
 

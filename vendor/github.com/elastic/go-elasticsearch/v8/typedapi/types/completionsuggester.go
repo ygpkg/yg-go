@@ -15,31 +15,150 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // CompletionSuggester type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_global/search/_types/suggester.ts#L130-L136
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_global/search/_types/suggester.ts#L163-L181
 type CompletionSuggester struct {
-	Analyzer       *string                        `json:"analyzer,omitempty"`
-	Contexts       map[string][]CompletionContext `json:"contexts,omitempty"`
-	Field          string                         `json:"field"`
-	Fuzzy          *SuggestFuzziness              `json:"fuzzy,omitempty"`
-	Prefix         *string                        `json:"prefix,omitempty"`
-	Regex          *string                        `json:"regex,omitempty"`
-	Size           *int                           `json:"size,omitempty"`
-	SkipDuplicates *bool                          `json:"skip_duplicates,omitempty"`
+	// Analyzer The analyzer to analyze the suggest text with.
+	// Defaults to the search analyzer of the suggest field.
+	Analyzer *string `json:"analyzer,omitempty"`
+	// Contexts A value, geo point object, or a geo hash string to filter or boost the
+	// suggestion on.
+	Contexts map[string][]CompletionContext `json:"contexts,omitempty"`
+	// Field The field to fetch the candidate suggestions from.
+	// Needs to be set globally or per suggestion.
+	Field string `json:"field"`
+	// Fuzzy Enables fuzziness, meaning you can have a typo in your search and still get
+	// results back.
+	Fuzzy *SuggestFuzziness `json:"fuzzy,omitempty"`
+	// Regex A regex query that expresses a prefix as a regular expression.
+	Regex *RegexOptions `json:"regex,omitempty"`
+	// Size The maximum corrections to be returned per suggest text token.
+	Size *int `json:"size,omitempty"`
+	// SkipDuplicates Whether duplicate suggestions should be filtered out.
+	SkipDuplicates *bool `json:"skip_duplicates,omitempty"`
+}
+
+func (s *CompletionSuggester) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "analyzer":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Analyzer", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Analyzer = &o
+
+		case "contexts":
+			if s.Contexts == nil {
+				s.Contexts = make(map[string][]CompletionContext, 0)
+			}
+			rawMsg := make(map[string]json.RawMessage, 0)
+			dec.Decode(&rawMsg)
+			for key, value := range rawMsg {
+				switch {
+				case bytes.HasPrefix(value, []byte("\"")), bytes.HasPrefix(value, []byte("{")):
+					o := NewCompletionContext()
+					err := json.NewDecoder(bytes.NewReader(value)).Decode(&o)
+					if err != nil {
+						return fmt.Errorf("%s | %w", "Contexts", err)
+					}
+					s.Contexts[key] = append(s.Contexts[key], *o)
+				default:
+					o := []CompletionContext{}
+					err := json.NewDecoder(bytes.NewReader(value)).Decode(&o)
+					if err != nil {
+						return fmt.Errorf("%s | %w", "Contexts", err)
+					}
+					s.Contexts[key] = o
+				}
+			}
+
+		case "field":
+			if err := dec.Decode(&s.Field); err != nil {
+				return fmt.Errorf("%s | %w", "Field", err)
+			}
+
+		case "fuzzy":
+			if err := dec.Decode(&s.Fuzzy); err != nil {
+				return fmt.Errorf("%s | %w", "Fuzzy", err)
+			}
+
+		case "regex":
+			if err := dec.Decode(&s.Regex); err != nil {
+				return fmt.Errorf("%s | %w", "Regex", err)
+			}
+
+		case "size":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Size", err)
+				}
+				s.Size = &value
+			case float64:
+				f := int(v)
+				s.Size = &f
+			}
+
+		case "skip_duplicates":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "SkipDuplicates", err)
+				}
+				s.SkipDuplicates = &value
+			case bool:
+				s.SkipDuplicates = &v
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewCompletionSuggester returns a CompletionSuggester.
 func NewCompletionSuggester() *CompletionSuggester {
 	r := &CompletionSuggester{
-		Contexts: make(map[string][]CompletionContext, 0),
+		Contexts: make(map[string][]CompletionContext),
 	}
 
 	return r

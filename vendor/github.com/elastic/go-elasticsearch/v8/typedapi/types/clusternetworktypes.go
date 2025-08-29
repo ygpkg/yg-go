@@ -15,26 +15,26 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 // ClusterNetworkTypes type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/cluster/stats/types.ts#L171-L174
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/cluster/stats/types.ts#L446-L455
 type ClusterNetworkTypes struct {
-	HttpTypes      map[string]int `json:"http_types"`
+	// HttpTypes Contains statistics about the HTTP network types used by selected nodes.
+	HttpTypes map[string]int `json:"http_types"`
+	// TransportTypes Contains statistics about the transport network types used by selected nodes.
 	TransportTypes map[string]int `json:"transport_types"`
 }
 
 // NewClusterNetworkTypes returns a ClusterNetworkTypes.
 func NewClusterNetworkTypes() *ClusterNetworkTypes {
 	r := &ClusterNetworkTypes{
-		HttpTypes:      make(map[string]int, 0),
-		TransportTypes: make(map[string]int, 0),
+		HttpTypes:      make(map[string]int),
+		TransportTypes: make(map[string]int),
 	}
 
 	return r

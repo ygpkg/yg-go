@@ -81,6 +81,7 @@ type BucketDomainCertificateInfo struct {
 	CustomCert *BucketDomainCustomCert `xml:"CustomCert,omitempty"`
 }
 type BucketDomainCustomCert struct {
+	CertId     string `xml:"CertId,omitempty"`
 	Cert       string `xml:"Cert,omitempty"`
 	PrivateKey string `xml:"PrivateKey,omitempty"`
 }
@@ -97,8 +98,15 @@ func (s *BucketService) PutDomainCertificate(ctx context.Context, opt *BucketPut
 }
 
 type BucketGetDomainCertificateResult struct {
-	XMLName xml.Name `xml:"DomainCertificate"`
-	Status  string   `xml:"Status,omitempty"`
+	XMLName         xml.Name                        `xml:"DomainCertificate"`
+	Status          string                          `xml:"Status,omitempty"`
+	CertificateInfo *GetBucketDomainCertificateInfo `xml:"CertificateInfo"`
+}
+
+type GetBucketDomainCertificateInfo struct {
+	CertId         string `xml:"CertId"`
+	ValidityBegin  int64  `xml:"ValidityBegin"`
+	ValidityExpire int64  `xml:"ValidityExpire"`
 }
 
 type BucketGetDomainCertificateOptions struct {

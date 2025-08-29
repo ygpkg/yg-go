@@ -15,29 +15,96 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // UserProfile type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/security/_types/UserProfile.ts#L42-L48
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/security/_types/UserProfile.ts#L41-L47
 type UserProfile struct {
-	Data    map[string]interface{} `json:"data"`
-	Enabled *bool                  `json:"enabled,omitempty"`
-	Labels  map[string]interface{} `json:"labels"`
-	Uid     string                 `json:"uid"`
-	User    UserProfileUser        `json:"user"`
+	Data    map[string]json.RawMessage `json:"data"`
+	Enabled *bool                      `json:"enabled,omitempty"`
+	Labels  map[string]json.RawMessage `json:"labels"`
+	Uid     string                     `json:"uid"`
+	User    UserProfileUser            `json:"user"`
+}
+
+func (s *UserProfile) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "data":
+			if s.Data == nil {
+				s.Data = make(map[string]json.RawMessage, 0)
+			}
+			if err := dec.Decode(&s.Data); err != nil {
+				return fmt.Errorf("%s | %w", "Data", err)
+			}
+
+		case "enabled":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Enabled", err)
+				}
+				s.Enabled = &value
+			case bool:
+				s.Enabled = &v
+			}
+
+		case "labels":
+			if s.Labels == nil {
+				s.Labels = make(map[string]json.RawMessage, 0)
+			}
+			if err := dec.Decode(&s.Labels); err != nil {
+				return fmt.Errorf("%s | %w", "Labels", err)
+			}
+
+		case "uid":
+			if err := dec.Decode(&s.Uid); err != nil {
+				return fmt.Errorf("%s | %w", "Uid", err)
+			}
+
+		case "user":
+			if err := dec.Decode(&s.User); err != nil {
+				return fmt.Errorf("%s | %w", "User", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewUserProfile returns a UserProfile.
 func NewUserProfile() *UserProfile {
 	r := &UserProfile{
-		Data:   make(map[string]interface{}, 0),
-		Labels: make(map[string]interface{}, 0),
+		Data:   make(map[string]json.RawMessage),
+		Labels: make(map[string]json.RawMessage),
 	}
 
 	return r

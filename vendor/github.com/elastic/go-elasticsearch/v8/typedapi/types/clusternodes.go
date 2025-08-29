@@ -15,16 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 // ClusterNodes type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/cluster/stats/types.ts#L194-L221
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/cluster/stats/types.ts#L480-L513
 type ClusterNodes struct {
 	// Count Contains counts for nodes selected by the request’s node filters.
 	Count ClusterNodeCount `json:"count"`
@@ -46,6 +44,7 @@ type ClusterNodes struct {
 	// nodes.
 	PackagingTypes []NodePackagingType `json:"packaging_types"`
 	// Plugins Contains statistics about installed plugins and modules by selected nodes.
+	// If no plugins or modules are installed, this array is empty.
 	Plugins []PluginStats `json:"plugins"`
 	// Process Contains statistics about processes used by selected nodes.
 	Process ClusterProcess `json:"process"`
@@ -56,7 +55,7 @@ type ClusterNodes struct {
 // NewClusterNodes returns a ClusterNodes.
 func NewClusterNodes() *ClusterNodes {
 	r := &ClusterNodes{
-		DiscoveryTypes: make(map[string]int, 0),
+		DiscoveryTypes: make(map[string]int),
 	}
 
 	return r

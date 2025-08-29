@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newCCRResumeFollowFunc(t Transport) CCRResumeFollow {
@@ -32,6 +33,11 @@ func newCCRResumeFollowFunc(t Transport) CCRResumeFollow {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -49,6 +55,8 @@ type CCRResumeFollowRequest struct {
 
 	Body io.Reader
 
+	MasterTimeout time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -57,15 +65,26 @@ type CCRResumeFollowRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r CCRResumeFollowRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r CCRResumeFollowRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ccr.resume_follow")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -73,12 +92,19 @@ func (r CCRResumeFollowRequest) Do(ctx context.Context, transport Transport) (*R
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(r.Index)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "index", r.Index)
+	}
 	path.WriteString("/")
 	path.WriteString("_ccr")
 	path.WriteString("/")
 	path.WriteString("resume_follow")
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -98,6 +124,9 @@ func (r CCRResumeFollowRequest) Do(ctx context.Context, transport Transport) (*R
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -129,8 +158,20 @@ func (r CCRResumeFollowRequest) Do(ctx context.Context, transport Transport) (*R
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "ccr.resume_follow")
+		if reader := instrument.RecordRequestBody(ctx, "ccr.resume_follow", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ccr.resume_follow")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -154,6 +195,13 @@ func (f CCRResumeFollow) WithContext(v context.Context) func(*CCRResumeFollowReq
 func (f CCRResumeFollow) WithBody(v io.Reader) func(*CCRResumeFollowRequest) {
 	return func(r *CCRResumeFollowRequest) {
 		r.Body = v
+	}
+}
+
+// WithMasterTimeout - explicit operation timeout for connection to master node.
+func (f CCRResumeFollow) WithMasterTimeout(v time.Duration) func(*CCRResumeFollowRequest) {
+	return func(r *CCRResumeFollowRequest) {
+		r.MasterTimeout = v
 	}
 }
 

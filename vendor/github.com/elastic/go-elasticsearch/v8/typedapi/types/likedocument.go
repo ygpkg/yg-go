@@ -15,35 +15,106 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/versiontype"
 )
 
 // LikeDocument type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/query_dsl/specialized.ts#L91-L101
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/query_dsl/specialized.ts#L174-L196
 type LikeDocument struct {
-	Doc              interface{}              `json:"doc,omitempty"`
-	Fields           []string                 `json:"fields,omitempty"`
-	Id_              *string                  `json:"_id,omitempty"`
-	Index_           *string                  `json:"_index,omitempty"`
+	// Doc A document not present in the index.
+	Doc    json.RawMessage `json:"doc,omitempty"`
+	Fields []string        `json:"fields,omitempty"`
+	// Id_ ID of a document.
+	Id_ *string `json:"_id,omitempty"`
+	// Index_ Index of a document.
+	Index_ *string `json:"_index,omitempty"`
+	// PerFieldAnalyzer Overrides the default analyzer.
 	PerFieldAnalyzer map[string]string        `json:"per_field_analyzer,omitempty"`
 	Routing          *string                  `json:"routing,omitempty"`
 	Version          *int64                   `json:"version,omitempty"`
 	VersionType      *versiontype.VersionType `json:"version_type,omitempty"`
 }
 
+func (s *LikeDocument) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "doc":
+			if err := dec.Decode(&s.Doc); err != nil {
+				return fmt.Errorf("%s | %w", "Doc", err)
+			}
+
+		case "fields":
+			if err := dec.Decode(&s.Fields); err != nil {
+				return fmt.Errorf("%s | %w", "Fields", err)
+			}
+
+		case "_id":
+			if err := dec.Decode(&s.Id_); err != nil {
+				return fmt.Errorf("%s | %w", "Id_", err)
+			}
+
+		case "_index":
+			if err := dec.Decode(&s.Index_); err != nil {
+				return fmt.Errorf("%s | %w", "Index_", err)
+			}
+
+		case "per_field_analyzer":
+			if s.PerFieldAnalyzer == nil {
+				s.PerFieldAnalyzer = make(map[string]string, 0)
+			}
+			if err := dec.Decode(&s.PerFieldAnalyzer); err != nil {
+				return fmt.Errorf("%s | %w", "PerFieldAnalyzer", err)
+			}
+
+		case "routing":
+			if err := dec.Decode(&s.Routing); err != nil {
+				return fmt.Errorf("%s | %w", "Routing", err)
+			}
+
+		case "version":
+			if err := dec.Decode(&s.Version); err != nil {
+				return fmt.Errorf("%s | %w", "Version", err)
+			}
+
+		case "version_type":
+			if err := dec.Decode(&s.VersionType); err != nil {
+				return fmt.Errorf("%s | %w", "VersionType", err)
+			}
+
+		}
+	}
+	return nil
+}
+
 // NewLikeDocument returns a LikeDocument.
 func NewLikeDocument() *LikeDocument {
 	r := &LikeDocument{
-		PerFieldAnalyzer: make(map[string]string, 0),
+		PerFieldAnalyzer: make(map[string]string),
 	}
 
 	return r

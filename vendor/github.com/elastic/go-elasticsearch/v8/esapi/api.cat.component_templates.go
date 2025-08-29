@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -33,6 +33,11 @@ func newCatComponentTemplatesFunc(t Transport) CatComponentTemplates {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -41,7 +46,7 @@ func newCatComponentTemplatesFunc(t Transport) CatComponentTemplates {
 
 // CatComponentTemplates returns information about existing component_templates templates.
 //
-// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/master/cat-compoentn-templates.html.
+// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/master/cat-component-templates.html.
 type CatComponentTemplates func(o ...func(*CatComponentTemplatesRequest)) (*Response, error)
 
 // CatComponentTemplatesRequest configures the Cat Component Templates API request.
@@ -64,15 +69,26 @@ type CatComponentTemplatesRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r CatComponentTemplatesRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r CatComponentTemplatesRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "cat.component_templates")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -85,6 +101,9 @@ func (r CatComponentTemplatesRequest) Do(ctx context.Context, transport Transpor
 	if r.Name != "" {
 		path.WriteString("/")
 		path.WriteString(r.Name)
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "name", r.Name)
+		}
 	}
 
 	params = make(map[string]string)
@@ -135,6 +154,9 @@ func (r CatComponentTemplatesRequest) Do(ctx context.Context, transport Transpor
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -162,8 +184,17 @@ func (r CatComponentTemplatesRequest) Do(ctx context.Context, transport Transpor
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "cat.component_templates")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "cat.component_templates")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 

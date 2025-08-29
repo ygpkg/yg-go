@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -34,6 +34,11 @@ func newIndexFunc(t Transport) Index {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -52,17 +57,19 @@ type IndexRequest struct {
 
 	Body io.Reader
 
-	IfPrimaryTerm       *int
-	IfSeqNo             *int
-	OpType              string
-	Pipeline            string
-	Refresh             string
-	RequireAlias        *bool
-	Routing             string
-	Timeout             time.Duration
-	Version             *int
-	VersionType         string
-	WaitForActiveShards string
+	IfPrimaryTerm        *int
+	IfSeqNo              *int
+	IncludeSourceOnError *bool
+	OpType               string
+	Pipeline             string
+	Refresh              string
+	RequireAlias         *bool
+	RequireDataStream    *bool
+	Routing              string
+	Timeout              time.Duration
+	Version              *int
+	VersionType          string
+	WaitForActiveShards  string
 
 	Pretty     bool
 	Human      bool
@@ -72,15 +79,26 @@ type IndexRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r IndexRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r IndexRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "index")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	if r.DocumentID != "" {
 		method = "PUT"
@@ -92,11 +110,17 @@ func (r IndexRequest) Do(ctx context.Context, transport Transport) (*Response, e
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(r.Index)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "index", r.Index)
+	}
 	path.WriteString("/")
 	path.WriteString("_doc")
 	if r.DocumentID != "" {
 		path.WriteString("/")
 		path.WriteString(r.DocumentID)
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "id", r.DocumentID)
+		}
 	}
 
 	params = make(map[string]string)
@@ -107,6 +131,10 @@ func (r IndexRequest) Do(ctx context.Context, transport Transport) (*Response, e
 
 	if r.IfSeqNo != nil {
 		params["if_seq_no"] = strconv.FormatInt(int64(*r.IfSeqNo), 10)
+	}
+
+	if r.IncludeSourceOnError != nil {
+		params["include_source_on_error"] = strconv.FormatBool(*r.IncludeSourceOnError)
 	}
 
 	if r.OpType != "" {
@@ -123,6 +151,10 @@ func (r IndexRequest) Do(ctx context.Context, transport Transport) (*Response, e
 
 	if r.RequireAlias != nil {
 		params["require_alias"] = strconv.FormatBool(*r.RequireAlias)
+	}
+
+	if r.RequireDataStream != nil {
+		params["require_data_stream"] = strconv.FormatBool(*r.RequireDataStream)
 	}
 
 	if r.Routing != "" {
@@ -163,6 +195,9 @@ func (r IndexRequest) Do(ctx context.Context, transport Transport) (*Response, e
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -194,8 +229,20 @@ func (r IndexRequest) Do(ctx context.Context, transport Transport) (*Response, e
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "index")
+		if reader := instrument.RecordRequestBody(ctx, "index", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "index")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -236,6 +283,13 @@ func (f Index) WithIfSeqNo(v int) func(*IndexRequest) {
 	}
 }
 
+// WithIncludeSourceOnError - true or false if to include the document source in the error message in case of parsing errors. defaults to true..
+func (f Index) WithIncludeSourceOnError(v bool) func(*IndexRequest) {
+	return func(r *IndexRequest) {
+		r.IncludeSourceOnError = &v
+	}
+}
+
 // WithOpType - explicit operation type. defaults to `index` for requests with an explicit document ID, and to `create`for requests without an explicit document ID.
 func (f Index) WithOpType(v string) func(*IndexRequest) {
 	return func(r *IndexRequest) {
@@ -261,6 +315,13 @@ func (f Index) WithRefresh(v string) func(*IndexRequest) {
 func (f Index) WithRequireAlias(v bool) func(*IndexRequest) {
 	return func(r *IndexRequest) {
 		r.RequireAlias = &v
+	}
+}
+
+// WithRequireDataStream - when true, requires the destination to be a data stream (existing or to-be-created). default is false.
+func (f Index) WithRequireDataStream(v bool) func(*IndexRequest) {
+	return func(r *IndexRequest) {
+		r.RequireDataStream = &v
 	}
 }
 

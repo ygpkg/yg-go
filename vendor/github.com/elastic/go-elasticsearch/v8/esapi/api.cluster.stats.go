@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -33,6 +33,11 @@ func newClusterStatsFunc(t Transport) ClusterStats {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -48,8 +53,8 @@ type ClusterStats func(o ...func(*ClusterStatsRequest)) (*Response, error)
 type ClusterStatsRequest struct {
 	NodeID []string
 
-	FlatSettings *bool
-	Timeout      time.Duration
+	IncludeRemotes *bool
+	Timeout        time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -59,15 +64,26 @@ type ClusterStatsRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r ClusterStatsRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r ClusterStatsRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "cluster.stats")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -85,8 +101,8 @@ func (r ClusterStatsRequest) Do(ctx context.Context, transport Transport) (*Resp
 
 	params = make(map[string]string)
 
-	if r.FlatSettings != nil {
-		params["flat_settings"] = strconv.FormatBool(*r.FlatSettings)
+	if r.IncludeRemotes != nil {
+		params["include_remotes"] = strconv.FormatBool(*r.IncludeRemotes)
 	}
 
 	if r.Timeout != 0 {
@@ -111,6 +127,9 @@ func (r ClusterStatsRequest) Do(ctx context.Context, transport Transport) (*Resp
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -138,8 +157,17 @@ func (r ClusterStatsRequest) Do(ctx context.Context, transport Transport) (*Resp
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "cluster.stats")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "cluster.stats")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -166,10 +194,10 @@ func (f ClusterStats) WithNodeID(v ...string) func(*ClusterStatsRequest) {
 	}
 }
 
-// WithFlatSettings - return settings in flat format (default: false).
-func (f ClusterStats) WithFlatSettings(v bool) func(*ClusterStatsRequest) {
+// WithIncludeRemotes - include remote cluster data into the response (default: false).
+func (f ClusterStats) WithIncludeRemotes(v bool) func(*ClusterStatsRequest) {
 	return func(r *ClusterStatsRequest) {
-		r.FlatSettings = &v
+		r.IncludeRemotes = &v
 	}
 }
 

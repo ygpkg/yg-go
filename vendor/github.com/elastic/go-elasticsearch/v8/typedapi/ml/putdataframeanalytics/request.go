@@ -15,23 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package putdataframeanalytics
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"strconv"
 
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 // Request holds the request body struct for the package putdataframeanalytics
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/put_data_frame_analytics/MlPutDataFrameAnalyticsRequest.ts#L30-L139
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/put_data_frame_analytics/MlPutDataFrameAnalyticsRequest.ts#L30-L155
 type Request struct {
 
 	// AllowLazyStart Specifies whether this job can start when there is insufficient machine
@@ -80,12 +82,13 @@ type Request struct {
 	Description *string `json:"description,omitempty"`
 	// Dest The destination configuration.
 	Dest    types.DataframeAnalyticsDestination `json:"dest"`
-	Headers map[string][]string                 `json:"headers,omitempty"`
+	Headers types.HttpHeaders                   `json:"headers,omitempty"`
 	// MaxNumThreads The maximum number of threads to be used by the analysis. Using more
 	// threads may decrease the time necessary to complete the analysis at the
 	// cost of using more CPU. Note that the process may use additional threads
 	// for operational functionality other than the analysis itself.
-	MaxNumThreads *int `json:"max_num_threads,omitempty"`
+	MaxNumThreads *int           `json:"max_num_threads,omitempty"`
+	Meta_         types.Metadata `json:"_meta,omitempty"`
 	// ModelMemoryLimit The approximate maximum amount of memory resources that are permitted for
 	// analytical processing. If your `elasticsearch.yml` file contains an
 	// `xpack.ml.max_model_memory_limit` setting, an error occurs when you try
@@ -100,11 +103,12 @@ type Request struct {
 // NewRequest returns a Request
 func NewRequest() *Request {
 	r := &Request{}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 
@@ -113,4 +117,112 @@ func (rb *Request) FromJSON(data string) (*Request, error) {
 	}
 
 	return &req, nil
+}
+
+func (s *Request) UnmarshalJSON(data []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "allow_lazy_start":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "AllowLazyStart", err)
+				}
+				s.AllowLazyStart = &value
+			case bool:
+				s.AllowLazyStart = &v
+			}
+
+		case "analysis":
+			if err := dec.Decode(&s.Analysis); err != nil {
+				return fmt.Errorf("%s | %w", "Analysis", err)
+			}
+
+		case "analyzed_fields":
+			if err := dec.Decode(&s.AnalyzedFields); err != nil {
+				return fmt.Errorf("%s | %w", "AnalyzedFields", err)
+			}
+
+		case "description":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Description", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Description = &o
+
+		case "dest":
+			if err := dec.Decode(&s.Dest); err != nil {
+				return fmt.Errorf("%s | %w", "Dest", err)
+			}
+
+		case "headers":
+			if err := dec.Decode(&s.Headers); err != nil {
+				return fmt.Errorf("%s | %w", "Headers", err)
+			}
+
+		case "max_num_threads":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MaxNumThreads", err)
+				}
+				s.MaxNumThreads = &value
+			case float64:
+				f := int(v)
+				s.MaxNumThreads = &f
+			}
+
+		case "_meta":
+			if err := dec.Decode(&s.Meta_); err != nil {
+				return fmt.Errorf("%s | %w", "Meta_", err)
+			}
+
+		case "model_memory_limit":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "ModelMemoryLimit", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.ModelMemoryLimit = &o
+
+		case "source":
+			if err := dec.Decode(&s.Source); err != nil {
+				return fmt.Errorf("%s | %w", "Source", err)
+			}
+
+		case "version":
+			if err := dec.Decode(&s.Version); err != nil {
+				return fmt.Errorf("%s | %w", "Version", err)
+			}
+
+		}
+	}
+	return nil
 }

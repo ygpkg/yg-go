@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -33,6 +33,11 @@ func newClusterGetComponentTemplateFunc(t Transport) ClusterGetComponentTemplate
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -48,8 +53,11 @@ type ClusterGetComponentTemplate func(o ...func(*ClusterGetComponentTemplateRequ
 type ClusterGetComponentTemplateRequest struct {
 	Name []string
 
-	Local         *bool
-	MasterTimeout time.Duration
+	FlatSettings    *bool
+	IncludeDefaults *bool
+	Local           *bool
+	MasterTimeout   time.Duration
+	SettingsFilter  string
 
 	Pretty     bool
 	Human      bool
@@ -59,15 +67,26 @@ type ClusterGetComponentTemplateRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r ClusterGetComponentTemplateRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r ClusterGetComponentTemplateRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "cluster.get_component_template")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -78,9 +97,20 @@ func (r ClusterGetComponentTemplateRequest) Do(ctx context.Context, transport Tr
 	if len(r.Name) > 0 {
 		path.WriteString("/")
 		path.WriteString(strings.Join(r.Name, ","))
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "name", strings.Join(r.Name, ","))
+		}
 	}
 
 	params = make(map[string]string)
+
+	if r.FlatSettings != nil {
+		params["flat_settings"] = strconv.FormatBool(*r.FlatSettings)
+	}
+
+	if r.IncludeDefaults != nil {
+		params["include_defaults"] = strconv.FormatBool(*r.IncludeDefaults)
+	}
 
 	if r.Local != nil {
 		params["local"] = strconv.FormatBool(*r.Local)
@@ -88,6 +118,10 @@ func (r ClusterGetComponentTemplateRequest) Do(ctx context.Context, transport Tr
 
 	if r.MasterTimeout != 0 {
 		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.SettingsFilter != "" {
+		params["settings_filter"] = r.SettingsFilter
 	}
 
 	if r.Pretty {
@@ -108,6 +142,9 @@ func (r ClusterGetComponentTemplateRequest) Do(ctx context.Context, transport Tr
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -135,8 +172,17 @@ func (r ClusterGetComponentTemplateRequest) Do(ctx context.Context, transport Tr
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "cluster.get_component_template")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "cluster.get_component_template")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -163,6 +209,20 @@ func (f ClusterGetComponentTemplate) WithName(v ...string) func(*ClusterGetCompo
 	}
 }
 
+// WithFlatSettings - return settings in flat format (default: false).
+func (f ClusterGetComponentTemplate) WithFlatSettings(v bool) func(*ClusterGetComponentTemplateRequest) {
+	return func(r *ClusterGetComponentTemplateRequest) {
+		r.FlatSettings = &v
+	}
+}
+
+// WithIncludeDefaults - return all default configurations for the component template (default: false).
+func (f ClusterGetComponentTemplate) WithIncludeDefaults(v bool) func(*ClusterGetComponentTemplateRequest) {
+	return func(r *ClusterGetComponentTemplateRequest) {
+		r.IncludeDefaults = &v
+	}
+}
+
 // WithLocal - return local information, do not retrieve the state from master node (default: false).
 func (f ClusterGetComponentTemplate) WithLocal(v bool) func(*ClusterGetComponentTemplateRequest) {
 	return func(r *ClusterGetComponentTemplateRequest) {
@@ -174,6 +234,13 @@ func (f ClusterGetComponentTemplate) WithLocal(v bool) func(*ClusterGetComponent
 func (f ClusterGetComponentTemplate) WithMasterTimeout(v time.Duration) func(*ClusterGetComponentTemplateRequest) {
 	return func(r *ClusterGetComponentTemplateRequest) {
 		r.MasterTimeout = v
+	}
+}
+
+// WithSettingsFilter - filter out results, for example to filter out sensitive information. supports wildcards or full settings keys.
+func (f ClusterGetComponentTemplate) WithSettingsFilter(v string) func(*ClusterGetComponentTemplateRequest) {
+	return func(r *ClusterGetComponentTemplateRequest) {
+		r.SettingsFilter = v
 	}
 }
 

@@ -15,32 +15,260 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // BoxPlotAggregate type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/Aggregate.ts#L697-L713
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/Aggregate.ts#L808-L827
 type BoxPlotAggregate struct {
-	Lower         float64                `json:"lower"`
-	LowerAsString *string                `json:"lower_as_string,omitempty"`
-	Max           float64                `json:"max"`
-	MaxAsString   *string                `json:"max_as_string,omitempty"`
-	Meta          map[string]interface{} `json:"meta,omitempty"`
-	Min           float64                `json:"min"`
-	MinAsString   *string                `json:"min_as_string,omitempty"`
-	Q1            float64                `json:"q1"`
-	Q1AsString    *string                `json:"q1_as_string,omitempty"`
-	Q2            float64                `json:"q2"`
-	Q2AsString    *string                `json:"q2_as_string,omitempty"`
-	Q3            float64                `json:"q3"`
-	Q3AsString    *string                `json:"q3_as_string,omitempty"`
-	Upper         float64                `json:"upper"`
-	UpperAsString *string                `json:"upper_as_string,omitempty"`
+	Lower         Float64  `json:"lower"`
+	LowerAsString *string  `json:"lower_as_string,omitempty"`
+	Max           Float64  `json:"max"`
+	MaxAsString   *string  `json:"max_as_string,omitempty"`
+	Meta          Metadata `json:"meta,omitempty"`
+	Min           Float64  `json:"min"`
+	MinAsString   *string  `json:"min_as_string,omitempty"`
+	Q1            Float64  `json:"q1"`
+	Q1AsString    *string  `json:"q1_as_string,omitempty"`
+	Q2            Float64  `json:"q2"`
+	Q2AsString    *string  `json:"q2_as_string,omitempty"`
+	Q3            Float64  `json:"q3"`
+	Q3AsString    *string  `json:"q3_as_string,omitempty"`
+	Upper         Float64  `json:"upper"`
+	UpperAsString *string  `json:"upper_as_string,omitempty"`
+}
+
+func (s *BoxPlotAggregate) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "lower":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Lower", err)
+				}
+				f := Float64(value)
+				s.Lower = f
+			case float64:
+				f := Float64(v)
+				s.Lower = f
+			}
+
+		case "lower_as_string":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "LowerAsString", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.LowerAsString = &o
+
+		case "max":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Max", err)
+				}
+				f := Float64(value)
+				s.Max = f
+			case float64:
+				f := Float64(v)
+				s.Max = f
+			}
+
+		case "max_as_string":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "MaxAsString", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.MaxAsString = &o
+
+		case "meta":
+			if err := dec.Decode(&s.Meta); err != nil {
+				return fmt.Errorf("%s | %w", "Meta", err)
+			}
+
+		case "min":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Min", err)
+				}
+				f := Float64(value)
+				s.Min = f
+			case float64:
+				f := Float64(v)
+				s.Min = f
+			}
+
+		case "min_as_string":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "MinAsString", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.MinAsString = &o
+
+		case "q1":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Q1", err)
+				}
+				f := Float64(value)
+				s.Q1 = f
+			case float64:
+				f := Float64(v)
+				s.Q1 = f
+			}
+
+		case "q1_as_string":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Q1AsString", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Q1AsString = &o
+
+		case "q2":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Q2", err)
+				}
+				f := Float64(value)
+				s.Q2 = f
+			case float64:
+				f := Float64(v)
+				s.Q2 = f
+			}
+
+		case "q2_as_string":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Q2AsString", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Q2AsString = &o
+
+		case "q3":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Q3", err)
+				}
+				f := Float64(value)
+				s.Q3 = f
+			case float64:
+				f := Float64(v)
+				s.Q3 = f
+			}
+
+		case "q3_as_string":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Q3AsString", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Q3AsString = &o
+
+		case "upper":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Upper", err)
+				}
+				f := Float64(value)
+				s.Upper = f
+			case float64:
+				f := Float64(v)
+				s.Upper = f
+			}
+
+		case "upper_as_string":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "UpperAsString", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.UpperAsString = &o
+
+		}
+	}
+	return nil
 }
 
 // NewBoxPlotAggregate returns a BoxPlotAggregate.

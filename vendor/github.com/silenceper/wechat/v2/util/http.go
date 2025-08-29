@@ -22,6 +22,9 @@ type URIModifier func(uri string) string
 
 var uriModifier URIModifier
 
+// DefaultHTTPClient 默认httpClient
+var DefaultHTTPClient = http.DefaultClient
+
 // SetURIModifier 设置URI修改器
 func SetURIModifier(fn URIModifier) {
 	uriModifier = fn
@@ -41,7 +44,7 @@ func HTTPGetContext(ctx context.Context, uri string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	response, err := http.DefaultClient.Do(request)
+	response, err := DefaultHTTPClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +76,7 @@ func HTTPPostContext(ctx context.Context, uri string, data []byte, header map[st
 		request.Header.Set(key, value)
 	}
 
-	response, err := http.DefaultClient.Do(request)
+	response, err := DefaultHTTPClient.Do(request)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +105,7 @@ func PostJSONContext(ctx context.Context, uri string, obj interface{}) ([]byte, 
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json;charset=utf-8")
-	response, err := http.DefaultClient.Do(req)
+	response, err := DefaultHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +132,7 @@ func PostJSONWithRespContentType(uri string, obj interface{}) ([]byte, string, e
 		return nil, "", err
 	}
 
-	response, err := http.Post(uri, "application/json;charset=utf-8", jsonBuf)
+	response, err := DefaultHTTPClient.Post(uri, "application/json;charset=utf-8", jsonBuf)
 	if err != nil {
 		return nil, "", err
 	}
@@ -143,13 +146,41 @@ func PostJSONWithRespContentType(uri string, obj interface{}) ([]byte, string, e
 	return responseData, contentType, err
 }
 
+// PostFileByStream 上传文件
+func PostFileByStream(fieldName, fileName, uri string, byteData []byte) ([]byte, error) {
+	fields := []MultipartFormField{
+		{
+			IsFile:    false,
+			Fieldname: fieldName,
+			Filename:  fileName,
+			Value:     byteData,
+		},
+	}
+	return PostMultipartForm(fields, uri)
+}
+
 // PostFile 上传文件
-func PostFile(fieldName, filename, uri string) ([]byte, error) {
+func PostFile(fieldName, filePath, uri string) ([]byte, error) {
 	fields := []MultipartFormField{
 		{
 			IsFile:    true,
 			Fieldname: fieldName,
-			Filename:  filename,
+			FilePath:  filePath,
+			Filename:  filePath,
+		},
+	}
+	return PostMultipartForm(fields, uri)
+}
+
+// PostFileFromReader 上传文件，从 io.Reader 中读取
+func PostFileFromReader(filedName, filePath, fileName, uri string, reader io.Reader) ([]byte, error) {
+	fields := []MultipartFormField{
+		{
+			IsFile:     true,
+			Fieldname:  filedName,
+			FilePath:   filePath,
+			Filename:   fileName,
+			FileReader: reader,
 		},
 	}
 	return PostMultipartForm(fields, uri)
@@ -157,10 +188,12 @@ func PostFile(fieldName, filename, uri string) ([]byte, error) {
 
 // MultipartFormField 保存文件或其他字段信息
 type MultipartFormField struct {
-	IsFile    bool
-	Fieldname string
-	Value     []byte
-	Filename  string
+	IsFile     bool
+	Fieldname  string
+	Value      []byte
+	FilePath   string
+	Filename   string
+	FileReader io.Reader
 }
 
 // PostMultipartForm 上传文件或其他多个字段
@@ -179,18 +212,24 @@ func PostMultipartForm(fields []MultipartFormField, uri string) (respBody []byte
 				return
 			}
 
-			fh, e := os.Open(field.Filename)
-			if e != nil {
-				err = fmt.Errorf("error opening file , err=%v", e)
-				return
-			}
-			defer fh.Close()
-
-			if _, err = io.Copy(fileWriter, fh); err != nil {
-				return
+			if field.FileReader == nil {
+				fh, e := os.Open(field.FilePath)
+				if e != nil {
+					err = fmt.Errorf("error opening file , err=%v", e)
+					return
+				}
+				_, err = io.Copy(fileWriter, fh)
+				_ = fh.Close()
+				if err != nil {
+					return
+				}
+			} else {
+				if _, err = io.Copy(fileWriter, field.FileReader); err != nil {
+					return
+				}
 			}
 		} else {
-			partWriter, e := bodyWriter.CreateFormField(field.Fieldname)
+			partWriter, e := bodyWriter.CreateFormFile(field.Fieldname, field.Filename)
 			if e != nil {
 				err = e
 				return
@@ -205,14 +244,14 @@ func PostMultipartForm(fields []MultipartFormField, uri string) (respBody []byte
 	contentType := bodyWriter.FormDataContentType()
 	bodyWriter.Close()
 
-	resp, e := http.Post(uri, contentType, bodyBuf)
+	resp, e := DefaultHTTPClient.Post(uri, contentType, bodyBuf)
 	if e != nil {
 		err = e
 		return
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, err
+		return nil, fmt.Errorf("http code error : uri=%v , statusCode=%v", uri, resp.StatusCode)
 	}
 	respBody, err = io.ReadAll(resp.Body)
 	return
@@ -229,7 +268,7 @@ func PostXML(uri string, obj interface{}) ([]byte, error) {
 	}
 
 	body := bytes.NewBuffer(xmlData)
-	response, err := http.Post(uri, "application/xml;charset=utf-8", body)
+	response, err := DefaultHTTPClient.Post(uri, "application/xml;charset=utf-8", body)
 	if err != nil {
 		return nil, err
 	}
@@ -252,11 +291,10 @@ func httpWithTLS(rootCa, key string) (*http.Client, error) {
 	config := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 	}
-	tr := &http.Transport{
-		TLSClientConfig:    config,
-		DisableCompression: true,
-	}
-	client = &http.Client{Transport: tr}
+	trans := (DefaultHTTPClient.Transport.(*http.Transport)).Clone()
+	trans.TLSClientConfig = config
+	trans.DisableCompression = true
+	client = &http.Client{Transport: trans}
 	return client, nil
 }
 

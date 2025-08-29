@@ -15,25 +15,172 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // FuzzyQuery type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/query_dsl/term.ts#L40-L51
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/query_dsl/term.ts#L48-L86
 type FuzzyQuery struct {
-	Boost          *float32   `json:"boost,omitempty"`
-	Fuzziness      *Fuzziness `json:"fuzziness,omitempty"`
-	MaxExpansions  *int       `json:"max_expansions,omitempty"`
-	PrefixLength   *int       `json:"prefix_length,omitempty"`
-	QueryName_     *string    `json:"_name,omitempty"`
-	Rewrite        *string    `json:"rewrite,omitempty"`
-	Transpositions *bool      `json:"transpositions,omitempty"`
-	Value          string     `json:"value"`
+	// Boost Floating point number used to decrease or increase the relevance scores of
+	// the query.
+	// Boost values are relative to the default value of 1.0.
+	// A boost value between 0 and 1.0 decreases the relevance score.
+	// A value greater than 1.0 increases the relevance score.
+	Boost *float32 `json:"boost,omitempty"`
+	// Fuzziness Maximum edit distance allowed for matching.
+	Fuzziness Fuzziness `json:"fuzziness,omitempty"`
+	// MaxExpansions Maximum number of variations created.
+	MaxExpansions *int `json:"max_expansions,omitempty"`
+	// PrefixLength Number of beginning characters left unchanged when creating expansions.
+	PrefixLength *int    `json:"prefix_length,omitempty"`
+	QueryName_   *string `json:"_name,omitempty"`
+	// Rewrite Number of beginning characters left unchanged when creating expansions.
+	Rewrite *string `json:"rewrite,omitempty"`
+	// Transpositions Indicates whether edits include transpositions of two adjacent characters
+	// (for example `ab` to `ba`).
+	Transpositions *bool `json:"transpositions,omitempty"`
+	// Value Term you wish to find in the provided field.
+	Value string `json:"value"`
+}
+
+func (s *FuzzyQuery) UnmarshalJSON(data []byte) error {
+
+	if !bytes.HasPrefix(data, []byte(`{`)) {
+		if !bytes.HasPrefix(data, []byte(`"`)) {
+			data = append([]byte{'"'}, data...)
+			data = append(data, []byte{'"'}...)
+		}
+		err := json.NewDecoder(bytes.NewReader(data)).Decode(&s.Value)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "boost":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 32)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Boost", err)
+				}
+				f := float32(value)
+				s.Boost = &f
+			case float64:
+				f := float32(v)
+				s.Boost = &f
+			}
+
+		case "fuzziness":
+			if err := dec.Decode(&s.Fuzziness); err != nil {
+				return fmt.Errorf("%s | %w", "Fuzziness", err)
+			}
+
+		case "max_expansions":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MaxExpansions", err)
+				}
+				s.MaxExpansions = &value
+			case float64:
+				f := int(v)
+				s.MaxExpansions = &f
+			}
+
+		case "prefix_length":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "PrefixLength", err)
+				}
+				s.PrefixLength = &value
+			case float64:
+				f := int(v)
+				s.PrefixLength = &f
+			}
+
+		case "_name":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "QueryName_", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.QueryName_ = &o
+
+		case "rewrite":
+			if err := dec.Decode(&s.Rewrite); err != nil {
+				return fmt.Errorf("%s | %w", "Rewrite", err)
+			}
+
+		case "transpositions":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Transpositions", err)
+				}
+				s.Transpositions = &value
+			case bool:
+				s.Transpositions = &v
+			}
+
+		case "value":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Value", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Value = o
+
+		}
+	}
+	return nil
 }
 
 // NewFuzzyQuery returns a FuzzyQuery.

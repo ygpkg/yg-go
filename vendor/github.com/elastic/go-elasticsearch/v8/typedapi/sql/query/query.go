@@ -15,12 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Executes a SQL request
+// Get SQL search results.
+// Run an SQL request.
 package query
 
 import (
@@ -29,11 +28,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/sqlformat"
 )
 
 // ErrBuildPath is returned in case of missing parameters within the build of the request.
@@ -46,12 +49,17 @@ type Query struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
-	req *Request
-	raw json.RawMessage
+	req      *Request
+	deferred []func(request *Request) error
+	buf      *gobytes.Buffer
 
 	paramSet int
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewQuery type alias for index.
@@ -67,7 +75,8 @@ func NewQueryFunc(tp elastictransport.Interface) NewQuery {
 	}
 }
 
-// Executes a SQL request
+// Get SQL search results.
+// Run an SQL request.
 //
 // https://www.elastic.co/guide/en/elasticsearch/reference/current/sql-search-api.html
 func New(tp elastictransport.Interface) *Query {
@@ -75,7 +84,14 @@ func New(tp elastictransport.Interface) *Query {
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+
+		buf: gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -83,7 +99,7 @@ func New(tp elastictransport.Interface) *Query {
 
 // Raw takes a json payload as input which is then passed to the http.Request
 // If specified Raw takes precedence on Request method.
-func (r *Query) Raw(raw json.RawMessage) *Query {
+func (r *Query) Raw(raw io.Reader) *Query {
 	r.raw = raw
 
 	return r
@@ -105,9 +121,17 @@ func (r *Query) HttpRequest(ctx context.Context) (*http.Request, error) {
 
 	var err error
 
-	if r.raw != nil {
-		r.buf.Write(r.raw)
-	} else if r.req != nil {
+	if len(r.deferred) > 0 {
+		for _, f := range r.deferred {
+			deferredErr := f(r.req)
+			if deferredErr != nil {
+				return nil, deferredErr
+			}
+		}
+	}
+
+	if r.raw == nil && r.req != nil {
+
 		data, err := json.Marshal(r.req)
 
 		if err != nil {
@@ -115,6 +139,11 @@ func (r *Query) HttpRequest(ctx context.Context) (*http.Request, error) {
 		}
 
 		r.buf.Write(data)
+
+	}
+
+	if r.buf.Len() > 0 {
+		r.raw = r.buf
 	}
 
 	r.path.Scheme = "http"
@@ -135,15 +164,15 @@ func (r *Query) HttpRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
 
 	if req.Header.Get("Content-Type") == "" {
-		if r.buf.Len() > 0 {
+		if r.raw != nil {
 			req.Header.Set("Content-Type", "application/vnd.elasticsearch+json;compatible-with=8")
 		}
 	}
@@ -159,19 +188,100 @@ func (r *Query) HttpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r Query) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r Query) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "sql.query")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "sql.query")
+		if reader := instrument.RecordRequestBody(ctx, "sql.query", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "sql.query")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the Query query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the Query query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
+}
+
+// Do runs the request through the transport, handle the response and returns a query.Response
+func (r Query) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "sql.query")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
 }
 
 // Header set a key, value pair in the Query headers map.
@@ -181,10 +291,274 @@ func (r *Query) Header(key, value string) *Query {
 	return r
 }
 
-// Format a short version of the Accept header, e.g. json, yaml
+// Format The format for the response.
+// You can also specify a format using the `Accept` HTTP header.
+// If you specify both this parameter and the `Accept` HTTP header, this
+// parameter takes precedence.
 // API name: format
-func (r *Query) Format(value string) *Query {
-	r.values.Set("format", value)
+func (r *Query) Format(format sqlformat.SqlFormat) *Query {
+	r.values.Set("format", format.String())
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *Query) ErrorTrace(errortrace bool) *Query {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *Query) FilterPath(filterpaths ...string) *Query {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *Query) Human(human bool) *Query {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *Query) Pretty(pretty bool) *Query {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
+
+	return r
+}
+
+// AllowPartialSearchResults If `true`, the response has partial results when there are shard request
+// timeouts or shard failures.
+// If `false`, the API returns an error with no partial results.
+// API name: allow_partial_search_results
+func (r *Query) AllowPartialSearchResults(allowpartialsearchresults bool) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.AllowPartialSearchResults = &allowpartialsearchresults
+
+	return r
+}
+
+// Catalog The default catalog (cluster) for queries.
+// If unspecified, the queries execute on the data in the local cluster only.
+// API name: catalog
+func (r *Query) Catalog(catalog string) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.Catalog = &catalog
+
+	return r
+}
+
+// Columnar If `true`, the results are in a columnar fashion: one row represents all the
+// values of a certain column from the current page of results.
+// The API supports this parameter only for CBOR, JSON, SMILE, and YAML
+// responses.
+// API name: columnar
+func (r *Query) Columnar(columnar bool) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Columnar = &columnar
+
+	return r
+}
+
+// Cursor The cursor used to retrieve a set of paginated results.
+// If you specify a cursor, the API only uses the `columnar` and `time_zone`
+// request body parameters.
+// It ignores other request body parameters.
+// API name: cursor
+func (r *Query) Cursor(cursor string) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.Cursor = &cursor
+
+	return r
+}
+
+// FetchSize The maximum number of rows (or entries) to return in one response.
+// API name: fetch_size
+func (r *Query) FetchSize(fetchsize int) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.FetchSize = &fetchsize
+
+	return r
+}
+
+// FieldMultiValueLeniency If `false`, the API returns an exception when encountering multiple values
+// for a field.
+// If `true`, the API is lenient and returns the first value from the array with
+// no guarantee of consistent results.
+// API name: field_multi_value_leniency
+func (r *Query) FieldMultiValueLeniency(fieldmultivalueleniency bool) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.FieldMultiValueLeniency = &fieldmultivalueleniency
+
+	return r
+}
+
+// Filter The Elasticsearch query DSL for additional filtering.
+// API name: filter
+func (r *Query) Filter(filter *types.Query) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.Filter = filter
+
+	return r
+}
+
+// IndexUsingFrozen If `true`, the search can run on frozen indices.
+// API name: index_using_frozen
+func (r *Query) IndexUsingFrozen(indexusingfrozen bool) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.IndexUsingFrozen = &indexusingfrozen
+
+	return r
+}
+
+// KeepAlive The retention period for an async or saved synchronous search.
+// API name: keep_alive
+func (r *Query) KeepAlive(duration types.Duration) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.KeepAlive = duration
+
+	return r
+}
+
+// KeepOnCompletion If `true`, Elasticsearch stores synchronous searches if you also specify the
+// `wait_for_completion_timeout` parameter.
+// If `false`, Elasticsearch only stores async searches that don't finish before
+// the `wait_for_completion_timeout`.
+// API name: keep_on_completion
+func (r *Query) KeepOnCompletion(keeponcompletion bool) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.KeepOnCompletion = &keeponcompletion
+
+	return r
+}
+
+// PageTimeout The minimum retention period for the scroll cursor.
+// After this time period, a pagination request might fail because the scroll
+// cursor is no longer available.
+// Subsequent scroll requests prolong the lifetime of the scroll cursor by the
+// duration of `page_timeout` in the scroll request.
+// API name: page_timeout
+func (r *Query) PageTimeout(duration types.Duration) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.PageTimeout = duration
+
+	return r
+}
+
+// Params The values for parameters in the query.
+// API name: params
+func (r *Query) Params(params ...json.RawMessage) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Params = params
+
+	return r
+}
+
+// Query The SQL query to run.
+// API name: query
+func (r *Query) Query(query string) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.Query = &query
+
+	return r
+}
+
+// RequestTimeout The timeout before the request fails.
+// API name: request_timeout
+func (r *Query) RequestTimeout(duration types.Duration) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.RequestTimeout = duration
+
+	return r
+}
+
+// RuntimeMappings One or more runtime fields for the search request.
+// These fields take precedence over mapped fields with the same name.
+// API name: runtime_mappings
+func (r *Query) RuntimeMappings(runtimefields types.RuntimeFields) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.RuntimeMappings = runtimefields
+
+	return r
+}
+
+// TimeZone The ISO-8601 time zone ID for the search.
+// API name: time_zone
+func (r *Query) TimeZone(timezone string) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.TimeZone = &timezone
+
+	return r
+}
+
+// WaitForCompletionTimeout The period to wait for complete results.
+// It defaults to no timeout, meaning the request waits for complete search
+// results.
+// If the search doesn't finish within this period, the search becomes async.
+//
+// To save a synchronous search, you must specify this parameter and the
+// `keep_on_completion` parameter.
+// API name: wait_for_completion_timeout
+func (r *Query) WaitForCompletionTimeout(duration types.Duration) *Query {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.WaitForCompletionTimeout = duration
 
 	return r
 }

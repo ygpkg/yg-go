@@ -74,6 +74,8 @@ type QuerySendStatisticsRequest struct {
 	ResourceOwnerId      requests.Integer `position:"Query" name:"ResourceOwnerId"`
 	IsGlobe              requests.Integer `position:"Query" name:"IsGlobe"`
 	StartDate            string           `position:"Query" name:"StartDate"`
+	SignName             string           `position:"Query" name:"SignName"`
+	TemplateType         requests.Integer `position:"Query" name:"TemplateType"`
 	PageSize             requests.Integer `position:"Query" name:"PageSize"`
 	PageIndex            requests.Integer `position:"Query" name:"PageIndex"`
 	ResourceOwnerAccount string           `position:"Query" name:"ResourceOwnerAccount"`
@@ -95,7 +97,7 @@ func CreateQuerySendStatisticsRequest() (request *QuerySendStatisticsRequest) {
 	request = &QuerySendStatisticsRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySendStatistics", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySendStatistics", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

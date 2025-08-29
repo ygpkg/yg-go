@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Allows to use the Mustache language to pre-render a search definition.
+// Render a search template.
+//
+// Render a search template as a search request body.
 package rendersearchtemplate
 
 import (
@@ -29,15 +29,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
-)
-
-const (
-	idMask = iota + 1
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 // ErrBuildPath is returned in case of missing parameters within the build of the request.
@@ -50,14 +49,19 @@ type RenderSearchTemplate struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
-	req *Request
-	raw json.RawMessage
+	req      *Request
+	deferred []func(request *Request) error
+	buf      *gobytes.Buffer
 
 	paramSet int
 
 	id string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewRenderSearchTemplate type alias for index.
@@ -73,7 +77,9 @@ func NewRenderSearchTemplateFunc(tp elastictransport.Interface) NewRenderSearchT
 	}
 }
 
-// Allows to use the Mustache language to pre-render a search definition.
+// Render a search template.
+//
+// Render a search template as a search request body.
 //
 // https://www.elastic.co/guide/en/elasticsearch/reference/current/render-search-template-api.html
 func New(tp elastictransport.Interface) *RenderSearchTemplate {
@@ -81,7 +87,14 @@ func New(tp elastictransport.Interface) *RenderSearchTemplate {
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+
+		buf: gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -89,7 +102,7 @@ func New(tp elastictransport.Interface) *RenderSearchTemplate {
 
 // Raw takes a json payload as input which is then passed to the http.Request
 // If specified Raw takes precedence on Request method.
-func (r *RenderSearchTemplate) Raw(raw json.RawMessage) *RenderSearchTemplate {
+func (r *RenderSearchTemplate) Raw(raw io.Reader) *RenderSearchTemplate {
 	r.raw = raw
 
 	return r
@@ -111,9 +124,17 @@ func (r *RenderSearchTemplate) HttpRequest(ctx context.Context) (*http.Request, 
 
 	var err error
 
-	if r.raw != nil {
-		r.buf.Write(r.raw)
-	} else if r.req != nil {
+	if len(r.deferred) > 0 {
+		for _, f := range r.deferred {
+			deferredErr := f(r.req)
+			if deferredErr != nil {
+				return nil, deferredErr
+			}
+		}
+	}
+
+	if r.raw == nil && r.req != nil {
+
 		data, err := json.Marshal(r.req)
 
 		if err != nil {
@@ -121,6 +142,11 @@ func (r *RenderSearchTemplate) HttpRequest(ctx context.Context) (*http.Request, 
 		}
 
 		r.buf.Write(data)
+
+	}
+
+	if r.buf.Len() > 0 {
+		r.raw = r.buf
 	}
 
 	r.path.Scheme = "http"
@@ -133,16 +159,6 @@ func (r *RenderSearchTemplate) HttpRequest(ctx context.Context) (*http.Request, 
 		path.WriteString("template")
 
 		method = http.MethodPost
-	case r.paramSet == idMask:
-		path.WriteString("/")
-		path.WriteString("_render")
-		path.WriteString("/")
-		path.WriteString("template")
-		path.WriteString("/")
-
-		path.WriteString(r.id)
-
-		method = http.MethodPost
 	}
 
 	r.path.Path = path.String()
@@ -153,15 +169,15 @@ func (r *RenderSearchTemplate) HttpRequest(ctx context.Context) (*http.Request, 
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
 
 	if req.Header.Get("Content-Type") == "" {
-		if r.buf.Len() > 0 {
+		if r.raw != nil {
 			req.Header.Set("Content-Type", "application/vnd.elasticsearch+json;compatible-with=8")
 		}
 	}
@@ -177,19 +193,100 @@ func (r *RenderSearchTemplate) HttpRequest(ctx context.Context) (*http.Request, 
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r RenderSearchTemplate) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r RenderSearchTemplate) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "render_search_template")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "render_search_template")
+		if reader := instrument.RecordRequestBody(ctx, "render_search_template", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "render_search_template")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the RenderSearchTemplate query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the RenderSearchTemplate query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
+}
+
+// Do runs the request through the transport, handle the response and returns a rendersearchtemplate.Response
+func (r RenderSearchTemplate) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "render_search_template")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
 }
 
 // Header set a key, value pair in the RenderSearchTemplate headers map.
@@ -199,11 +296,101 @@ func (r *RenderSearchTemplate) Header(key, value string) *RenderSearchTemplate {
 	return r
 }
 
-// Id The id of the stored search template
-// API Name: id
-func (r *RenderSearchTemplate) Id(v string) *RenderSearchTemplate {
-	r.paramSet |= idMask
-	r.id = v
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *RenderSearchTemplate) ErrorTrace(errortrace bool) *RenderSearchTemplate {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *RenderSearchTemplate) FilterPath(filterpaths ...string) *RenderSearchTemplate {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *RenderSearchTemplate) Human(human bool) *RenderSearchTemplate {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *RenderSearchTemplate) Pretty(pretty bool) *RenderSearchTemplate {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
+
+	return r
+}
+
+// API name: file
+func (r *RenderSearchTemplate) File(file string) *RenderSearchTemplate {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.File = &file
+
+	return r
+}
+
+// Id The ID of the search template to render.
+// If no `source` is specified, this or the `<template-id>` request path
+// parameter is required.
+// If you specify both this parameter and the `<template-id>` parameter, the API
+// uses only `<template-id>`.
+// API name: id
+func (r *RenderSearchTemplate) Id(id string) *RenderSearchTemplate {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Id = &id
+
+	return r
+}
+
+// Params Key-value pairs used to replace Mustache variables in the template.
+// The key is the variable name.
+// The value is the variable value.
+// API name: params
+func (r *RenderSearchTemplate) Params(params map[string]json.RawMessage) *RenderSearchTemplate {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.Params = params
+
+	return r
+}
+
+// Source An inline search template.
+// It supports the same parameters as the search API's request body.
+// These parameters also support Mustache variables.
+// If no `id` or `<templated-id>` is specified, this parameter is required.
+// API name: source
+func (r *RenderSearchTemplate) Source(source string) *RenderSearchTemplate {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.Source = &source
 
 	return r
 }

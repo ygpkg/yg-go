@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newIndicesMigrateToDataStreamFunc(t Transport) IndicesMigrateToDataStream {
@@ -31,6 +32,11 @@ func newIndicesMigrateToDataStreamFunc(t Transport) IndicesMigrateToDataStream {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -46,6 +52,9 @@ type IndicesMigrateToDataStream func(name string, o ...func(*IndicesMigrateToDat
 type IndicesMigrateToDataStreamRequest struct {
 	Name string
 
+	MasterTimeout time.Duration
+	Timeout       time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -54,15 +63,26 @@ type IndicesMigrateToDataStreamRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r IndicesMigrateToDataStreamRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r IndicesMigrateToDataStreamRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.migrate_to_data_stream")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -74,8 +94,19 @@ func (r IndicesMigrateToDataStreamRequest) Do(ctx context.Context, transport Tra
 	path.WriteString("_migrate")
 	path.WriteString("/")
 	path.WriteString(r.Name)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "name", r.Name)
+	}
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -95,6 +126,9 @@ func (r IndicesMigrateToDataStreamRequest) Do(ctx context.Context, transport Tra
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -122,8 +156,17 @@ func (r IndicesMigrateToDataStreamRequest) Do(ctx context.Context, transport Tra
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.migrate_to_data_stream")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.migrate_to_data_stream")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -140,6 +183,20 @@ func (r IndicesMigrateToDataStreamRequest) Do(ctx context.Context, transport Tra
 func (f IndicesMigrateToDataStream) WithContext(v context.Context) func(*IndicesMigrateToDataStreamRequest) {
 	return func(r *IndicesMigrateToDataStreamRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - specify timeout for connection to master.
+func (f IndicesMigrateToDataStream) WithMasterTimeout(v time.Duration) func(*IndicesMigrateToDataStreamRequest) {
+	return func(r *IndicesMigrateToDataStreamRequest) {
+		r.MasterTimeout = v
+	}
+}
+
+// WithTimeout - specify timeout for acknowledging the cluster state update.
+func (f IndicesMigrateToDataStream) WithTimeout(v time.Duration) func(*IndicesMigrateToDataStreamRequest) {
+	return func(r *IndicesMigrateToDataStreamRequest) {
+		r.Timeout = v
 	}
 }
 

@@ -85,10 +85,10 @@ type SendSmsRequest struct {
 // SendSmsResponse is the response struct for api SendSms
 type SendSmsResponse struct {
 	*responses.BaseResponse
-	RequestId string `json:"RequestId" xml:"RequestId"`
-	BizId     string `json:"BizId" xml:"BizId"`
 	Code      string `json:"Code" xml:"Code"`
 	Message   string `json:"Message" xml:"Message"`
+	BizId     string `json:"BizId" xml:"BizId"`
+	RequestId string `json:"RequestId" xml:"RequestId"`
 }
 
 // CreateSendSmsRequest creates a request to invoke SendSms API
@@ -96,7 +96,7 @@ func CreateSendSmsRequest() (request *SendSmsRequest) {
 	request = &SendSmsRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "SendSms", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "SendSms", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

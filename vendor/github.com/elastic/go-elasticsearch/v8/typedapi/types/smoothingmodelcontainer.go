@@ -15,25 +15,67 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // SmoothingModelContainer type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_global/search/_types/suggester.ts#L224-L231
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_global/search/_types/suggester.ts#L445-L461
 type SmoothingModelContainer struct {
-	Laplace             *LaplaceSmoothingModel             `json:"laplace,omitempty"`
+	AdditionalSmoothingModelContainerProperty map[string]json.RawMessage `json:"-"`
+	// Laplace A smoothing model that uses an additive smoothing where a constant (typically
+	// `1.0` or smaller) is added to all counts to balance weights.
+	Laplace *LaplaceSmoothingModel `json:"laplace,omitempty"`
+	// LinearInterpolation A smoothing model that takes the weighted mean of the unigrams, bigrams, and
+	// trigrams based on user supplied weights (lambdas).
 	LinearInterpolation *LinearInterpolationSmoothingModel `json:"linear_interpolation,omitempty"`
-	StupidBackoff       *StupidBackoffSmoothingModel       `json:"stupid_backoff,omitempty"`
+	// StupidBackoff A simple backoff model that backs off to lower order n-gram models if the
+	// higher order count is `0` and discounts the lower order n-gram model by a
+	// constant factor.
+	StupidBackoff *StupidBackoffSmoothingModel `json:"stupid_backoff,omitempty"`
+}
+
+// MarhsalJSON overrides marshalling for types with additional properties
+func (s SmoothingModelContainer) MarshalJSON() ([]byte, error) {
+	type opt SmoothingModelContainer
+	// We transform the struct to a map without the embedded additional properties map
+	tmp := make(map[string]any, 0)
+
+	data, err := json.Marshal(opt(s))
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(data, &tmp)
+	if err != nil {
+		return nil, err
+	}
+
+	// We inline the additional fields from the underlying map
+	for key, value := range s.AdditionalSmoothingModelContainerProperty {
+		tmp[fmt.Sprintf("%s", key)] = value
+	}
+	delete(tmp, "AdditionalSmoothingModelContainerProperty")
+
+	data, err = json.Marshal(tmp)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // NewSmoothingModelContainer returns a SmoothingModelContainer.
 func NewSmoothingModelContainer() *SmoothingModelContainer {
-	r := &SmoothingModelContainer{}
+	r := &SmoothingModelContainer{
+		AdditionalSmoothingModelContainerProperty: make(map[string]json.RawMessage),
+	}
 
 	return r
 }

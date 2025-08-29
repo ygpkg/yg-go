@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newLicenseDeleteFunc(t Transport) LicenseDelete {
@@ -31,6 +32,11 @@ func newLicenseDeleteFunc(t Transport) LicenseDelete {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -44,6 +50,9 @@ type LicenseDelete func(o ...func(*LicenseDeleteRequest)) (*Response, error)
 
 // LicenseDeleteRequest configures the License Delete API request.
 type LicenseDeleteRequest struct {
+	MasterTimeout time.Duration
+	Timeout       time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -52,15 +61,26 @@ type LicenseDeleteRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r LicenseDeleteRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r LicenseDeleteRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "license.delete")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "DELETE"
 
@@ -69,6 +89,14 @@ func (r LicenseDeleteRequest) Do(ctx context.Context, transport Transport) (*Res
 	path.WriteString("/_license")
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -88,6 +116,9 @@ func (r LicenseDeleteRequest) Do(ctx context.Context, transport Transport) (*Res
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -115,8 +146,17 @@ func (r LicenseDeleteRequest) Do(ctx context.Context, transport Transport) (*Res
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "license.delete")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "license.delete")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -133,6 +173,20 @@ func (r LicenseDeleteRequest) Do(ctx context.Context, transport Transport) (*Res
 func (f LicenseDelete) WithContext(v context.Context) func(*LicenseDeleteRequest) {
 	return func(r *LicenseDeleteRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - timeout for processing on master node.
+func (f LicenseDelete) WithMasterTimeout(v time.Duration) func(*LicenseDeleteRequest) {
+	return func(r *LicenseDeleteRequest) {
+		r.MasterTimeout = v
+	}
+}
+
+// WithTimeout - timeout for acknowledgement of update from all nodes in cluster.
+func (f LicenseDelete) WithTimeout(v time.Duration) func(*LicenseDeleteRequest) {
+	return func(r *LicenseDeleteRequest) {
+		r.Timeout = v
 	}
 }
 

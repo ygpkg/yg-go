@@ -81,9 +81,9 @@ type QueryShortUrlRequest struct {
 // QueryShortUrlResponse is the response struct for api QueryShortUrl
 type QueryShortUrlResponse struct {
 	*responses.BaseResponse
-	RequestId string `json:"RequestId" xml:"RequestId"`
 	Code      string `json:"Code" xml:"Code"`
 	Message   string `json:"Message" xml:"Message"`
+	RequestId string `json:"RequestId" xml:"RequestId"`
 	Data      Data   `json:"Data" xml:"Data"`
 }
 
@@ -92,7 +92,7 @@ func CreateQueryShortUrlRequest() (request *QueryShortUrlRequest) {
 	request = &QueryShortUrlRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QueryShortUrl", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QueryShortUrl", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

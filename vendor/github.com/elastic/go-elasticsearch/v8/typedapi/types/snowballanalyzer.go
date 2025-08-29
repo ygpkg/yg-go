@@ -15,32 +15,89 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/snowballlanguage"
 )
 
 // SnowballAnalyzer type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/analysis/analyzers.ts#L88-L93
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/analysis/analyzers.ts#L325-L330
 type SnowballAnalyzer struct {
 	Language  snowballlanguage.SnowballLanguage `json:"language"`
-	Stopwords []string                          `json:"stopwords,omitempty"`
+	Stopwords StopWords                         `json:"stopwords,omitempty"`
 	Type      string                            `json:"type,omitempty"`
 	Version   *string                           `json:"version,omitempty"`
+}
+
+func (s *SnowballAnalyzer) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "language":
+			if err := dec.Decode(&s.Language); err != nil {
+				return fmt.Errorf("%s | %w", "Language", err)
+			}
+
+		case "stopwords":
+			if err := dec.Decode(&s.Stopwords); err != nil {
+				return fmt.Errorf("%s | %w", "Stopwords", err)
+			}
+
+		case "type":
+			if err := dec.Decode(&s.Type); err != nil {
+				return fmt.Errorf("%s | %w", "Type", err)
+			}
+
+		case "version":
+			if err := dec.Decode(&s.Version); err != nil {
+				return fmt.Errorf("%s | %w", "Version", err)
+			}
+
+		}
+	}
+	return nil
+}
+
+// MarshalJSON override marshalling to include literal value
+func (s SnowballAnalyzer) MarshalJSON() ([]byte, error) {
+	type innerSnowballAnalyzer SnowballAnalyzer
+	tmp := innerSnowballAnalyzer{
+		Language:  s.Language,
+		Stopwords: s.Stopwords,
+		Type:      s.Type,
+		Version:   s.Version,
+	}
+
+	tmp.Type = "snowball"
+
+	return json.Marshal(tmp)
 }
 
 // NewSnowballAnalyzer returns a SnowballAnalyzer.
 func NewSnowballAnalyzer() *SnowballAnalyzer {
 	r := &SnowballAnalyzer{}
-
-	r.Type = "snowball"
 
 	return r
 }

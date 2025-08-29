@@ -15,35 +15,112 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/shardstoreallocation"
 )
 
 // ShardStore type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/shard_stores/types.ts#L29-L38
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/shard_stores/types.ts#L29-L36
 type ShardStore struct {
-	Allocation       shardstoreallocation.ShardStoreAllocation `json:"allocation"`
-	AllocationId     string                                    `json:"allocation_id"`
-	Attributes       map[string]interface{}                    `json:"attributes"`
-	Id               string                                    `json:"id"`
-	LegacyVersion    int64                                     `json:"legacy_version"`
-	Name             string                                    `json:"name"`
-	StoreException   ShardStoreException                       `json:"store_exception"`
-	TransportAddress string                                    `json:"transport_address"`
+	Allocation     shardstoreallocation.ShardStoreAllocation `json:"allocation"`
+	AllocationId   *string                                   `json:"allocation_id,omitempty"`
+	ShardStore     map[string]ShardStoreNode                 `json:"-"`
+	StoreException *ShardStoreException                      `json:"store_exception,omitempty"`
+}
+
+func (s *ShardStore) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "allocation":
+			if err := dec.Decode(&s.Allocation); err != nil {
+				return fmt.Errorf("%s | %w", "Allocation", err)
+			}
+
+		case "allocation_id":
+			if err := dec.Decode(&s.AllocationId); err != nil {
+				return fmt.Errorf("%s | %w", "AllocationId", err)
+			}
+
+		case "store_exception":
+			if err := dec.Decode(&s.StoreException); err != nil {
+				return fmt.Errorf("%s | %w", "StoreException", err)
+			}
+
+		default:
+
+			if key, ok := t.(string); ok {
+				if s.ShardStore == nil {
+					s.ShardStore = make(map[string]ShardStoreNode, 0)
+				}
+				raw := NewShardStoreNode()
+				if err := dec.Decode(&raw); err != nil {
+					return fmt.Errorf("%s | %w", "ShardStore", err)
+				}
+				s.ShardStore[key] = *raw
+			}
+
+		}
+	}
+	return nil
+}
+
+// MarhsalJSON overrides marshalling for types with additional properties
+func (s ShardStore) MarshalJSON() ([]byte, error) {
+	type opt ShardStore
+	// We transform the struct to a map without the embedded additional properties map
+	tmp := make(map[string]any, 0)
+
+	data, err := json.Marshal(opt(s))
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(data, &tmp)
+	if err != nil {
+		return nil, err
+	}
+
+	// We inline the additional fields from the underlying map
+	for key, value := range s.ShardStore {
+		tmp[fmt.Sprintf("%s", key)] = value
+	}
+	delete(tmp, "ShardStore")
+
+	data, err = json.Marshal(tmp)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // NewShardStore returns a ShardStore.
 func NewShardStore() *ShardStore {
 	r := &ShardStore{
-		Attributes: make(map[string]interface{}, 0),
+		ShardStore: make(map[string]ShardStoreNode),
 	}
 
 	return r

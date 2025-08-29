@@ -15,20 +15,82 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // ShardSequenceNumber type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/stats/types.ts#L164-L168
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/stats/types.ts#L176-L180
 type ShardSequenceNumber struct {
 	GlobalCheckpoint int64 `json:"global_checkpoint"`
 	LocalCheckpoint  int64 `json:"local_checkpoint"`
 	MaxSeqNo         int64 `json:"max_seq_no"`
+}
+
+func (s *ShardSequenceNumber) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "global_checkpoint":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "GlobalCheckpoint", err)
+				}
+				s.GlobalCheckpoint = value
+			case float64:
+				f := int64(v)
+				s.GlobalCheckpoint = f
+			}
+
+		case "local_checkpoint":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "LocalCheckpoint", err)
+				}
+				s.LocalCheckpoint = value
+			case float64:
+				f := int64(v)
+				s.LocalCheckpoint = f
+			}
+
+		case "max_seq_no":
+			if err := dec.Decode(&s.MaxSeqNo); err != nil {
+				return fmt.Errorf("%s | %w", "MaxSeqNo", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewShardSequenceNumber returns a ShardSequenceNumber.

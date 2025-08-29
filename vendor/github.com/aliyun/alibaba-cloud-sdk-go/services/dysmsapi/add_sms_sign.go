@@ -76,6 +76,7 @@ type AddSmsSignRequest struct {
 	SignName             string                    `position:"Query" name:"SignName"`
 	SignFileList         *[]AddSmsSignSignFileList `position:"Body" name:"SignFileList"  type:"Repeated"`
 	ResourceOwnerAccount string                    `position:"Query" name:"ResourceOwnerAccount"`
+	SignType             requests.Integer          `position:"Query" name:"SignType"`
 	OwnerId              requests.Integer          `position:"Query" name:"OwnerId"`
 	SignSource           requests.Integer          `position:"Query" name:"SignSource"`
 }
@@ -89,10 +90,10 @@ type AddSmsSignSignFileList struct {
 // AddSmsSignResponse is the response struct for api AddSmsSign
 type AddSmsSignResponse struct {
 	*responses.BaseResponse
-	RequestId string `json:"RequestId" xml:"RequestId"`
-	SignName  string `json:"SignName" xml:"SignName"`
 	Code      string `json:"Code" xml:"Code"`
 	Message   string `json:"Message" xml:"Message"`
+	RequestId string `json:"RequestId" xml:"RequestId"`
+	SignName  string `json:"SignName" xml:"SignName"`
 }
 
 // CreateAddSmsSignRequest creates a request to invoke AddSmsSign API
@@ -100,7 +101,7 @@ func CreateAddSmsSignRequest() (request *AddSmsSignRequest) {
 	request = &AddSmsSignRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "AddSmsSign", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "AddSmsSign", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

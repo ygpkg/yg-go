@@ -15,22 +15,83 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // SecurityRoleMapping type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/security/_types/RoleMapping.ts#L25-L31
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/security/_types/RoleMapping.ts#L25-L33
 type SecurityRoleMapping struct {
-	Enabled       bool                   `json:"enabled"`
-	Metadata      map[string]interface{} `json:"metadata"`
-	RoleTemplates []RoleTemplate         `json:"role_templates,omitempty"`
-	Roles         []string               `json:"roles"`
-	Rules         RoleMappingRule        `json:"rules"`
+	Enabled       bool            `json:"enabled"`
+	Metadata      Metadata        `json:"metadata"`
+	RoleTemplates []RoleTemplate  `json:"role_templates,omitempty"`
+	Roles         []string        `json:"roles,omitempty"`
+	Rules         RoleMappingRule `json:"rules"`
+}
+
+func (s *SecurityRoleMapping) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "enabled":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Enabled", err)
+				}
+				s.Enabled = value
+			case bool:
+				s.Enabled = v
+			}
+
+		case "metadata":
+			if err := dec.Decode(&s.Metadata); err != nil {
+				return fmt.Errorf("%s | %w", "Metadata", err)
+			}
+
+		case "role_templates":
+			if err := dec.Decode(&s.RoleTemplates); err != nil {
+				return fmt.Errorf("%s | %w", "RoleTemplates", err)
+			}
+
+		case "roles":
+			if err := dec.Decode(&s.Roles); err != nil {
+				return fmt.Errorf("%s | %w", "Roles", err)
+			}
+
+		case "rules":
+			if err := dec.Decode(&s.Rules); err != nil {
+				return fmt.Errorf("%s | %w", "Rules", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewSecurityRoleMapping returns a SecurityRoleMapping.

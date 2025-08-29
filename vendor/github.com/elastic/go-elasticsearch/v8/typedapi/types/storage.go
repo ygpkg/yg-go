@@ -15,20 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/storagetype"
 )
 
 // Storage type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/_types/IndexSettings.ts#L497-L506
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/_types/IndexSettings.ts#L534-L545
 type Storage struct {
 	// AllowMmap You can restrict the use of the mmapfs and the related hybridfs store type
 	// via the setting node.store.allow_mmap.
@@ -37,8 +42,54 @@ type Storage struct {
 	// setting is useful, for example, if you are in an environment where you can
 	// not control the ability to create a lot
 	// of memory maps so you need disable the ability to use memory-mapping.
-	AllowMmap *bool                   `json:"allow_mmap,omitempty"`
-	Type      storagetype.StorageType `json:"type"`
+	AllowMmap *bool `json:"allow_mmap,omitempty"`
+	// StatsRefreshInterval How often store statistics are refreshed
+	StatsRefreshInterval Duration                `json:"stats_refresh_interval,omitempty"`
+	Type                 storagetype.StorageType `json:"type"`
+}
+
+func (s *Storage) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "allow_mmap":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "AllowMmap", err)
+				}
+				s.AllowMmap = &value
+			case bool:
+				s.AllowMmap = &v
+			}
+
+		case "stats_refresh_interval":
+			if err := dec.Decode(&s.StatsRefreshInterval); err != nil {
+				return fmt.Errorf("%s | %w", "StatsRefreshInterval", err)
+			}
+
+		case "type":
+			if err := dec.Decode(&s.Type); err != nil {
+				return fmt.Errorf("%s | %w", "Type", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewStorage returns a Storage.

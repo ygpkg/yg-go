@@ -15,27 +15,98 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // RollupCapabilitySummary type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/rollup/get_rollup_caps/types.ts#L28-L33
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/rollup/get_rollup_caps/types.ts#L31-L36
 type RollupCapabilitySummary struct {
-	Fields       map[string]map[string]interface{} `json:"fields"`
-	IndexPattern string                            `json:"index_pattern"`
-	JobId        string                            `json:"job_id"`
-	RollupIndex  string                            `json:"rollup_index"`
+	Fields       map[string][]RollupFieldSummary `json:"fields"`
+	IndexPattern string                          `json:"index_pattern"`
+	JobId        string                          `json:"job_id"`
+	RollupIndex  string                          `json:"rollup_index"`
+}
+
+func (s *RollupCapabilitySummary) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "fields":
+			if s.Fields == nil {
+				s.Fields = make(map[string][]RollupFieldSummary, 0)
+			}
+			if err := dec.Decode(&s.Fields); err != nil {
+				return fmt.Errorf("%s | %w", "Fields", err)
+			}
+
+		case "index_pattern":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "IndexPattern", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.IndexPattern = o
+
+		case "job_id":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "JobId", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.JobId = o
+
+		case "rollup_index":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "RollupIndex", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.RollupIndex = o
+
+		}
+	}
+	return nil
 }
 
 // NewRollupCapabilitySummary returns a RollupCapabilitySummary.
 func NewRollupCapabilitySummary() *RollupCapabilitySummary {
 	r := &RollupCapabilitySummary{
-		Fields: make(map[string]map[string]interface{}, 0),
+		Fields: make(map[string][]RollupFieldSummary),
 	}
 
 	return r

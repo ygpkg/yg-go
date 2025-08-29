@@ -80,16 +80,16 @@ type QuerySmsTemplateRequest struct {
 // QuerySmsTemplateResponse is the response struct for api QuerySmsTemplate
 type QuerySmsTemplateResponse struct {
 	*responses.BaseResponse
-	RequestId       string `json:"RequestId" xml:"RequestId"`
-	Code            string `json:"Code" xml:"Code"`
-	Message         string `json:"Message" xml:"Message"`
-	TemplateStatus  int    `json:"TemplateStatus" xml:"TemplateStatus"`
-	Reason          string `json:"Reason" xml:"Reason"`
-	TemplateCode    string `json:"TemplateCode" xml:"TemplateCode"`
-	TemplateType    int    `json:"TemplateType" xml:"TemplateType"`
-	TemplateName    string `json:"TemplateName" xml:"TemplateName"`
 	TemplateContent string `json:"TemplateContent" xml:"TemplateContent"`
+	RequestId       string `json:"RequestId" xml:"RequestId"`
+	TemplateCode    string `json:"TemplateCode" xml:"TemplateCode"`
+	TemplateStatus  int    `json:"TemplateStatus" xml:"TemplateStatus"`
+	Code            string `json:"Code" xml:"Code"`
+	TemplateType    int    `json:"TemplateType" xml:"TemplateType"`
+	Message         string `json:"Message" xml:"Message"`
+	TemplateName    string `json:"TemplateName" xml:"TemplateName"`
 	CreateDate      string `json:"CreateDate" xml:"CreateDate"`
+	Reason          string `json:"Reason" xml:"Reason"`
 }
 
 // CreateQuerySmsTemplateRequest creates a request to invoke QuerySmsTemplate API
@@ -97,7 +97,7 @@ func CreateQuerySmsTemplateRequest() (request *QuerySmsTemplateRequest) {
 	request = &QuerySmsTemplateRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySmsTemplate", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySmsTemplate", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

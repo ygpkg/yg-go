@@ -15,27 +15,44 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Cancels a task, if it can be cancelled through an API.
+// Cancel a task.
+//
+// WARNING: The task management API is new and should still be considered a beta
+// feature.
+// The API may change in ways that are not backwards compatible.
+//
+// A task may continue to run for some time after it has been cancelled because
+// it may not be able to safely stop its current activity straight away.
+// It is also possible that Elasticsearch must complete its work on other tasks
+// before it can process the cancellation.
+// The get task information API will continue to list these cancelled tasks
+// until they complete.
+// The cancelled flag in the response indicates that the cancellation command
+// has been processed and the task will stop as soon as possible.
+//
+// To troubleshoot why a cancelled task does not complete promptly, use the get
+// task information API with the `?detailed` parameter to identify the other
+// tasks the system is running.
+// You can also use the node hot threads API to obtain detailed information
+// about the work the system is doing instead of completing the cancelled task.
 package cancel
 
 import (
-	gobytes "bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 const (
@@ -52,11 +69,15 @@ type Cancel struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
 	paramSet int
 
 	taskid string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewCancel type alias for index.
@@ -72,15 +93,39 @@ func NewCancelFunc(tp elastictransport.Interface) NewCancel {
 	}
 }
 
-// Cancels a task, if it can be cancelled through an API.
+// Cancel a task.
 //
-// https://www.elastic.co/guide/en/elasticsearch/reference/{branch}/tasks.html
+// WARNING: The task management API is new and should still be considered a beta
+// feature.
+// The API may change in ways that are not backwards compatible.
+//
+// A task may continue to run for some time after it has been cancelled because
+// it may not be able to safely stop its current activity straight away.
+// It is also possible that Elasticsearch must complete its work on other tasks
+// before it can process the cancellation.
+// The get task information API will continue to list these cancelled tasks
+// until they complete.
+// The cancelled flag in the response indicates that the cancellation command
+// has been processed and the task will stop as soon as possible.
+//
+// To troubleshoot why a cancelled task does not complete promptly, use the get
+// task information API with the `?detailed` parameter to identify the other
+// tasks the system is running.
+// You can also use the node hot threads API to obtain detailed information
+// about the work the system is doing instead of completing the cancelled task.
+//
+// https://www.elastic.co/guide/en/elasticsearch/reference/current/tasks.html
 func New(tp elastictransport.Interface) *Cancel {
 	r := &Cancel{
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -110,6 +155,9 @@ func (r *Cancel) HttpRequest(ctx context.Context) (*http.Request, error) {
 		path.WriteString("_tasks")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "taskid", r.taskid)
+		}
 		path.WriteString(r.taskid)
 		path.WriteString("/")
 		path.WriteString("_cancel")
@@ -125,9 +173,9 @@ func (r *Cancel) HttpRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
@@ -143,30 +191,121 @@ func (r *Cancel) HttpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r Cancel) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r Cancel) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "tasks.cancel")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "tasks.cancel")
+		if reader := instrument.RecordRequestBody(ctx, "tasks.cancel", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "tasks.cancel")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the Cancel query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the Cancel query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
 }
 
+// Do runs the request through the transport, handle the response and returns a cancel.Response
+func (r Cancel) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "tasks.cancel")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
+}
+
 // IsSuccess allows to run a query with a context and retrieve the result as a boolean.
 // This only exists for endpoints without a request payload and allows for quick control flow.
-func (r Cancel) IsSuccess(ctx context.Context) (bool, error) {
-	res, err := r.Do(ctx)
+func (r Cancel) IsSuccess(providedCtx context.Context) (bool, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "tasks.cancel")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	res, err := r.Perform(ctx)
 
 	if err != nil {
 		return false, err
 	}
-	io.Copy(ioutil.Discard, res.Body)
+	io.Copy(io.Discard, res.Body)
 	err = res.Body.Close()
 	if err != nil {
 		return false, err
@@ -174,6 +313,14 @@ func (r Cancel) IsSuccess(ctx context.Context) (bool, error) {
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
+	}
+
+	if res.StatusCode != 404 {
+		err := fmt.Errorf("an error happened during the Cancel query execution, status code: %d", res.StatusCode)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return false, err
 	}
 
 	return false, nil
@@ -186,48 +333,97 @@ func (r *Cancel) Header(key, value string) *Cancel {
 	return r
 }
 
-// TaskId Cancel the task with specified task id (node_id:task_number)
+// TaskId The task identifier.
 // API Name: taskid
-func (r *Cancel) TaskId(v string) *Cancel {
+func (r *Cancel) TaskId(taskid string) *Cancel {
 	r.paramSet |= taskidMask
-	r.taskid = v
+	r.taskid = taskid
 
 	return r
 }
 
-// Actions A comma-separated list of actions that should be cancelled. Leave empty to
-// cancel all.
+// Actions A comma-separated list or wildcard expression of actions that is used to
+// limit the request.
 // API name: actions
-func (r *Cancel) Actions(value string) *Cancel {
-	r.values.Set("actions", value)
+func (r *Cancel) Actions(actions ...string) *Cancel {
+	tmp := []string{}
+	for _, item := range actions {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("actions", strings.Join(tmp, ","))
 
 	return r
 }
 
-// Nodes A comma-separated list of node IDs or names to limit the returned
-// information; use `_local` to return information from the node you're
-// connecting to, leave empty to get information from all nodes
+// Nodes A comma-separated list of node IDs or names that is used to limit the
+// request.
 // API name: nodes
-func (r *Cancel) Nodes(value string) *Cancel {
-	r.values.Set("nodes", value)
+func (r *Cancel) Nodes(nodes ...string) *Cancel {
+	tmp := []string{}
+	for _, item := range nodes {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("nodes", strings.Join(tmp, ","))
 
 	return r
 }
 
-// ParentTaskId Cancel tasks with specified parent task id (node_id:task_number). Set to -1
-// to cancel all.
+// ParentTaskId A parent task ID that is used to limit the tasks.
 // API name: parent_task_id
-func (r *Cancel) ParentTaskId(value string) *Cancel {
-	r.values.Set("parent_task_id", value)
+func (r *Cancel) ParentTaskId(parenttaskid string) *Cancel {
+	r.values.Set("parent_task_id", parenttaskid)
 
 	return r
 }
 
-// WaitForCompletion Should the request block until the cancellation of the task and its
-// descendant tasks is completed. Defaults to false
+// WaitForCompletion If true, the request blocks until all found tasks are complete.
 // API name: wait_for_completion
-func (r *Cancel) WaitForCompletion(b bool) *Cancel {
-	r.values.Set("wait_for_completion", strconv.FormatBool(b))
+func (r *Cancel) WaitForCompletion(waitforcompletion bool) *Cancel {
+	r.values.Set("wait_for_completion", strconv.FormatBool(waitforcompletion))
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *Cancel) ErrorTrace(errortrace bool) *Cancel {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *Cancel) FilterPath(filterpaths ...string) *Cancel {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *Cancel) Human(human bool) *Cancel {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *Cancel) Pretty(pretty bool) *Cancel {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
 
 	return r
 }

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func newLicensePostFunc(t Transport) LicensePost {
@@ -33,6 +34,11 @@ func newLicensePostFunc(t Transport) LicensePost {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -48,7 +54,9 @@ type LicensePost func(o ...func(*LicensePostRequest)) (*Response, error)
 type LicensePostRequest struct {
 	Body io.Reader
 
-	Acknowledge *bool
+	Acknowledge   *bool
+	MasterTimeout time.Duration
+	Timeout       time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -58,15 +66,26 @@ type LicensePostRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r LicensePostRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r LicensePostRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "license.post")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "PUT"
 
@@ -78,6 +97,14 @@ func (r LicensePostRequest) Do(ctx context.Context, transport Transport) (*Respo
 
 	if r.Acknowledge != nil {
 		params["acknowledge"] = strconv.FormatBool(*r.Acknowledge)
+	}
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
 	}
 
 	if r.Pretty {
@@ -98,6 +125,9 @@ func (r LicensePostRequest) Do(ctx context.Context, transport Transport) (*Respo
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -129,8 +159,20 @@ func (r LicensePostRequest) Do(ctx context.Context, transport Transport) (*Respo
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "license.post")
+		if reader := instrument.RecordRequestBody(ctx, "license.post", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "license.post")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -161,6 +203,20 @@ func (f LicensePost) WithBody(v io.Reader) func(*LicensePostRequest) {
 func (f LicensePost) WithAcknowledge(v bool) func(*LicensePostRequest) {
 	return func(r *LicensePostRequest) {
 		r.Acknowledge = &v
+	}
+}
+
+// WithMasterTimeout - timeout for processing on master node.
+func (f LicensePost) WithMasterTimeout(v time.Duration) func(*LicensePostRequest) {
+	return func(r *LicensePostRequest) {
+		r.MasterTimeout = v
+	}
+}
+
+// WithTimeout - timeout for acknowledgement of update from all nodes in cluster.
+func (f LicensePost) WithTimeout(v time.Duration) func(*LicensePostRequest) {
+	return func(r *LicensePostRequest) {
+		r.Timeout = v
 	}
 }
 

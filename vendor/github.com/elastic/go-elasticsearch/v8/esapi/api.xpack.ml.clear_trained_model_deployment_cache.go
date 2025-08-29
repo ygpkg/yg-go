@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -31,6 +31,11 @@ func newMLClearTrainedModelDeploymentCacheFunc(t Transport) MLClearTrainedModelD
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -38,8 +43,6 @@ func newMLClearTrainedModelDeploymentCacheFunc(t Transport) MLClearTrainedModelD
 // ----- API Definition -------------------------------------------------------
 
 // MLClearTrainedModelDeploymentCache - Clear the cached results from a trained model deployment
-//
-// This API is beta.
 //
 // See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/master/clear-trained-model-deployment-cache.html.
 type MLClearTrainedModelDeploymentCache func(model_id string, o ...func(*MLClearTrainedModelDeploymentCacheRequest)) (*Response, error)
@@ -56,15 +59,26 @@ type MLClearTrainedModelDeploymentCacheRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r MLClearTrainedModelDeploymentCacheRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r MLClearTrainedModelDeploymentCacheRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ml.clear_trained_model_deployment_cache")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -76,6 +90,9 @@ func (r MLClearTrainedModelDeploymentCacheRequest) Do(ctx context.Context, trans
 	path.WriteString("trained_models")
 	path.WriteString("/")
 	path.WriteString(r.ModelID)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "model_id", r.ModelID)
+	}
 	path.WriteString("/")
 	path.WriteString("deployment")
 	path.WriteString("/")
@@ -103,6 +120,9 @@ func (r MLClearTrainedModelDeploymentCacheRequest) Do(ctx context.Context, trans
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -130,8 +150,17 @@ func (r MLClearTrainedModelDeploymentCacheRequest) Do(ctx context.Context, trans
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "ml.clear_trained_model_deployment_cache")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ml.clear_trained_model_deployment_cache")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 

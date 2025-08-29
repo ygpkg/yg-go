@@ -15,10 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package movetostep
 
@@ -31,20 +29,24 @@ import (
 
 // Request holds the request body struct for the package movetostep
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ilm/move_to_step/MoveToStepRequest.ts#L24-L37
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ilm/move_to_step/MoveToStepRequest.ts#L24-L64
 type Request struct {
-	CurrentStep *types.StepKey `json:"current_step,omitempty"`
-	NextStep    *types.StepKey `json:"next_step,omitempty"`
+
+	// CurrentStep The step that the index is expected to be in.
+	CurrentStep types.StepKey `json:"current_step"`
+	// NextStep The step that you want to run.
+	NextStep types.StepKey `json:"next_step"`
 }
 
 // NewRequest returns a Request
 func NewRequest() *Request {
 	r := &Request{}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 

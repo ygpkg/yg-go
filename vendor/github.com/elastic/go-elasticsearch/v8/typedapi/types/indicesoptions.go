@@ -15,18 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
-import "github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/expandwildcard"
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/expandwildcard"
+)
 
 // IndicesOptions type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/common.ts#L297-L324
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/common.ts#L341-L368
 type IndicesOptions struct {
 	// AllowNoIndices If false, the request returns an error if any wildcard expression, index
 	// alias, or `_all` value targets only
@@ -45,6 +52,84 @@ type IndicesOptions struct {
 	IgnoreThrottled *bool `json:"ignore_throttled,omitempty"`
 	// IgnoreUnavailable If true, missing or closed indices are not included in the response.
 	IgnoreUnavailable *bool `json:"ignore_unavailable,omitempty"`
+}
+
+func (s *IndicesOptions) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "allow_no_indices":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "AllowNoIndices", err)
+				}
+				s.AllowNoIndices = &value
+			case bool:
+				s.AllowNoIndices = &v
+			}
+
+		case "expand_wildcards":
+			rawMsg := json.RawMessage{}
+			dec.Decode(&rawMsg)
+			if !bytes.HasPrefix(rawMsg, []byte("[")) {
+				o := &expandwildcard.ExpandWildcard{}
+				if err := json.NewDecoder(bytes.NewReader(rawMsg)).Decode(&o); err != nil {
+					return fmt.Errorf("%s | %w", "ExpandWildcards", err)
+				}
+
+				s.ExpandWildcards = append(s.ExpandWildcards, *o)
+			} else {
+				if err := json.NewDecoder(bytes.NewReader(rawMsg)).Decode(&s.ExpandWildcards); err != nil {
+					return fmt.Errorf("%s | %w", "ExpandWildcards", err)
+				}
+			}
+
+		case "ignore_throttled":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "IgnoreThrottled", err)
+				}
+				s.IgnoreThrottled = &value
+			case bool:
+				s.IgnoreThrottled = &v
+			}
+
+		case "ignore_unavailable":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "IgnoreUnavailable", err)
+				}
+				s.IgnoreUnavailable = &value
+			case bool:
+				s.IgnoreUnavailable = &v
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewIndicesOptions returns a IndicesOptions.

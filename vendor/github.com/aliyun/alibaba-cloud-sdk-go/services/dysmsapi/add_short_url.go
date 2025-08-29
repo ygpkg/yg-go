@@ -83,9 +83,9 @@ type AddShortUrlRequest struct {
 // AddShortUrlResponse is the response struct for api AddShortUrl
 type AddShortUrlResponse struct {
 	*responses.BaseResponse
-	RequestId string `json:"RequestId" xml:"RequestId"`
 	Code      string `json:"Code" xml:"Code"`
 	Message   string `json:"Message" xml:"Message"`
+	RequestId string `json:"RequestId" xml:"RequestId"`
 	Data      Data   `json:"Data" xml:"Data"`
 }
 
@@ -94,7 +94,7 @@ func CreateAddShortUrlRequest() (request *AddShortUrlRequest) {
 	request = &AddShortUrlRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "AddShortUrl", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "AddShortUrl", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

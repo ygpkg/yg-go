@@ -15,26 +15,61 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // PivotGroupByContainer type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/transform/_types/Transform.ts#L70-L78
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/transform/_types/Transform.ts#L70-L78
 type PivotGroupByContainer struct {
-	DateHistogram *DateHistogramAggregation `json:"date_histogram,omitempty"`
-	GeotileGrid   *GeoTileGridAggregation   `json:"geotile_grid,omitempty"`
-	Histogram     *HistogramAggregation     `json:"histogram,omitempty"`
-	Terms         *TermsAggregation         `json:"terms,omitempty"`
+	AdditionalPivotGroupByContainerProperty map[string]json.RawMessage `json:"-"`
+	DateHistogram                           *DateHistogramAggregation  `json:"date_histogram,omitempty"`
+	GeotileGrid                             *GeoTileGridAggregation    `json:"geotile_grid,omitempty"`
+	Histogram                               *HistogramAggregation      `json:"histogram,omitempty"`
+	Terms                                   *TermsAggregation          `json:"terms,omitempty"`
+}
+
+// MarhsalJSON overrides marshalling for types with additional properties
+func (s PivotGroupByContainer) MarshalJSON() ([]byte, error) {
+	type opt PivotGroupByContainer
+	// We transform the struct to a map without the embedded additional properties map
+	tmp := make(map[string]any, 0)
+
+	data, err := json.Marshal(opt(s))
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(data, &tmp)
+	if err != nil {
+		return nil, err
+	}
+
+	// We inline the additional fields from the underlying map
+	for key, value := range s.AdditionalPivotGroupByContainerProperty {
+		tmp[fmt.Sprintf("%s", key)] = value
+	}
+	delete(tmp, "AdditionalPivotGroupByContainerProperty")
+
+	data, err = json.Marshal(tmp)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // NewPivotGroupByContainer returns a PivotGroupByContainer.
 func NewPivotGroupByContainer() *PivotGroupByContainer {
-	r := &PivotGroupByContainer{}
+	r := &PivotGroupByContainer{
+		AdditionalPivotGroupByContainerProperty: make(map[string]json.RawMessage),
+	}
 
 	return r
 }

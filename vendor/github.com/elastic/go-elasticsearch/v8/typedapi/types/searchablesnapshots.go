@@ -15,22 +15,125 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // SearchableSnapshots type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/xpack/usage/types.ts#L410-L414
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/xpack/usage/types.ts#L438-L442
 type SearchableSnapshots struct {
 	Available               bool `json:"available"`
 	Enabled                 bool `json:"enabled"`
 	FullCopyIndicesCount    *int `json:"full_copy_indices_count,omitempty"`
 	IndicesCount            int  `json:"indices_count"`
 	SharedCacheIndicesCount *int `json:"shared_cache_indices_count,omitempty"`
+}
+
+func (s *SearchableSnapshots) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "available":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Available", err)
+				}
+				s.Available = value
+			case bool:
+				s.Available = v
+			}
+
+		case "enabled":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Enabled", err)
+				}
+				s.Enabled = value
+			case bool:
+				s.Enabled = v
+			}
+
+		case "full_copy_indices_count":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "FullCopyIndicesCount", err)
+				}
+				s.FullCopyIndicesCount = &value
+			case float64:
+				f := int(v)
+				s.FullCopyIndicesCount = &f
+			}
+
+		case "indices_count":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "IndicesCount", err)
+				}
+				s.IndicesCount = value
+			case float64:
+				f := int(v)
+				s.IndicesCount = f
+			}
+
+		case "shared_cache_indices_count":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "SharedCacheIndicesCount", err)
+				}
+				s.SharedCacheIndicesCount = &value
+			case float64:
+				f := int(v)
+				s.SharedCacheIndicesCount = &f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewSearchableSnapshots returns a SearchableSnapshots.

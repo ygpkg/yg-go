@@ -15,17 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 // Package fieldtype
 package fieldtype
 
 import "strings"
 
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/mapping/Property.ts#L158-L201
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/mapping/Property.ts#L193-L242
 type FieldType struct {
 	Name string
 }
@@ -58,6 +56,10 @@ var (
 	Nested = FieldType{"nested"}
 
 	Object = FieldType{"object"}
+
+	Passthrough = FieldType{"passthrough"}
+
+	Version = FieldType{"version"}
 
 	Murmur3 = FieldType{"murmur3"}
 
@@ -109,11 +111,19 @@ var (
 
 	Constantkeyword = FieldType{"constant_keyword"}
 
+	Countedkeyword = FieldType{"counted_keyword"}
+
 	Aggregatemetricdouble = FieldType{"aggregate_metric_double"}
 
 	Densevector = FieldType{"dense_vector"}
 
+	Semantictext = FieldType{"semantic_text"}
+
+	Sparsevector = FieldType{"sparse_vector"}
+
 	Matchonlytext = FieldType{"match_only_text"}
+
+	Icucollationkeyword = FieldType{"icu_collation_keyword"}
 )
 
 func (f FieldType) MarshalText() (text []byte, err error) {
@@ -121,7 +131,7 @@ func (f FieldType) MarshalText() (text []byte, err error) {
 }
 
 func (f *FieldType) UnmarshalText(text []byte) error {
-	switch strings.ToLower(string(text)) {
+	switch strings.ReplaceAll(strings.ToLower(string(text)), "\"", "") {
 
 	case "none":
 		*f = None
@@ -151,6 +161,10 @@ func (f *FieldType) UnmarshalText(text []byte) error {
 		*f = Nested
 	case "object":
 		*f = Object
+	case "passthrough":
+		*f = Passthrough
+	case "version":
+		*f = Version
 	case "murmur3":
 		*f = Murmur3
 	case "token_count":
@@ -201,12 +215,20 @@ func (f *FieldType) UnmarshalText(text []byte) error {
 		*f = Histogram
 	case "constant_keyword":
 		*f = Constantkeyword
+	case "counted_keyword":
+		*f = Countedkeyword
 	case "aggregate_metric_double":
 		*f = Aggregatemetricdouble
 	case "dense_vector":
 		*f = Densevector
+	case "semantic_text":
+		*f = Semantictext
+	case "sparse_vector":
+		*f = Sparsevector
 	case "match_only_text":
 		*f = Matchonlytext
+	case "icu_collation_keyword":
+		*f = Icucollationkeyword
 	default:
 		*f = FieldType{string(text)}
 	}

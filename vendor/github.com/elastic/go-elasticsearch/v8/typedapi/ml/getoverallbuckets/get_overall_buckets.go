@@ -15,13 +15,28 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Retrieves overall bucket results that summarize the bucket results of
+// Get overall bucket results.
+//
+// Retrievs overall bucket results that summarize the bucket results of
 // multiple anomaly detection jobs.
+//
+// The `overall_score` is calculated by combining the scores of all the
+// buckets within the overall bucket span. First, the maximum
+// `anomaly_score` per anomaly detection job in the overall bucket is
+// calculated. Then the `top_n` of those scores are averaged to result in
+// the `overall_score`. This means that you can fine-tune the
+// `overall_score` so that it is more or less sensitive to the number of
+// jobs that detect an anomaly at the same time. For example, if you set
+// `top_n` to `1`, the `overall_score` is the maximum bucket score in the
+// overall bucket. Alternatively, if you set `top_n` to the number of jobs,
+// the `overall_score` is high only when all jobs detect anomalies in that
+// overall bucket. If you set the `bucket_span` parameter (to a value
+// greater than its default), the `overall_score` is the maximum
+// `overall_score` of the overall buckets that have a span equal to the
+// jobs' largest bucket span.
 package getoverallbuckets
 
 import (
@@ -30,12 +45,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 const (
@@ -52,14 +69,19 @@ type GetOverallBuckets struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
-	req *Request
-	raw json.RawMessage
+	req      *Request
+	deferred []func(request *Request) error
+	buf      *gobytes.Buffer
 
 	paramSet int
 
 	jobid string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewGetOverallBuckets type alias for index.
@@ -71,14 +93,31 @@ func NewGetOverallBucketsFunc(tp elastictransport.Interface) NewGetOverallBucket
 	return func(jobid string) *GetOverallBuckets {
 		n := New(tp)
 
-		n.JobId(jobid)
+		n._jobid(jobid)
 
 		return n
 	}
 }
 
-// Retrieves overall bucket results that summarize the bucket results of
+// Get overall bucket results.
+//
+// Retrievs overall bucket results that summarize the bucket results of
 // multiple anomaly detection jobs.
+//
+// The `overall_score` is calculated by combining the scores of all the
+// buckets within the overall bucket span. First, the maximum
+// `anomaly_score` per anomaly detection job in the overall bucket is
+// calculated. Then the `top_n` of those scores are averaged to result in
+// the `overall_score`. This means that you can fine-tune the
+// `overall_score` so that it is more or less sensitive to the number of
+// jobs that detect an anomaly at the same time. For example, if you set
+// `top_n` to `1`, the `overall_score` is the maximum bucket score in the
+// overall bucket. Alternatively, if you set `top_n` to the number of jobs,
+// the `overall_score` is high only when all jobs detect anomalies in that
+// overall bucket. If you set the `bucket_span` parameter (to a value
+// greater than its default), the `overall_score` is the maximum
+// `overall_score` of the overall buckets that have a span equal to the
+// jobs' largest bucket span.
 //
 // https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-get-overall-buckets.html
 func New(tp elastictransport.Interface) *GetOverallBuckets {
@@ -86,7 +125,14 @@ func New(tp elastictransport.Interface) *GetOverallBuckets {
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+
+		buf: gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -94,7 +140,7 @@ func New(tp elastictransport.Interface) *GetOverallBuckets {
 
 // Raw takes a json payload as input which is then passed to the http.Request
 // If specified Raw takes precedence on Request method.
-func (r *GetOverallBuckets) Raw(raw json.RawMessage) *GetOverallBuckets {
+func (r *GetOverallBuckets) Raw(raw io.Reader) *GetOverallBuckets {
 	r.raw = raw
 
 	return r
@@ -116,9 +162,17 @@ func (r *GetOverallBuckets) HttpRequest(ctx context.Context) (*http.Request, err
 
 	var err error
 
-	if r.raw != nil {
-		r.buf.Write(r.raw)
-	} else if r.req != nil {
+	if len(r.deferred) > 0 {
+		for _, f := range r.deferred {
+			deferredErr := f(r.req)
+			if deferredErr != nil {
+				return nil, deferredErr
+			}
+		}
+	}
+
+	if r.raw == nil && r.req != nil {
+
 		data, err := json.Marshal(r.req)
 
 		if err != nil {
@@ -126,6 +180,11 @@ func (r *GetOverallBuckets) HttpRequest(ctx context.Context) (*http.Request, err
 		}
 
 		r.buf.Write(data)
+
+	}
+
+	if r.buf.Len() > 0 {
+		r.raw = r.buf
 	}
 
 	r.path.Scheme = "http"
@@ -138,6 +197,9 @@ func (r *GetOverallBuckets) HttpRequest(ctx context.Context) (*http.Request, err
 		path.WriteString("anomaly_detectors")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "jobid", r.jobid)
+		}
 		path.WriteString(r.jobid)
 		path.WriteString("/")
 		path.WriteString("results")
@@ -155,15 +217,15 @@ func (r *GetOverallBuckets) HttpRequest(ctx context.Context) (*http.Request, err
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
 
 	if req.Header.Get("Content-Type") == "" {
-		if r.buf.Len() > 0 {
+		if r.raw != nil {
 			req.Header.Set("Content-Type", "application/vnd.elasticsearch+json;compatible-with=8")
 		}
 	}
@@ -179,19 +241,100 @@ func (r *GetOverallBuckets) HttpRequest(ctx context.Context) (*http.Request, err
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r GetOverallBuckets) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r GetOverallBuckets) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "ml.get_overall_buckets")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "ml.get_overall_buckets")
+		if reader := instrument.RecordRequestBody(ctx, "ml.get_overall_buckets", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ml.get_overall_buckets")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the GetOverallBuckets query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the GetOverallBuckets query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
+}
+
+// Do runs the request through the transport, handle the response and returns a getoverallbuckets.Response
+func (r GetOverallBuckets) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ml.get_overall_buckets")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
 }
 
 // Header set a key, value pair in the GetOverallBuckets headers map.
@@ -208,82 +351,130 @@ func (r *GetOverallBuckets) Header(key, value string) *GetOverallBuckets {
 // You can summarize the bucket results for all anomaly detection jobs by
 // using `_all` or by specifying `*` as the `<job_id>`.
 // API Name: jobid
-func (r *GetOverallBuckets) JobId(v string) *GetOverallBuckets {
+func (r *GetOverallBuckets) _jobid(jobid string) *GetOverallBuckets {
 	r.paramSet |= jobidMask
-	r.jobid = v
+	r.jobid = jobid
 
 	return r
 }
 
-// AllowNoMatch Specifies what to do when the request:
-//
-// 1. Contains wildcard expressions and there are no jobs that match.
-// 2. Contains the `_all` string or no identifiers and there are no matches.
-// 3. Contains wildcard expressions and there are only partial matches.
-//
-// If `true`, the request returns an empty `jobs` array when there are no
-// matches and the subset of results when there are partial matches. If this
-// parameter is `false`, the request returns a `404` status code when there
-// are no matches or only partial matches.
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *GetOverallBuckets) ErrorTrace(errortrace bool) *GetOverallBuckets {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *GetOverallBuckets) FilterPath(filterpaths ...string) *GetOverallBuckets {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *GetOverallBuckets) Human(human bool) *GetOverallBuckets {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *GetOverallBuckets) Pretty(pretty bool) *GetOverallBuckets {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
+
+	return r
+}
+
+// AllowNoMatch Refer to the description for the `allow_no_match` query parameter.
 // API name: allow_no_match
-func (r *GetOverallBuckets) AllowNoMatch(b bool) *GetOverallBuckets {
-	r.values.Set("allow_no_match", strconv.FormatBool(b))
+func (r *GetOverallBuckets) AllowNoMatch(allownomatch bool) *GetOverallBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.AllowNoMatch = &allownomatch
 
 	return r
 }
 
-// BucketSpan The span of the overall buckets. Must be greater or equal to the largest
-// bucket span of the specified anomaly detection jobs, which is the default
-// value.
-//
-// By default, an overall bucket has a span equal to the largest bucket span
-// of the specified anomaly detection jobs. To override that behavior, use
-// the optional `bucket_span` parameter.
+// BucketSpan Refer to the description for the `bucket_span` query parameter.
 // API name: bucket_span
-func (r *GetOverallBuckets) BucketSpan(value string) *GetOverallBuckets {
-	r.values.Set("bucket_span", value)
+func (r *GetOverallBuckets) BucketSpan(duration types.Duration) *GetOverallBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.BucketSpan = duration
 
 	return r
 }
 
-// End Returns overall buckets with timestamps earlier than this time.
+// End Refer to the description for the `end` query parameter.
 // API name: end
-func (r *GetOverallBuckets) End(value string) *GetOverallBuckets {
-	r.values.Set("end", value)
+func (r *GetOverallBuckets) End(datetime types.DateTime) *GetOverallBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.End = datetime
 
 	return r
 }
 
-// ExcludeInterim If `true`, the output excludes interim results.
+// ExcludeInterim Refer to the description for the `exclude_interim` query parameter.
 // API name: exclude_interim
-func (r *GetOverallBuckets) ExcludeInterim(b bool) *GetOverallBuckets {
-	r.values.Set("exclude_interim", strconv.FormatBool(b))
+func (r *GetOverallBuckets) ExcludeInterim(excludeinterim bool) *GetOverallBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.ExcludeInterim = &excludeinterim
 
 	return r
 }
 
-// OverallScore Returns overall buckets with overall scores greater than or equal to this
-// value.
+// OverallScore Refer to the description for the `overall_score` query parameter.
 // API name: overall_score
-func (r *GetOverallBuckets) OverallScore(value string) *GetOverallBuckets {
-	r.values.Set("overall_score", value)
+func (r *GetOverallBuckets) OverallScore(overallscore string) *GetOverallBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.OverallScore = &overallscore
 
 	return r
 }
 
-// Start Returns overall buckets with timestamps after this time.
+// Start Refer to the description for the `start` query parameter.
 // API name: start
-func (r *GetOverallBuckets) Start(value string) *GetOverallBuckets {
-	r.values.Set("start", value)
+func (r *GetOverallBuckets) Start(datetime types.DateTime) *GetOverallBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Start = datetime
 
 	return r
 }
 
-// TopN The number of top anomaly detection job bucket scores to be used in the
-// `overall_score` calculation.
+// TopN Refer to the description for the `top_n` query parameter.
 // API name: top_n
-func (r *GetOverallBuckets) TopN(i int) *GetOverallBuckets {
-	r.values.Set("top_n", strconv.Itoa(i))
+func (r *GetOverallBuckets) TopN(topn int) *GetOverallBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.TopN = &topn
 
 	return r
 }

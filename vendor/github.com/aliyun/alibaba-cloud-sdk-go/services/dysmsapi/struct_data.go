@@ -17,14 +17,46 @@ package dysmsapi
 
 // Data is a nested struct in dysmsapi response
 type Data struct {
-	CreateDate         string             `json:"CreateDate" xml:"CreateDate"`
-	PageViewCount      string             `json:"PageViewCount" xml:"PageViewCount"`
-	ShortUrlStatus     string             `json:"ShortUrlStatus" xml:"ShortUrlStatus"`
-	ShortUrl           string             `json:"ShortUrl" xml:"ShortUrl"`
-	UniqueVisitorCount string             `json:"UniqueVisitorCount" xml:"UniqueVisitorCount"`
-	ExpireDate         string             `json:"ExpireDate" xml:"ExpireDate"`
-	ShortUrlName       string             `json:"ShortUrlName" xml:"ShortUrlName"`
-	SourceUrl          string             `json:"SourceUrl" xml:"SourceUrl"`
-	TotalSize          int64              `json:"TotalSize" xml:"TotalSize"`
-	TargetList         []SmsStatisticsDTO `json:"TargetList" xml:"TargetList"`
+	NotMediaMobiles    string                   `json:"NotMediaMobiles" xml:"NotMediaMobiles"`
+	PageSize           int64                    `json:"PageSize" xml:"PageSize"`
+	BizDigitalId       string                   `json:"BizDigitalId" xml:"BizDigitalId"`
+	SourceUrl          string                   `json:"SourceUrl" xml:"SourceUrl"`
+	TotalSize          int64                    `json:"TotalSize" xml:"TotalSize"`
+	CardTmpState       int                      `json:"CardTmpState" xml:"CardTmpState"`
+	Source             string                   `json:"Source" xml:"Source"`
+	Bucket             string                   `json:"Bucket" xml:"Bucket"`
+	PageViewCount      string                   `json:"PageViewCount" xml:"PageViewCount"`
+	StartPath          string                   `json:"StartPath" xml:"StartPath"`
+	ExtCode            string                   `json:"ExtCode" xml:"ExtCode"`
+	MediaMobiles       string                   `json:"MediaMobiles" xml:"MediaMobiles"`
+	ShortUrl           string                   `json:"ShortUrl" xml:"ShortUrl"`
+	CardPhoneNumbers   string                   `json:"CardPhoneNumbers" xml:"CardPhoneNumbers"`
+	ExpireTime         string                   `json:"ExpireTime" xml:"ExpireTime"`
+	Active             int64                    `json:"Active" xml:"Active"`
+	Policy             string                   `json:"Policy" xml:"Policy"`
+	ResourceId         int64                    `json:"ResourceId" xml:"ResourceId"`
+	TemplateCode       string                   `json:"TemplateCode" xml:"TemplateCode"`
+	CardSmsLinks       string                   `json:"CardSmsLinks" xml:"CardSmsLinks"`
+	UniqueVisitorCount string                   `json:"UniqueVisitorCount" xml:"UniqueVisitorCount"`
+	ExpireDate         string                   `json:"ExpireDate" xml:"ExpireDate"`
+	ShortUrlName       string                   `json:"ShortUrlName" xml:"ShortUrlName"`
+	ResUrlDownload     string                   `json:"ResUrlDownload" xml:"ResUrlDownload"`
+	AliUid             string                   `json:"AliUid" xml:"AliUid"`
+	PageNo             int64                    `json:"PageNo" xml:"PageNo"`
+	AccessKeyId        string                   `json:"AccessKeyId" xml:"AccessKeyId"`
+	BizCardId          string                   `json:"BizCardId" xml:"BizCardId"`
+	Host               string                   `json:"Host" xml:"Host"`
+	Signature          string                   `json:"Signature" xml:"Signature"`
+	CreateDate         string                   `json:"CreateDate" xml:"CreateDate"`
+	SendCount          int64                    `json:"SendCount" xml:"SendCount"`
+	ShortUrlStatus     string                   `json:"ShortUrlStatus" xml:"ShortUrlStatus"`
+	BizSmsId           string                   `json:"BizSmsId" xml:"BizSmsId"`
+	CardSignNames      string                   `json:"CardSignNames" xml:"CardSignNames"`
+	SignName           string                   `json:"SignName" xml:"SignName"`
+	Total              int64                    `json:"Total" xml:"Total"`
+	Templates          []map[string]interface{} `json:"Templates" xml:"Templates"`
+	Model              []map[string]interface{} `json:"model" xml:"model"`
+	TargetList         []SmsStatisticsDTO       `json:"TargetList" xml:"TargetList"`
+	QueryResult        []QueryResultItem        `json:"queryResult" xml:"queryResult"`
+	List               []Data                   `json:"List" xml:"List"`
 }

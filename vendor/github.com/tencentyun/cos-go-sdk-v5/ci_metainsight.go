@@ -11,6 +11,7 @@ import (
 
 type MetaInsightService service
 
+// OptHeaders 请求头
 type OptHeaders struct {
 	XOptionHeader *http.Header `header:"-,omitempty" url:"-" json:"-" xml:"-"`
 }
@@ -57,10 +58,16 @@ func (s *MetaInsightService) baseSend(ctx context.Context, opt interface{}, opti
 }
 
 type CreateDatasetOptions struct {
-	DatasetName string      `json:"DatasetName, omitempty" url:"-" ` // 数据集名称，同一个账户下唯一。命名规则如下： 长度为1~32字符。 只能包含小写英文字母，数字，短划线（-）。 必须以英文字母和数字开头。
-	Description string      `json:"Description, omitempty" url:"-" ` // 数据集描述信息。长度为1~256个英文或中文字符，默认值为空。
-	TemplateId  string      `json:"TemplateId, omitempty" url:"-" `  // 指模板，在建立元数据索引时，后端将根据模板来决定收集哪些元数据。每个模板都包含一个或多个算子，不同的算子表示不同的元数据。目前支持的模板： Official:DefaultEmptyId：默认为空的模板，表示不进行元数据的采集。 Official:COSBasicMeta：基础信息模板，包含 COS 文件基础元信息算子，表示采集 COS 文件的名称、类型、ACL等基础元信息数据。 Official:FaceSearch：人脸检索模板，包含人脸检索、COS 文件基础元信息算子。Official:ImageSearch：图像检索模板，包含图像检索、COS 文件基础元信息算子。
-	OptHeaders  *OptHeaders `header:"-, omitempty" url:"-" json:"-" xml:"-"`
+	DatasetName     string      `json:"DatasetName, omitempty" url:"-" `     // 数据集名称，同一个账户下唯一。命名规则如下： 长度为1~32字符。 只能包含小写英文字母，数字，短划线（-）。 必须以英文字母和数字开头。
+	Description     string      `json:"Description, omitempty" url:"-" `     // 数据集描述信息。长度为1~256个英文或中文字符，默认值为空。
+	TemplateId      string      `json:"TemplateId, omitempty" url:"-" `      // 指模板，在建立元数据索引时，后端将根据模板来决定收集哪些元数据。每个模板都包含一个或多个算子，不同的算子表示不同的元数据。目前支持的模板： Official:DefaultEmptyId：默认为空的模板，表示不进行元数据的采集。 Official:COSBasicMeta：基础信息模板，包含 COS 文件基础元信息算子，表示采集 COS 文件的名称、类型、ACL等基础元信息数据。 Official:FaceSearch：人脸检索模板，包含人脸检索、COS 文件基础元信息算子。Official:ImageSearch：图像检索模板，包含图像检索、COS 文件基础元信息算子。
+	Version         string      `json:"Version, omitempty" url:"-" `         // 数据集版本。basic、standard，默认为basic。
+	Volume          int         `json:"Volume, omitempty" url:"-" `          // Version为basic时为50w。Version为standard时，默认为500w，可设置1-10000，单位w。传0采用默认值。
+	TrainingMode    int         `json:"TrainingMode, omitempty" url:"-" `    // 训练数据的来源模式。默认为0，表示训练数据来源于指定数据集，值为1时表示训练数据来源于cos某个bucket目录下文件。仅在Version为standard时生效。
+	TrainingDataset string      `json:"TrainingDataset, omitempty" url:"-" ` // 训练数据的数据集名称。仅在TrainingMode为0时生效。
+	TrainingURI     string      `json:"TrainingURI, omitempty" url:"-" `     // 训练数据的资源路径。仅在TrainingMode为1时生效。
+	SceneType       string      `json:"SceneType, omitempty" url:"-" `       // 场景类型。支持general、E-commercial、iDrive，默认为general。
+	OptHeaders      *OptHeaders `header:"-, omitempty" url:"-" json:"-" xml:"-"`
 }
 
 type CreateDatasetResult struct {
@@ -79,7 +86,7 @@ type Dataset struct {
 	DatasetName   string `json:"DatasetName"`   // 数据集名称
 }
 
-// 创建数据集
+// CreateDataset 创建数据集
 // https://cloud.tencent.com/document/product/460/106020
 func (s *MetaInsightService) CreateDataset(ctx context.Context, opt *CreateDatasetOptions) (*CreateDatasetResult, *Response, error) {
 	var res CreateDatasetResult
@@ -106,7 +113,7 @@ type DescribeDatasetsResult struct {
 	NextToken string     `json:"NextToken"` // 翻页标记。当任务列表总数大于设置的MaxResults时，用于翻页的Token。符合条件的任务列表未全部返回时，此参数才有值。下一次列出任务列表时将此值作为NextToken传入，将后续的任务列表返回。
 }
 
-// 列出数据集
+// DescribeDatasets 列出数据集
 // https://cloud.tencent.com/document/product/460/106158
 func (s *MetaInsightService) DescribeDatasets(ctx context.Context, opt *DescribeDatasetsOptions) (*DescribeDatasetsResult, *Response, error) {
 	var res DescribeDatasetsResult
@@ -130,7 +137,7 @@ type UpdateDatasetResult struct {
 	Dataset   *Dataset `json:"Dataset"`   // 数据集信息
 }
 
-// 更新数据集
+// UpdateDataset 更新数据集
 // https://cloud.tencent.com/document/product/460/106156
 func (s *MetaInsightService) UpdateDataset(ctx context.Context, opt *UpdateDatasetOptions) (*UpdateDatasetResult, *Response, error) {
 	var res UpdateDatasetResult
@@ -154,7 +161,7 @@ type DeleteDatasetResult struct {
 	Dataset   *Dataset `json:"Dataset"`   // 数据集信息
 }
 
-// 删除数据集
+// DeleteDataset 删除数据集
 // https://cloud.tencent.com/document/product/460/106157
 func (s *MetaInsightService) DeleteDataset(ctx context.Context, opt *DeleteDatasetOptions) (*DeleteDatasetResult, *Response, error) {
 	var res DeleteDatasetResult
@@ -179,7 +186,7 @@ type DescribeDatasetResult struct {
 	Dataset   *Dataset `json:"Dataset"`   // 数据集信息
 }
 
-// 查询数据集
+// DescribeDataset 查询数据集
 // https://cloud.tencent.com/document/product/460/106155
 func (s *MetaInsightService) DescribeDataset(ctx context.Context, opt *DescribeDatasetOptions) (*DescribeDatasetResult, *Response, error) {
 	var res DescribeDatasetResult
@@ -220,7 +227,7 @@ type CreateFileMetaIndexResult struct {
 	EventId   string `json:"EventId"`   // 创建元数据索引的任务ID
 }
 
-// 创建元数据索引
+// CreateFileMetaIndex 创建元数据索引
 // https://cloud.tencent.com/document/product/460/106022
 func (s *MetaInsightService) CreateFileMetaIndex(ctx context.Context, opt *CreateFileMetaIndexOptions) (*CreateFileMetaIndexResult, *Response, error) {
 	var res CreateFileMetaIndexResult
@@ -246,7 +253,7 @@ type UpdateFileMetaIndexResult struct {
 	EventId   string `json:"EventId"`   // 创建元数据索引的任务ID
 }
 
-// 更新元数据索引
+// UpdateFileMetaIndex 更新元数据索引
 // https://cloud.tencent.com/document/product/460/106162
 func (s *MetaInsightService) UpdateFileMetaIndex(ctx context.Context, opt *UpdateFileMetaIndexOptions) (*UpdateFileMetaIndexResult, *Response, error) {
 	var res UpdateFileMetaIndexResult
@@ -289,7 +296,7 @@ type FilesDetail struct {
 	CustomLabels     *map[string]string `json:"CustomLabels"`     //   文件自定义标签列表。储存您业务自定义的键名、键值对信息，用于在查询时可以据此为筛选项进行检索。
 }
 
-// 查询元数据索引
+// DescribeFileMetaIndex 查询元数据索引
 // https://cloud.tencent.com/document/product/460/106164
 func (s *MetaInsightService) DescribeFileMetaIndex(ctx context.Context, opt *DescribeFileMetaIndexOptions) (*DescribeFileMetaIndexResult, *Response, error) {
 	var res DescribeFileMetaIndexResult
@@ -311,7 +318,7 @@ type DeleteFileMetaIndexResult struct {
 	RequestId string `json:"RequestId"` // 请求ID
 }
 
-// 删除元数据索引
+// DeleteFileMetaIndex 删除元数据索引
 // https://cloud.tencent.com/document/product/460/106163
 func (s *MetaInsightService) DeleteFileMetaIndex(ctx context.Context, opt *DeleteFileMetaIndexOptions) (*DeleteFileMetaIndexResult, *Response, error) {
 	var res DeleteFileMetaIndexResult
@@ -347,7 +354,7 @@ type Binding struct {
 	Detail      string `json:"Detail"`      // 详情
 }
 
-// 绑定存储桶与数据集
+// CreateDatasetBinding 绑定存储桶与数据集
 // https://cloud.tencent.com/document/product/460/106159
 func (s *MetaInsightService) CreateDatasetBinding(ctx context.Context, opt *CreateDatasetBindingOptions) (*CreateDatasetBindingResult, *Response, error) {
 	var res CreateDatasetBindingResult
@@ -372,7 +379,7 @@ type DescribeDatasetBindingResult struct {
 	Binding   *Binding `json:"Binding"`   // 数据集和 COS Bucket 绑定关系信息的列表。
 }
 
-// 查询数据集与存储桶的绑定关系
+// DescribeDatasetBinding 查询数据集与存储桶的绑定关系
 // https://cloud.tencent.com/document/product/460/106485
 func (s *MetaInsightService) DescribeDatasetBinding(ctx context.Context, opt *DescribeDatasetBindingOptions) (*DescribeDatasetBindingResult, *Response, error) {
 	var res DescribeDatasetBindingResult
@@ -397,7 +404,7 @@ type DescribeDatasetBindingsResult struct {
 	Bindings  []*Binding `json:"Bindings"`  // 数据集和 COS Bucket 绑定关系信息的列表。
 }
 
-// 查询绑定关系列表
+// DescribeDatasetBindings 查询绑定关系列表
 // https://cloud.tencent.com/document/product/460/106161
 func (s *MetaInsightService) DescribeDatasetBindings(ctx context.Context, opt *DescribeDatasetBindingsOptions) (*DescribeDatasetBindingsResult, *Response, error) {
 	var res DescribeDatasetBindingsResult
@@ -419,7 +426,7 @@ type DeleteDatasetBindingResult struct {
 	RequestId string `json:"RequestId"` // 请求ID
 }
 
-// 解绑存储桶与数据集
+// DeleteDatasetBinding 解绑存储桶与数据集
 // https://cloud.tencent.com/document/product/460/106160
 func (s *MetaInsightService) DeleteDatasetBinding(ctx context.Context, opt *DeleteDatasetBindingOptions) (*DeleteDatasetBindingResult, *Response, error) {
 	var res DeleteDatasetBindingResult
@@ -512,7 +519,7 @@ type FileResult struct {
 	DatasetName          string             `json:"DatasetName"`          // 数据集名称。
 }
 
-// 简单查询
+// DatasetSimpleQuery 简单查询
 // https://cloud.tencent.com/document/product/460/106375
 func (s *MetaInsightService) DatasetSimpleQuery(ctx context.Context, opt *DatasetSimpleQueryOptions) (*DatasetSimpleQueryResult, *Response, error) {
 	var res DatasetSimpleQueryResult
@@ -560,7 +567,7 @@ type FaceInfosInMeta struct {
 	URI          string        `json:"URI"`          // 资源标识字段，表示需要建立索引的文件地址。
 }
 
-// 人脸搜索
+// DatasetFaceSearch 人脸搜索
 // https://cloud.tencent.com/document/product/460/106166
 func (s *MetaInsightService) DatasetFaceSearch(ctx context.Context, opt *DatasetFaceSearchOptions) (*DatasetFaceSearchResult, *Response, error) {
 	var res DatasetFaceSearchResult
@@ -594,7 +601,7 @@ type ImageResult struct {
 	Score int    `json:"Score"` // 相关图片匹配得分。
 }
 
-// 图像检索
+// SearchImage 图像检索
 // https://cloud.tencent.com/document/product/460/106376
 func (s *MetaInsightService) SearchImage(ctx context.Context, opt *SearchImageOptions) (*SearchImageResult, *Response, error) {
 	var res SearchImageResult

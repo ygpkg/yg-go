@@ -74,7 +74,9 @@ type QuerySmsSignListRequest struct {
 	ResourceOwnerId      requests.Integer `position:"Query" name:"ResourceOwnerId"`
 	PageSize             requests.Integer `position:"Query" name:"PageSize"`
 	PageIndex            requests.Integer `position:"Query" name:"PageIndex"`
+	RouteName            string           `position:"Query" name:"RouteName"`
 	ResourceOwnerAccount string           `position:"Query" name:"ResourceOwnerAccount"`
+	IsGlobeSign          string           `position:"Query" name:"IsGlobeSign"`
 	OwnerId              requests.Integer `position:"Query" name:"OwnerId"`
 }
 
@@ -84,6 +86,9 @@ type QuerySmsSignListResponse struct {
 	RequestId   string            `json:"RequestId" xml:"RequestId"`
 	Code        string            `json:"Code" xml:"Code"`
 	Message     string            `json:"Message" xml:"Message"`
+	TotalCount  int64             `json:"TotalCount" xml:"TotalCount"`
+	CurrentPage int               `json:"CurrentPage" xml:"CurrentPage"`
+	PageSize    int               `json:"PageSize" xml:"PageSize"`
 	SmsSignList []QuerySmsSignDTO `json:"SmsSignList" xml:"SmsSignList"`
 }
 
@@ -92,7 +97,7 @@ func CreateQuerySmsSignListRequest() (request *QuerySmsSignListRequest) {
 	request = &QuerySmsSignListRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySmsSignList", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySmsSignList", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

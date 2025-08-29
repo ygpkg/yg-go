@@ -9,7 +9,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/swaggo/swag)](https://goreportcard.com/report/github.com/swaggo/swag)
 [![codebeat badge](https://codebeat.co/badges/71e2f5e5-9e6b-405d-baf9-7cc8b5037330)](https://codebeat.co/projects/github-com-swaggo-swag-master)
 [![Go Doc](https://godoc.org/github.com/swaggo/swagg?status.svg)](https://godoc.org/github.com/swaggo/swag)
-[![Backers on Open Collective](https://opencollective.com/swag/backers/badge.svg)](#backers) 
+[![Backers on Open Collective](https://opencollective.com/swag/backers/badge.svg)](#backers)
 [![Sponsors on Open Collective](https://opencollective.com/swag/sponsors/badge.svg)](#sponsors) [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fswaggo%2Fswag.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fswaggo%2Fswag?ref=badge_shield)
 [![Release](https://img.shields.io/github/release/swaggo/swag.svg?style=flat-square)](https://github.com/swaggo/swag/releases)
 
@@ -50,7 +50,7 @@ Swag将Go的注释转换为Swagger2.0文档。我们为流行的 [Go Web Framewo
 go install github.com/swaggo/swag/cmd/swag@latest
 ```
 
-从源码开始构建的话，需要有Go环境（1.17及以上版本）。
+从源码开始构建的话，需要有Go环境（1.19及以上版本）。
 
 或者从github的release页面下载预编译好的二进制文件。
 
@@ -90,6 +90,7 @@ OPTIONS:
    --output value, -o value               文件(swagger.json, swagger.yaml and doc.go)输出目录 (默认: "./docs")
    --parseVendor                          是否解析vendor目录里的go源文件，默认不
    --parseDependency                      是否解析依赖目录中的go源文件，默认不
+   --parseDependencyLevel, --pdl          对'--parseDependency'参数进行增强, 是否解析依赖目录中的go源文件, 0 不解析, 1 只解析对象模型, 2 只解析API, 3 对象模型和API都解析 (default: 0)
    --markdownFiles value, --md value      指定API的描述信息所使用的markdown文件所在的目录
    --generatedTime                        是否输出时间到输出文件docs.go的顶部，默认是
    --codeExampleFiles value, --cef value  解析包含用于 x-codeSamples 扩展的代码示例文件的文件夹，默认禁用
@@ -119,7 +120,6 @@ OPTIONS:
 - [gin](http://github.com/swaggo/gin-swagger)
 - [echo](http://github.com/swaggo/echo-swagger)
 - [buffalo](https://github.com/swaggo/buffalo-swagger)
-- [net/http](https://github.com/swaggo/http-swagger)
 - [net/http](https://github.com/swaggo/http-swagger)
 - [gorilla/mux](https://github.com/swaggo/http-swagger)
 - [go-chi/chi](https://github.com/swaggo/http-swagger)
@@ -299,7 +299,7 @@ swag init
 
 ## 格式化说明
 
-可以针对Swag的注释自动格式化，就像`go fmt`。   
+可以针对Swag的注释自动格式化，就像`go fmt`。
 此处查看格式化结果 [here](https://github.com/swaggo/swag/tree/master/example/celler).
 
 示例：
@@ -379,23 +379,25 @@ swag fmt -d ./ --exclude ./internal
 
 Example [celler/controller](https://github.com/swaggo/swag/tree/master/example/celler/controller)
 
-| 注释                 | 描述                                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------------- |
-| description          | 操作行为的详细说明。                                                                                    |
-| description.markdown | 应用程序的简短描述。该描述将从名为`endpointname.md`的文件中读取。                                       |
-| id                   | 用于标识操作的唯一字符串。在所有API操作中必须唯一。                                                     |
-| tags                 | 每个API操作的标签列表，以逗号分隔。                                                                     |
+| 注释                   | 描述                                                                                             |
+|----------------------|------------------------------------------------------------------------------------------------|
+| description          | 操作行为的详细说明。                                                                                     |
+| description.markdown | 应用程序的简短描述。该描述将从名为`endpointname.md`的文件中读取。                                                      |
+| id                   | 用于标识操作的唯一字符串。在所有API操作中必须唯一。                                                                    |
+| tags                 | 每个API操作的标签列表，以逗号分隔。                                                                            |
 | summary              | 该操作的简短摘要。                                                                                      |
-| accept               | API 可以使用的 MIME 类型列表。 请注意，Accept 仅影响具有请求正文的操作，例如 POST、PUT 和 PATCH。 值必须如“[Mime类型](#mime类型)”中所述。                                  |
-| produce              | API可以生成的MIME类型的列表。值必须如“[Mime类型](#mime类型)”中所述。                                  |
+| accept               | API 可以使用的 MIME 类型列表。 请注意，Accept 仅影响具有请求正文的操作，例如 POST、PUT 和 PATCH。 值必须如“[Mime类型](#mime类型)”中所述。  |
+| produce              | API可以生成的MIME类型的列表。值必须如“[Mime类型](#mime类型)”中所述。                                                  |
 | param                | 用空格分隔的参数。`param name`,`param type`,`data type`,`is mandatory?`,`comment` `attribute(optional)` |
-| security             | 每个API操作的[安全性](#安全性)。                                                                      |
-| success              | 以空格分隔的成功响应。`return code`,`{param type}`,`data type`,`comment`                                |
-| failure              | 以空格分隔的故障响应。`return code`,`{param type}`,`data type`,`comment`                                |
-| response             | 与success、failure作用相同                                                                               |
-| header               | 以空格分隔的头字段。 `return code`,`{param type}`,`data type`,`comment`                                 |
-| router               | 以空格分隔的路径定义。 `path`,`[httpMethod]`                                                            |
-| x-name               | 扩展字段必须以`x-`开头，并且只能使用json值。                                                            |
+| security             | 每个API操作的[安全性](#安全性)。                                                                           |
+| success              | 以空格分隔的成功响应。`return code`,`{param type}`,`data type`,`comment`                                  |
+| failure              | 以空格分隔的故障响应。`return code`,`{param type}`,`data type`,`comment`                                  |
+| response             | 与success、failure作用相同                                                                           |
+| header               | 以空格分隔的头字段。 `return code`,`{param type}`,`data type`,`comment`                                  |
+| router               | 以空格分隔的路径定义。 `path`,`[httpMethod]`                                                              |
+| deprecatedrouter     | 与router相同，但是是deprecated的。                                                                      |
+| x-name               | 扩展字段必须以`x-`开头，并且只能使用json值。                                                                     |
+| deprecated           | 将当前API操作的所有路径设置为deprecated                                                                     |
 
 ## Mime类型
 
@@ -415,6 +417,7 @@ Example [celler/controller](https://github.com/swaggo/swag/tree/master/example/c
 | png                   | image/png                         |
 | jpeg                  | image/jpeg                        |
 | gif                   | image/gif                         |
+| event-stream          | text/event-stream                 |
 
 ## 参数类型
 
@@ -730,8 +733,7 @@ type Resp struct {
 使用AND条件。
 
 ```go
-// @Security ApiKeyAuth
-// @Security OAuth2Application[write, admin]
+// @Security ApiKeyAuth && OAuth2Application[write, admin]
 ```
 
 ## 项目相关

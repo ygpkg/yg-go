@@ -15,47 +15,242 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // SegmentsRecord type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/cat/segments/types.ts#L22-L96
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/cat/segments/types.ts#L22-L107
 type SegmentsRecord struct {
-	// Committed is segment committed
+	// Committed If `true`, the segment is synced to disk.
+	// Segments that are synced can survive a hard reboot.
+	// If `false`, the data from uncommitted segments is also stored in the
+	// transaction log so that Elasticsearch is able to replay changes on the next
+	// start.
 	Committed *string `json:"committed,omitempty"`
-	// Compound is segment compound
+	// Compound If `true`, the segment is stored in a compound file.
+	// This means Lucene merged all files from the segment in a single file to save
+	// file descriptors.
 	Compound *string `json:"compound,omitempty"`
-	// DocsCount number of docs in segment
+	// DocsCount The number of documents in the segment.
+	// This excludes deleted documents and counts any nested documents separately
+	// from their parents.
+	// It also excludes documents which were indexed recently and do not yet belong
+	// to a segment.
 	DocsCount *string `json:"docs.count,omitempty"`
-	// DocsDeleted number of deleted docs in segment
+	// DocsDeleted The number of deleted documents in the segment, which might be higher or
+	// lower than the number of delete operations you have performed.
+	// This number excludes deletes that were performed recently and do not yet
+	// belong to a segment.
+	// Deleted documents are cleaned up by the automatic merge process if it makes
+	// sense to do so.
+	// Also, Elasticsearch creates extra deleted documents to internally track the
+	// recent history of operations on a shard.
 	DocsDeleted *string `json:"docs.deleted,omitempty"`
-	// Generation segment generation
+	// Generation The segment generation number.
+	// Elasticsearch increments this generation number for each segment written then
+	// uses this number to derive the segment name.
 	Generation *string `json:"generation,omitempty"`
-	// Id unique id of node where it lives
+	// Id The unique identifier of the node where it lives.
 	Id *string `json:"id,omitempty"`
-	// Index index name
+	// Index The index name.
 	Index *string `json:"index,omitempty"`
-	// Ip ip of node where it lives
+	// Ip The IP address of the node where it lives.
 	Ip *string `json:"ip,omitempty"`
-	// Prirep primary or replica
+	// Prirep The shard type: `primary` or `replica`.
 	Prirep *string `json:"prirep,omitempty"`
-	// Searchable is segment searched
+	// Searchable If `true`, the segment is searchable.
+	// If `false`, the segment has most likely been written to disk but needs a
+	// refresh to be searchable.
 	Searchable *string `json:"searchable,omitempty"`
-	// Segment segment name
+	// Segment The segment name, which is derived from the segment generation and used
+	// internally to create file names in the directory of the shard.
 	Segment *string `json:"segment,omitempty"`
-	// Shard shard name
+	// Shard The shard name.
 	Shard *string `json:"shard,omitempty"`
-	// Size segment size in bytes
-	Size *ByteSize `json:"size,omitempty"`
-	// SizeMemory segment memory in bytes
-	SizeMemory *ByteSize `json:"size.memory,omitempty"`
-	// Version version
+	// Size The segment size in bytes.
+	Size ByteSize `json:"size,omitempty"`
+	// SizeMemory The segment memory in bytes.
+	// A value of `-1` indicates Elasticsearch was unable to compute this number.
+	SizeMemory ByteSize `json:"size.memory,omitempty"`
+	// Version The version of Lucene used to write the segment.
 	Version *string `json:"version,omitempty"`
+}
+
+func (s *SegmentsRecord) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "committed", "ic", "isCommitted":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Committed", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Committed = &o
+
+		case "compound", "ico", "isCompound":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Compound", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Compound = &o
+
+		case "docs.count", "dc", "docsCount":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "DocsCount", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.DocsCount = &o
+
+		case "docs.deleted", "dd", "docsDeleted":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "DocsDeleted", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.DocsDeleted = &o
+
+		case "generation", "g", "gen":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Generation", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Generation = &o
+
+		case "id":
+			if err := dec.Decode(&s.Id); err != nil {
+				return fmt.Errorf("%s | %w", "Id", err)
+			}
+
+		case "index", "i", "idx":
+			if err := dec.Decode(&s.Index); err != nil {
+				return fmt.Errorf("%s | %w", "Index", err)
+			}
+
+		case "ip":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Ip", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Ip = &o
+
+		case "prirep", "p", "pr", "primaryOrReplica":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Prirep", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Prirep = &o
+
+		case "searchable", "is", "isSearchable":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Searchable", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Searchable = &o
+
+		case "segment", "seg":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Segment", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Segment = &o
+
+		case "shard", "s", "sh":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Shard", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Shard = &o
+
+		case "size", "si":
+			if err := dec.Decode(&s.Size); err != nil {
+				return fmt.Errorf("%s | %w", "Size", err)
+			}
+
+		case "size.memory", "sm", "sizeMemory":
+			if err := dec.Decode(&s.SizeMemory); err != nil {
+				return fmt.Errorf("%s | %w", "SizeMemory", err)
+			}
+
+		case "version", "v":
+			if err := dec.Decode(&s.Version); err != nil {
+				return fmt.Errorf("%s | %w", "Version", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewSegmentsRecord returns a SegmentsRecord.

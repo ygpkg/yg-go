@@ -15,21 +15,88 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // WatcherWatchTriggerSchedule type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/xpack/usage/types.ts#L448-L451
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/xpack/usage/types.ts#L476-L479
 type WatcherWatchTriggerSchedule struct {
 	Active int64   `json:"active"`
 	All_   Counter `json:"_all"`
 	Cron   Counter `json:"cron"`
 	Total  int64   `json:"total"`
+}
+
+func (s *WatcherWatchTriggerSchedule) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "active":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Active", err)
+				}
+				s.Active = value
+			case float64:
+				f := int64(v)
+				s.Active = f
+			}
+
+		case "_all":
+			if err := dec.Decode(&s.All_); err != nil {
+				return fmt.Errorf("%s | %w", "All_", err)
+			}
+
+		case "cron":
+			if err := dec.Decode(&s.Cron); err != nil {
+				return fmt.Errorf("%s | %w", "Cron", err)
+			}
+
+		case "total":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Total", err)
+				}
+				s.Total = value
+			case float64:
+				f := int64(v)
+				s.Total = f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewWatcherWatchTriggerSchedule returns a WatcherWatchTriggerSchedule.

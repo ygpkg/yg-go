@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newEnrichPutPolicyFunc(t Transport) EnrichPutPolicy {
@@ -32,6 +33,11 @@ func newEnrichPutPolicyFunc(t Transport) EnrichPutPolicy {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -49,6 +55,8 @@ type EnrichPutPolicyRequest struct {
 
 	Name string
 
+	MasterTimeout time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -57,15 +65,26 @@ type EnrichPutPolicyRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r EnrichPutPolicyRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r EnrichPutPolicyRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "enrich.put_policy")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "PUT"
 
@@ -77,8 +96,15 @@ func (r EnrichPutPolicyRequest) Do(ctx context.Context, transport Transport) (*R
 	path.WriteString("policy")
 	path.WriteString("/")
 	path.WriteString(r.Name)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "name", r.Name)
+	}
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -98,6 +124,9 @@ func (r EnrichPutPolicyRequest) Do(ctx context.Context, transport Transport) (*R
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -129,8 +158,20 @@ func (r EnrichPutPolicyRequest) Do(ctx context.Context, transport Transport) (*R
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "enrich.put_policy")
+		if reader := instrument.RecordRequestBody(ctx, "enrich.put_policy", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "enrich.put_policy")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -147,6 +188,13 @@ func (r EnrichPutPolicyRequest) Do(ctx context.Context, transport Transport) (*R
 func (f EnrichPutPolicy) WithContext(v context.Context) func(*EnrichPutPolicyRequest) {
 	return func(r *EnrichPutPolicyRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - timeout for processing on master node.
+func (f EnrichPutPolicy) WithMasterTimeout(v time.Duration) func(*EnrichPutPolicyRequest) {
+	return func(r *EnrichPutPolicyRequest) {
+		r.MasterTimeout = v
 	}
 }
 

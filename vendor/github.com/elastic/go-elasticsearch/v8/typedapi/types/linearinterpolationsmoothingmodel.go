@@ -15,20 +15,95 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // LinearInterpolationSmoothingModel type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_global/search/_types/suggester.ts#L216-L220
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_global/search/_types/suggester.ts#L437-L441
 type LinearInterpolationSmoothingModel struct {
-	BigramLambda  float64 `json:"bigram_lambda"`
-	TrigramLambda float64 `json:"trigram_lambda"`
-	UnigramLambda float64 `json:"unigram_lambda"`
+	BigramLambda  Float64 `json:"bigram_lambda"`
+	TrigramLambda Float64 `json:"trigram_lambda"`
+	UnigramLambda Float64 `json:"unigram_lambda"`
+}
+
+func (s *LinearInterpolationSmoothingModel) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "bigram_lambda":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "BigramLambda", err)
+				}
+				f := Float64(value)
+				s.BigramLambda = f
+			case float64:
+				f := Float64(v)
+				s.BigramLambda = f
+			}
+
+		case "trigram_lambda":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "TrigramLambda", err)
+				}
+				f := Float64(value)
+				s.TrigramLambda = f
+			case float64:
+				f := Float64(v)
+				s.TrigramLambda = f
+			}
+
+		case "unigram_lambda":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "UnigramLambda", err)
+				}
+				f := Float64(value)
+				s.UnigramLambda = f
+			case float64:
+				f := Float64(v)
+				s.UnigramLambda = f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewLinearInterpolationSmoothingModel returns a LinearInterpolationSmoothingModel.

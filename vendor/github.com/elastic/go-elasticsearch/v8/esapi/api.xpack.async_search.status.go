@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newAsyncSearchStatusFunc(t Transport) AsyncSearchStatus {
@@ -31,6 +32,11 @@ func newAsyncSearchStatusFunc(t Transport) AsyncSearchStatus {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -46,6 +52,8 @@ type AsyncSearchStatus func(id string, o ...func(*AsyncSearchStatusRequest)) (*R
 type AsyncSearchStatusRequest struct {
 	DocumentID string
 
+	KeepAlive time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -54,15 +62,26 @@ type AsyncSearchStatusRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r AsyncSearchStatusRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r AsyncSearchStatusRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "async_search.status")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -74,8 +93,15 @@ func (r AsyncSearchStatusRequest) Do(ctx context.Context, transport Transport) (
 	path.WriteString("status")
 	path.WriteString("/")
 	path.WriteString(r.DocumentID)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "id", r.DocumentID)
+	}
 
 	params = make(map[string]string)
+
+	if r.KeepAlive != 0 {
+		params["keep_alive"] = formatDuration(r.KeepAlive)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -95,6 +121,9 @@ func (r AsyncSearchStatusRequest) Do(ctx context.Context, transport Transport) (
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -122,8 +151,17 @@ func (r AsyncSearchStatusRequest) Do(ctx context.Context, transport Transport) (
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "async_search.status")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "async_search.status")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -140,6 +178,13 @@ func (r AsyncSearchStatusRequest) Do(ctx context.Context, transport Transport) (
 func (f AsyncSearchStatus) WithContext(v context.Context) func(*AsyncSearchStatusRequest) {
 	return func(r *AsyncSearchStatusRequest) {
 		r.ctx = v
+	}
+}
+
+// WithKeepAlive - specify the time interval in which the results (partial or final) for this search will be available.
+func (f AsyncSearchStatus) WithKeepAlive(v time.Duration) func(*AsyncSearchStatusRequest) {
+	return func(r *AsyncSearchStatusRequest) {
+		r.KeepAlive = v
 	}
 }
 

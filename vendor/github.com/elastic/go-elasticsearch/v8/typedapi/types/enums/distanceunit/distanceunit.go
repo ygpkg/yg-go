@@ -15,39 +15,37 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 // Package distanceunit
 package distanceunit
 
 import "strings"
 
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/Geo.ts#L30-L49
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/Geo.ts#L30-L40
 type DistanceUnit struct {
 	Name string
 }
 
 var (
-	In = DistanceUnit{"in"}
+	Inches = DistanceUnit{"in"}
 
-	Ft = DistanceUnit{"ft"}
+	Feet = DistanceUnit{"ft"}
 
-	Yd = DistanceUnit{"yd"}
+	Yards = DistanceUnit{"yd"}
 
-	Mi = DistanceUnit{"mi"}
+	Miles = DistanceUnit{"mi"}
 
-	Nmi = DistanceUnit{"nmi"}
+	Nauticmiles = DistanceUnit{"nmi"}
 
-	Km = DistanceUnit{"km"}
+	Kilometers = DistanceUnit{"km"}
 
-	M = DistanceUnit{"m"}
+	Meters = DistanceUnit{"m"}
 
-	Cm = DistanceUnit{"cm"}
+	Centimeters = DistanceUnit{"cm"}
 
-	Mm = DistanceUnit{"mm"}
+	Millimeters = DistanceUnit{"mm"}
 )
 
 func (d DistanceUnit) MarshalText() (text []byte, err error) {
@@ -55,26 +53,26 @@ func (d DistanceUnit) MarshalText() (text []byte, err error) {
 }
 
 func (d *DistanceUnit) UnmarshalText(text []byte) error {
-	switch strings.ToLower(string(text)) {
+	switch strings.ReplaceAll(strings.ToLower(string(text)), "\"", "") {
 
 	case "in":
-		*d = In
+		*d = Inches
 	case "ft":
-		*d = Ft
+		*d = Feet
 	case "yd":
-		*d = Yd
+		*d = Yards
 	case "mi":
-		*d = Mi
+		*d = Miles
 	case "nmi":
-		*d = Nmi
+		*d = Nauticmiles
 	case "km":
-		*d = Km
+		*d = Kilometers
 	case "m":
-		*d = M
+		*d = Meters
 	case "cm":
-		*d = Cm
+		*d = Centimeters
 	case "mm":
-		*d = Mm
+		*d = Millimeters
 	default:
 		*d = DistanceUnit{string(text)}
 	}

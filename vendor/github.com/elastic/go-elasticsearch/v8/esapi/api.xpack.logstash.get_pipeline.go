@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -26,11 +26,16 @@ import (
 )
 
 func newLogstashGetPipelineFunc(t Transport) LogstashGetPipeline {
-	return func(id string, o ...func(*LogstashGetPipelineRequest)) (*Response, error) {
-		var r = LogstashGetPipelineRequest{DocumentID: id}
+	return func(o ...func(*LogstashGetPipelineRequest)) (*Response, error) {
+		var r = LogstashGetPipelineRequest{}
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -40,7 +45,7 @@ func newLogstashGetPipelineFunc(t Transport) LogstashGetPipeline {
 // LogstashGetPipeline - Retrieves Logstash Pipelines used by Central Management
 //
 // See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/current/logstash-api-get-pipeline.html.
-type LogstashGetPipeline func(id string, o ...func(*LogstashGetPipelineRequest)) (*Response, error)
+type LogstashGetPipeline func(o ...func(*LogstashGetPipelineRequest)) (*Response, error)
 
 // LogstashGetPipelineRequest configures the Logstash Get Pipeline API request.
 type LogstashGetPipelineRequest struct {
@@ -54,15 +59,26 @@ type LogstashGetPipelineRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r LogstashGetPipelineRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r LogstashGetPipelineRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "logstash.get_pipeline")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -72,8 +88,13 @@ func (r LogstashGetPipelineRequest) Do(ctx context.Context, transport Transport)
 	path.WriteString("_logstash")
 	path.WriteString("/")
 	path.WriteString("pipeline")
-	path.WriteString("/")
-	path.WriteString(r.DocumentID)
+	if r.DocumentID != "" {
+		path.WriteString("/")
+		path.WriteString(r.DocumentID)
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "id", r.DocumentID)
+		}
+	}
 
 	params = make(map[string]string)
 
@@ -95,6 +116,9 @@ func (r LogstashGetPipelineRequest) Do(ctx context.Context, transport Transport)
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -122,8 +146,17 @@ func (r LogstashGetPipelineRequest) Do(ctx context.Context, transport Transport)
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "logstash.get_pipeline")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "logstash.get_pipeline")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -140,6 +173,13 @@ func (r LogstashGetPipelineRequest) Do(ctx context.Context, transport Transport)
 func (f LogstashGetPipeline) WithContext(v context.Context) func(*LogstashGetPipelineRequest) {
 	return func(r *LogstashGetPipelineRequest) {
 		r.ctx = v
+	}
+}
+
+// WithDocumentID - a list of pipeline ids.
+func (f LogstashGetPipeline) WithDocumentID(v string) func(*LogstashGetPipelineRequest) {
+	return func(r *LogstashGetPipelineRequest) {
+		r.DocumentID = v
 	}
 }
 

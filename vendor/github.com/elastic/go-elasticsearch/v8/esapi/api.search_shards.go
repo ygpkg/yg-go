@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func newSearchShardsFunc(t Transport) SearchShards {
@@ -32,6 +33,11 @@ func newSearchShardsFunc(t Transport) SearchShards {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -51,6 +57,7 @@ type SearchShardsRequest struct {
 	ExpandWildcards   string
 	IgnoreUnavailable *bool
 	Local             *bool
+	MasterTimeout     time.Duration
 	Preference        string
 	Routing           string
 
@@ -62,15 +69,26 @@ type SearchShardsRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r SearchShardsRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r SearchShardsRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "search_shards")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -79,6 +97,9 @@ func (r SearchShardsRequest) Do(ctx context.Context, transport Transport) (*Resp
 	if len(r.Index) > 0 {
 		path.WriteString("/")
 		path.WriteString(strings.Join(r.Index, ","))
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "index", strings.Join(r.Index, ","))
+		}
 	}
 	path.WriteString("/")
 	path.WriteString("_search_shards")
@@ -99,6 +120,10 @@ func (r SearchShardsRequest) Do(ctx context.Context, transport Transport) (*Resp
 
 	if r.Local != nil {
 		params["local"] = strconv.FormatBool(*r.Local)
+	}
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
 	}
 
 	if r.Preference != "" {
@@ -127,6 +152,9 @@ func (r SearchShardsRequest) Do(ctx context.Context, transport Transport) (*Resp
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -154,8 +182,17 @@ func (r SearchShardsRequest) Do(ctx context.Context, transport Transport) (*Resp
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "search_shards")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "search_shards")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -207,6 +244,13 @@ func (f SearchShards) WithIgnoreUnavailable(v bool) func(*SearchShardsRequest) {
 func (f SearchShards) WithLocal(v bool) func(*SearchShardsRequest) {
 	return func(r *SearchShardsRequest) {
 		r.Local = &v
+	}
+}
+
+// WithMasterTimeout - explicit operation timeout for connection to master node.
+func (f SearchShards) WithMasterTimeout(v time.Duration) func(*SearchShardsRequest) {
+	return func(r *SearchShardsRequest) {
+		r.MasterTimeout = v
 	}
 }
 

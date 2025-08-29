@@ -15,20 +15,69 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // ReloadDetails type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/reload_search_analyzers/types.ts#L20-L24
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/reload_search_analyzers/types.ts#L27-L31
 type ReloadDetails struct {
 	Index             string   `json:"index"`
 	ReloadedAnalyzers []string `json:"reloaded_analyzers"`
 	ReloadedNodeIds   []string `json:"reloaded_node_ids"`
+}
+
+func (s *ReloadDetails) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "index":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Index", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Index = o
+
+		case "reloaded_analyzers":
+			if err := dec.Decode(&s.ReloadedAnalyzers); err != nil {
+				return fmt.Errorf("%s | %w", "ReloadedAnalyzers", err)
+			}
+
+		case "reloaded_node_ids":
+			if err := dec.Decode(&s.ReloadedNodeIds); err != nil {
+				return fmt.Errorf("%s | %w", "ReloadedNodeIds", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewReloadDetails returns a ReloadDetails.

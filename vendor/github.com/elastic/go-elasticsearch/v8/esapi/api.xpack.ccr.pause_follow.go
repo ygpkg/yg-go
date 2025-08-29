@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newCCRPauseFollowFunc(t Transport) CCRPauseFollow {
@@ -31,6 +32,11 @@ func newCCRPauseFollowFunc(t Transport) CCRPauseFollow {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -46,6 +52,8 @@ type CCRPauseFollow func(index string, o ...func(*CCRPauseFollowRequest)) (*Resp
 type CCRPauseFollowRequest struct {
 	Index string
 
+	MasterTimeout time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -54,15 +62,26 @@ type CCRPauseFollowRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r CCRPauseFollowRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r CCRPauseFollowRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ccr.pause_follow")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -70,12 +89,19 @@ func (r CCRPauseFollowRequest) Do(ctx context.Context, transport Transport) (*Re
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(r.Index)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "index", r.Index)
+	}
 	path.WriteString("/")
 	path.WriteString("_ccr")
 	path.WriteString("/")
 	path.WriteString("pause_follow")
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -95,6 +121,9 @@ func (r CCRPauseFollowRequest) Do(ctx context.Context, transport Transport) (*Re
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -122,8 +151,17 @@ func (r CCRPauseFollowRequest) Do(ctx context.Context, transport Transport) (*Re
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "ccr.pause_follow")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ccr.pause_follow")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -140,6 +178,13 @@ func (r CCRPauseFollowRequest) Do(ctx context.Context, transport Transport) (*Re
 func (f CCRPauseFollow) WithContext(v context.Context) func(*CCRPauseFollowRequest) {
 	return func(r *CCRPauseFollowRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - explicit operation timeout for connection to master node.
+func (f CCRPauseFollow) WithMasterTimeout(v time.Duration) func(*CCRPauseFollowRequest) {
+	return func(r *CCRPauseFollowRequest) {
+		r.MasterTimeout = v
 	}
 }
 

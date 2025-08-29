@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // Retention type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/slm/_types/SnapshotLifecycle.ts#L84-L97
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/slm/_types/SnapshotLifecycle.ts#L94-L107
 type Retention struct {
 	// ExpireAfter Time period after which a snapshot is considered expired and eligible for
 	// deletion. SLM deletes expired snapshots based on the slm.retention_schedule.
@@ -35,6 +42,63 @@ type Retention struct {
 	MaxCount int `json:"max_count"`
 	// MinCount Minimum number of snapshots to retain, even if the snapshots have expired.
 	MinCount int `json:"min_count"`
+}
+
+func (s *Retention) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "expire_after":
+			if err := dec.Decode(&s.ExpireAfter); err != nil {
+				return fmt.Errorf("%s | %w", "ExpireAfter", err)
+			}
+
+		case "max_count":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MaxCount", err)
+				}
+				s.MaxCount = value
+			case float64:
+				f := int(v)
+				s.MaxCount = f
+			}
+
+		case "min_count":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MinCount", err)
+				}
+				s.MinCount = value
+			case float64:
+				f := int(v)
+				s.MinCount = f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewRetention returns a Retention.

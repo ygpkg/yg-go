@@ -15,16 +15,22 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+)
+
 // DataframeAnalysisAnalyzedFields type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/_types/DataframeAnalytics.ts#L238-L244
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/_types/DataframeAnalytics.ts#L238-L244
 type DataframeAnalysisAnalyzedFields struct {
 	// Excludes An array of strings that defines the fields that will be included in the
 	// analysis.
@@ -33,6 +39,46 @@ type DataframeAnalysisAnalyzedFields struct {
 	// analysis. You do not need to add fields with unsupported data types to
 	// excludes, these fields are excluded from the analysis automatically.
 	Includes []string `json:"includes"`
+}
+
+func (s *DataframeAnalysisAnalyzedFields) UnmarshalJSON(data []byte) error {
+
+	if !bytes.HasPrefix(data, []byte(`{`)) {
+		var item string
+		err := json.NewDecoder(bytes.NewReader(data)).Decode(&item)
+		if err != nil {
+			return err
+		}
+		s.Includes = append(s.Includes, item)
+		return nil
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "excludes":
+			if err := dec.Decode(&s.Excludes); err != nil {
+				return fmt.Errorf("%s | %w", "Excludes", err)
+			}
+
+		case "includes":
+			if err := dec.Decode(&s.Includes); err != nil {
+				return fmt.Errorf("%s | %w", "Includes", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewDataframeAnalysisAnalyzedFields returns a DataframeAnalysisAnalyzedFields.

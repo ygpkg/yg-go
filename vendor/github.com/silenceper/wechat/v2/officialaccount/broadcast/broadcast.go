@@ -79,6 +79,10 @@ type sendRequest struct {
 	Mpnews map[string]interface{} `json:"mpnews,omitempty"`
 	// 发送语音
 	Voice map[string]interface{} `json:"voice,omitempty"`
+	// 发送视频
+	Mpvideo map[string]interface{} `json:"mpvideo,omitempty"`
+	// 发送图片-预览使用
+	Image map[string]interface{} `json:"image,omitempty"`
 	// 发送图片
 	Images *Image `json:"images,omitempty"`
 	// 发送卡券
@@ -183,7 +187,13 @@ func (broadcast *Broadcast) SendImage(user *User, images *Image) (*Result, error
 		ToUser:  nil,
 		MsgType: MsgTypeImage,
 	}
-	req.Images = images
+	if broadcast.preview {
+		req.Image = map[string]interface{}{
+			"media_id": images.MediaIDs[0],
+		}
+	} else {
+		req.Images = images
+	}
 	req, sendURL := broadcast.chooseTagOrOpenID(user, req)
 	url := fmt.Sprintf("%s?access_token=%s", sendURL, ak)
 	data, err := util.PostJSON(url, req)
@@ -205,7 +215,7 @@ func (broadcast *Broadcast) SendVideo(user *User, mediaID string, title, descrip
 		ToUser:  nil,
 		MsgType: MsgTypeVideo,
 	}
-	req.Voice = map[string]interface{}{
+	req.Mpvideo = map[string]interface{}{
 		"media_id":    mediaID,
 		"title":       title,
 		"description": description,

@@ -15,28 +15,92 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+)
+
 // ConditionTokenFilter type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/analysis/token_filters.ts#L180-L184
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/analysis/token_filters.ts#L237-L243
 type ConditionTokenFilter struct {
-	Filter  []string `json:"filter"`
-	Script  Script   `json:"script"`
-	Type    string   `json:"type,omitempty"`
-	Version *string  `json:"version,omitempty"`
+	// Filter Array of token filters. If a token matches the predicate script in the
+	// `script` parameter, these filters are applied to the token in the order
+	// provided.
+	Filter []string `json:"filter"`
+	// Script Predicate script used to apply token filters. If a token matches this script,
+	// the filters in the `filter` parameter are applied to the token.
+	Script  Script  `json:"script"`
+	Type    string  `json:"type,omitempty"`
+	Version *string `json:"version,omitempty"`
+}
+
+func (s *ConditionTokenFilter) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "filter":
+			if err := dec.Decode(&s.Filter); err != nil {
+				return fmt.Errorf("%s | %w", "Filter", err)
+			}
+
+		case "script":
+			if err := dec.Decode(&s.Script); err != nil {
+				return fmt.Errorf("%s | %w", "Script", err)
+			}
+
+		case "type":
+			if err := dec.Decode(&s.Type); err != nil {
+				return fmt.Errorf("%s | %w", "Type", err)
+			}
+
+		case "version":
+			if err := dec.Decode(&s.Version); err != nil {
+				return fmt.Errorf("%s | %w", "Version", err)
+			}
+
+		}
+	}
+	return nil
+}
+
+// MarshalJSON override marshalling to include literal value
+func (s ConditionTokenFilter) MarshalJSON() ([]byte, error) {
+	type innerConditionTokenFilter ConditionTokenFilter
+	tmp := innerConditionTokenFilter{
+		Filter:  s.Filter,
+		Script:  s.Script,
+		Type:    s.Type,
+		Version: s.Version,
+	}
+
+	tmp.Type = "condition"
+
+	return json.Marshal(tmp)
 }
 
 // NewConditionTokenFilter returns a ConditionTokenFilter.
 func NewConditionTokenFilter() *ConditionTokenFilter {
 	r := &ConditionTokenFilter{}
-
-	r.Type = "condition"
 
 	return r
 }

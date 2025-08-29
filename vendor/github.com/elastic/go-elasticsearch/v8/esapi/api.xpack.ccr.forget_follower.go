@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newCCRForgetFollowerFunc(t Transport) CCRForgetFollower {
@@ -32,6 +33,11 @@ func newCCRForgetFollowerFunc(t Transport) CCRForgetFollower {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -49,6 +55,8 @@ type CCRForgetFollowerRequest struct {
 
 	Body io.Reader
 
+	Timeout time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -57,15 +65,26 @@ type CCRForgetFollowerRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r CCRForgetFollowerRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r CCRForgetFollowerRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ccr.forget_follower")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -73,12 +92,19 @@ func (r CCRForgetFollowerRequest) Do(ctx context.Context, transport Transport) (
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(r.Index)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "index", r.Index)
+	}
 	path.WriteString("/")
 	path.WriteString("_ccr")
 	path.WriteString("/")
 	path.WriteString("forget_follower")
 
 	params = make(map[string]string)
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -98,6 +124,9 @@ func (r CCRForgetFollowerRequest) Do(ctx context.Context, transport Transport) (
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -129,8 +158,20 @@ func (r CCRForgetFollowerRequest) Do(ctx context.Context, transport Transport) (
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "ccr.forget_follower")
+		if reader := instrument.RecordRequestBody(ctx, "ccr.forget_follower", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ccr.forget_follower")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -147,6 +188,13 @@ func (r CCRForgetFollowerRequest) Do(ctx context.Context, transport Transport) (
 func (f CCRForgetFollower) WithContext(v context.Context) func(*CCRForgetFollowerRequest) {
 	return func(r *CCRForgetFollowerRequest) {
 		r.ctx = v
+	}
+}
+
+// WithTimeout - explicit operation timeout.
+func (f CCRForgetFollower) WithTimeout(v time.Duration) func(*CCRForgetFollowerRequest) {
+	return func(r *CCRForgetFollowerRequest) {
+		r.Timeout = v
 	}
 }
 

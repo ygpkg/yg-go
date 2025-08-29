@@ -15,25 +15,37 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"encoding/json"
+)
+
 // LowercaseNormalizer type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/analysis/normalizers.ts#L26-L28
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/analysis/normalizers.ts#L26-L28
 type LowercaseNormalizer struct {
 	Type string `json:"type,omitempty"`
+}
+
+// MarshalJSON override marshalling to include literal value
+func (s LowercaseNormalizer) MarshalJSON() ([]byte, error) {
+	type innerLowercaseNormalizer LowercaseNormalizer
+	tmp := innerLowercaseNormalizer{
+		Type: s.Type,
+	}
+
+	tmp.Type = "lowercase"
+
+	return json.Marshal(tmp)
 }
 
 // NewLowercaseNormalizer returns a LowercaseNormalizer.
 func NewLowercaseNormalizer() *LowercaseNormalizer {
 	r := &LowercaseNormalizer{}
-
-	r.Type = "lowercase"
 
 	return r
 }

@@ -15,28 +15,36 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Gets configuration and usage information about datafeeds.
+// Get datafeeds.
+//
+// Get configuration and usage information about datafeeds.
+// This API returns a maximum of 10,000 datafeeds.
+// If the Elasticsearch security features are enabled, you must have
+// `monitor_ml`, `monitor`, `manage_ml`, or `manage`
+// cluster privileges to use this API.
+//
+// IMPORTANT: CAT APIs are only intended for human consumption using the Kibana
+// console or command line. They are not intended for use by applications. For
+// application consumption, use the get datafeed statistics API.
 package mldatafeeds
 
 import (
-	gobytes "bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
-
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/catdatafeedcolumn"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/timeunit"
 )
 
@@ -54,11 +62,15 @@ type MlDatafeeds struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
 	paramSet int
 
 	datafeedid string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewMlDatafeeds type alias for index.
@@ -74,15 +86,30 @@ func NewMlDatafeedsFunc(tp elastictransport.Interface) NewMlDatafeeds {
 	}
 }
 
-// Gets configuration and usage information about datafeeds.
+// Get datafeeds.
 //
-// https://www.elastic.co/guide/en/elasticsearch/reference/{branch}/cat-datafeeds.html
+// Get configuration and usage information about datafeeds.
+// This API returns a maximum of 10,000 datafeeds.
+// If the Elasticsearch security features are enabled, you must have
+// `monitor_ml`, `monitor`, `manage_ml`, or `manage`
+// cluster privileges to use this API.
+//
+// IMPORTANT: CAT APIs are only intended for human consumption using the Kibana
+// console or command line. They are not intended for use by applications. For
+// application consumption, use the get datafeed statistics API.
+//
+// https://www.elastic.co/guide/en/elasticsearch/reference/current/cat-datafeeds.html
 func New(tp elastictransport.Interface) *MlDatafeeds {
 	r := &MlDatafeeds{
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -118,6 +145,9 @@ func (r *MlDatafeeds) HttpRequest(ctx context.Context) (*http.Request, error) {
 		path.WriteString("datafeeds")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "datafeedid", r.datafeedid)
+		}
 		path.WriteString(r.datafeedid)
 
 		method = http.MethodGet
@@ -131,9 +161,9 @@ func (r *MlDatafeeds) HttpRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
@@ -149,30 +179,121 @@ func (r *MlDatafeeds) HttpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r MlDatafeeds) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r MlDatafeeds) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "cat.ml_datafeeds")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "cat.ml_datafeeds")
+		if reader := instrument.RecordRequestBody(ctx, "cat.ml_datafeeds", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "cat.ml_datafeeds")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the MlDatafeeds query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the MlDatafeeds query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
 }
 
+// Do runs the request through the transport, handle the response and returns a mldatafeeds.Response
+func (r MlDatafeeds) Do(providedCtx context.Context) (Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "cat.ml_datafeeds")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(&response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
+}
+
 // IsSuccess allows to run a query with a context and retrieve the result as a boolean.
 // This only exists for endpoints without a request payload and allows for quick control flow.
-func (r MlDatafeeds) IsSuccess(ctx context.Context) (bool, error) {
-	res, err := r.Do(ctx)
+func (r MlDatafeeds) IsSuccess(providedCtx context.Context) (bool, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "cat.ml_datafeeds")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	res, err := r.Perform(ctx)
 
 	if err != nil {
 		return false, err
 	}
-	io.Copy(ioutil.Discard, res.Body)
+	io.Copy(io.Discard, res.Body)
 	err = res.Body.Close()
 	if err != nil {
 		return false, err
@@ -180,6 +301,14 @@ func (r MlDatafeeds) IsSuccess(ctx context.Context) (bool, error) {
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
+	}
+
+	if res.StatusCode != 404 {
+		err := fmt.Errorf("an error happened during the MlDatafeeds query execution, status code: %d", res.StatusCode)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return false, err
 	}
 
 	return false, nil
@@ -194,9 +323,9 @@ func (r *MlDatafeeds) Header(key, value string) *MlDatafeeds {
 
 // DatafeedId A numerical character string that uniquely identifies the datafeed.
 // API Name: datafeedid
-func (r *MlDatafeeds) DatafeedId(v string) *MlDatafeeds {
+func (r *MlDatafeeds) DatafeedId(datafeedid string) *MlDatafeeds {
 	r.paramSet |= datafeedidMask
-	r.datafeedid = v
+	r.datafeedid = datafeedid
 
 	return r
 }
@@ -213,16 +342,20 @@ func (r *MlDatafeeds) DatafeedId(v string) *MlDatafeeds {
 // there are no matches or only
 // partial matches.
 // API name: allow_no_match
-func (r *MlDatafeeds) AllowNoMatch(b bool) *MlDatafeeds {
-	r.values.Set("allow_no_match", strconv.FormatBool(b))
+func (r *MlDatafeeds) AllowNoMatch(allownomatch bool) *MlDatafeeds {
+	r.values.Set("allow_no_match", strconv.FormatBool(allownomatch))
 
 	return r
 }
 
 // H Comma-separated list of column names to display.
 // API name: h
-func (r *MlDatafeeds) H(value string) *MlDatafeeds {
-	r.values.Set("h", value)
+func (r *MlDatafeeds) H(catdatafeedcolumns ...catdatafeedcolumn.CatDatafeedColumn) *MlDatafeeds {
+	tmp := []string{}
+	for _, item := range catdatafeedcolumns {
+		tmp = append(tmp, item.String())
+	}
+	r.values.Set("expand_wildcards", strings.Join(tmp, ","))
 
 	return r
 }
@@ -230,16 +363,90 @@ func (r *MlDatafeeds) H(value string) *MlDatafeeds {
 // S Comma-separated list of column names or column aliases used to sort the
 // response.
 // API name: s
-func (r *MlDatafeeds) S(value string) *MlDatafeeds {
-	r.values.Set("s", value)
+func (r *MlDatafeeds) S(catdatafeedcolumns ...catdatafeedcolumn.CatDatafeedColumn) *MlDatafeeds {
+	tmp := []string{}
+	for _, item := range catdatafeedcolumns {
+		tmp = append(tmp, item.String())
+	}
+	r.values.Set("expand_wildcards", strings.Join(tmp, ","))
 
 	return r
 }
 
 // Time The unit used to display time values.
 // API name: time
-func (r *MlDatafeeds) Time(enum timeunit.TimeUnit) *MlDatafeeds {
-	r.values.Set("time", enum.String())
+func (r *MlDatafeeds) Time(time timeunit.TimeUnit) *MlDatafeeds {
+	r.values.Set("time", time.String())
+
+	return r
+}
+
+// Format Specifies the format to return the columnar data in, can be set to
+// `text`, `json`, `cbor`, `yaml`, or `smile`.
+// API name: format
+func (r *MlDatafeeds) Format(format string) *MlDatafeeds {
+	r.values.Set("format", format)
+
+	return r
+}
+
+// Help When set to `true` will output available columns. This option
+// can't be combined with any other query string option.
+// API name: help
+func (r *MlDatafeeds) Help(help bool) *MlDatafeeds {
+	r.values.Set("help", strconv.FormatBool(help))
+
+	return r
+}
+
+// V When set to `true` will enable verbose output.
+// API name: v
+func (r *MlDatafeeds) V(v bool) *MlDatafeeds {
+	r.values.Set("v", strconv.FormatBool(v))
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *MlDatafeeds) ErrorTrace(errortrace bool) *MlDatafeeds {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *MlDatafeeds) FilterPath(filterpaths ...string) *MlDatafeeds {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *MlDatafeeds) Human(human bool) *MlDatafeeds {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *MlDatafeeds) Pretty(pretty bool) *MlDatafeeds {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
 
 	return r
 }

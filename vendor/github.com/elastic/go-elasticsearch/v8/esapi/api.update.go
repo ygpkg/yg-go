@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -34,6 +34,11 @@ func newUpdateFunc(t Transport) Update {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -52,18 +57,19 @@ type UpdateRequest struct {
 
 	Body io.Reader
 
-	IfPrimaryTerm       *int
-	IfSeqNo             *int
-	Lang                string
-	Refresh             string
-	RequireAlias        *bool
-	RetryOnConflict     *int
-	Routing             string
-	Source              []string
-	SourceExcludes      []string
-	SourceIncludes      []string
-	Timeout             time.Duration
-	WaitForActiveShards string
+	IfPrimaryTerm        *int
+	IfSeqNo              *int
+	IncludeSourceOnError *bool
+	Lang                 string
+	Refresh              string
+	RequireAlias         *bool
+	RetryOnConflict      *int
+	Routing              string
+	Source               []string
+	SourceExcludes       []string
+	SourceIncludes       []string
+	Timeout              time.Duration
+	WaitForActiveShards  string
 
 	Pretty     bool
 	Human      bool
@@ -73,15 +79,26 @@ type UpdateRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r UpdateRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r UpdateRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "update")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -89,10 +106,16 @@ func (r UpdateRequest) Do(ctx context.Context, transport Transport) (*Response, 
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(r.Index)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "index", r.Index)
+	}
 	path.WriteString("/")
 	path.WriteString("_update")
 	path.WriteString("/")
 	path.WriteString(r.DocumentID)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "id", r.DocumentID)
+	}
 
 	params = make(map[string]string)
 
@@ -102,6 +125,10 @@ func (r UpdateRequest) Do(ctx context.Context, transport Transport) (*Response, 
 
 	if r.IfSeqNo != nil {
 		params["if_seq_no"] = strconv.FormatInt(int64(*r.IfSeqNo), 10)
+	}
+
+	if r.IncludeSourceOnError != nil {
+		params["include_source_on_error"] = strconv.FormatBool(*r.IncludeSourceOnError)
 	}
 
 	if r.Lang != "" {
@@ -162,6 +189,9 @@ func (r UpdateRequest) Do(ctx context.Context, transport Transport) (*Response, 
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -193,8 +223,20 @@ func (r UpdateRequest) Do(ctx context.Context, transport Transport) (*Response, 
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "update")
+		if reader := instrument.RecordRequestBody(ctx, "update", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "update")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -225,6 +267,13 @@ func (f Update) WithIfPrimaryTerm(v int) func(*UpdateRequest) {
 func (f Update) WithIfSeqNo(v int) func(*UpdateRequest) {
 	return func(r *UpdateRequest) {
 		r.IfSeqNo = &v
+	}
+}
+
+// WithIncludeSourceOnError - true or false if to include the document source in the error message in case of parsing errors. defaults to true..
+func (f Update) WithIncludeSourceOnError(v bool) func(*UpdateRequest) {
+	return func(r *UpdateRequest) {
+		r.IncludeSourceOnError = &v
 	}
 }
 

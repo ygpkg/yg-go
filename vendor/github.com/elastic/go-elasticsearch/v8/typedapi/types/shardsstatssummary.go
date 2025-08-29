@@ -15,22 +15,73 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+)
+
 // ShardsStatsSummary type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/snapshot/_types/SnapshotShardsStatus.ts#L29-L35
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/snapshot/_types/SnapshotShardsStatus.ts#L29-L35
 type ShardsStatsSummary struct {
 	Incremental       ShardsStatsSummaryItem `json:"incremental"`
 	StartTimeInMillis int64                  `json:"start_time_in_millis"`
-	Time              *Duration              `json:"time,omitempty"`
+	Time              Duration               `json:"time,omitempty"`
 	TimeInMillis      int64                  `json:"time_in_millis"`
 	Total             ShardsStatsSummaryItem `json:"total"`
+}
+
+func (s *ShardsStatsSummary) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "incremental":
+			if err := dec.Decode(&s.Incremental); err != nil {
+				return fmt.Errorf("%s | %w", "Incremental", err)
+			}
+
+		case "start_time_in_millis":
+			if err := dec.Decode(&s.StartTimeInMillis); err != nil {
+				return fmt.Errorf("%s | %w", "StartTimeInMillis", err)
+			}
+
+		case "time":
+			if err := dec.Decode(&s.Time); err != nil {
+				return fmt.Errorf("%s | %w", "Time", err)
+			}
+
+		case "time_in_millis":
+			if err := dec.Decode(&s.TimeInMillis); err != nil {
+				return fmt.Errorf("%s | %w", "TimeInMillis", err)
+			}
+
+		case "total":
+			if err := dec.Decode(&s.Total); err != nil {
+				return fmt.Errorf("%s | %w", "Total", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewShardsStatsSummary returns a ShardsStatsSummary.

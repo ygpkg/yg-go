@@ -15,20 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 // RollupJob type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/rollup/get_jobs/types.ts#L28-L32
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/rollup/get_jobs/types.ts#L28-L43
 type RollupJob struct {
+	// Config The rollup job configuration.
 	Config RollupJobConfiguration `json:"config"`
-	Stats  RollupJobStats         `json:"stats"`
-	Status RollupJobStatus        `json:"status"`
+	// Stats Transient statistics about the rollup job, such as how many documents have
+	// been processed and how many rollup summary docs have been indexed.
+	// These stats are not persisted.
+	// If a node is restarted, these stats are reset.
+	Stats RollupJobStats `json:"stats"`
+	// Status The current status of the indexer for the rollup job.
+	Status RollupJobStatus `json:"status"`
 }
 
 // NewRollupJob returns a RollupJob.

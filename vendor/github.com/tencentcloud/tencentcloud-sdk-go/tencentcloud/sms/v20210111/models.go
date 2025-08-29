@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2018 THL A29 Limited, a Tencent company. All Rights Reserved.
+// Copyright (c) 2017-2025 Tencent. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,12 +34,10 @@ type AddSmsSignRequestParams struct {
 	// 签名类型。其中每种类型后面标注了其可选的 DocumentType（证明类型）：
 	// 0：公司，可选 DocumentType 有（0，1）。
 	// 1：APP，可选 DocumentType 有（0，1，2，3，4） 。
-	// 2：网站，可选 DocumentType 有（0，1，2，3，5）。
-	// 3：公众号，可选 DocumentType 有（0，1，2，3，8）。
 	// 4：商标，可选 DocumentType 有（7）。
 	// 5：政府/机关事业单位/其他机构，可选 DocumentType 有（2，3）。
-	// 6：小程序，可选 DocumentType 有（0，1，2，3，6）。
-	// 注：必须按照对应关系选择证明类型，否则会审核失败。
+	// 注1：必须按照对应关系选择证明类型，否则会审核失败。
+	// 注2：签名类型2（网站）、3（公众号）、6（小程序）已不再支持，具体可参考 [关于腾讯云短信签名申请规则更新的公告](https://cloud.tencent.com/document/product/382/116397)。
 	SignType *uint64 `json:"SignType,omitnil,omitempty" name:"SignType"`
 
 	// 证明类型：
@@ -48,10 +46,8 @@ type AddSmsSignRequestParams struct {
 	// 2：组织机构代码证书。
 	// 3：社会信用代码证书。
 	// 4：应用后台管理截图（个人开发APP）。
-	// 5：网站备案后台截图（个人开发网站）。
-	// 6：小程序设置页面截图（个人认证小程序）。
 	// 7：商标注册书。
-	// 8：公众号设置页面截图（个人认证公众号）。
+	// 注：证明类型5（网站备案后台截图）、6（小程序设置页面截图）、8（公众号设置页面截图）已不再支持，具体可参考 [关于腾讯云短信签名申请规则更新的公告](https://cloud.tencent.com/document/product/382/116397)。
 	DocumentType *uint64 `json:"DocumentType,omitnil,omitempty" name:"DocumentType"`
 
 	// 是否国际/港澳台短信：
@@ -74,6 +70,9 @@ type AddSmsSignRequestParams struct {
 
 	// 签名的申请备注。
 	Remark *string `json:"Remark,omitnil,omitempty" name:"Remark"`
+
+	// 已审核通过的国内短信的资质 ID。资质 ID 信息可前往国内短信的 [实名资质管理](https://console.cloud.tencent.com/smsv2/enterprise) 页查看。<dx-alert infotype="notice" title="说明"><ul><li>国内短信需填写资质ID，国际短信无需填写。</li></ul></dx-alert>
+	QualificationId *uint64 `json:"QualificationId,omitnil,omitempty" name:"QualificationId"`
 }
 
 type AddSmsSignRequest struct {
@@ -86,12 +85,10 @@ type AddSmsSignRequest struct {
 	// 签名类型。其中每种类型后面标注了其可选的 DocumentType（证明类型）：
 	// 0：公司，可选 DocumentType 有（0，1）。
 	// 1：APP，可选 DocumentType 有（0，1，2，3，4） 。
-	// 2：网站，可选 DocumentType 有（0，1，2，3，5）。
-	// 3：公众号，可选 DocumentType 有（0，1，2，3，8）。
 	// 4：商标，可选 DocumentType 有（7）。
 	// 5：政府/机关事业单位/其他机构，可选 DocumentType 有（2，3）。
-	// 6：小程序，可选 DocumentType 有（0，1，2，3，6）。
-	// 注：必须按照对应关系选择证明类型，否则会审核失败。
+	// 注1：必须按照对应关系选择证明类型，否则会审核失败。
+	// 注2：签名类型2（网站）、3（公众号）、6（小程序）已不再支持，具体可参考 [关于腾讯云短信签名申请规则更新的公告](https://cloud.tencent.com/document/product/382/116397)。
 	SignType *uint64 `json:"SignType,omitnil,omitempty" name:"SignType"`
 
 	// 证明类型：
@@ -100,10 +97,8 @@ type AddSmsSignRequest struct {
 	// 2：组织机构代码证书。
 	// 3：社会信用代码证书。
 	// 4：应用后台管理截图（个人开发APP）。
-	// 5：网站备案后台截图（个人开发网站）。
-	// 6：小程序设置页面截图（个人认证小程序）。
 	// 7：商标注册书。
-	// 8：公众号设置页面截图（个人认证公众号）。
+	// 注：证明类型5（网站备案后台截图）、6（小程序设置页面截图）、8（公众号设置页面截图）已不再支持，具体可参考 [关于腾讯云短信签名申请规则更新的公告](https://cloud.tencent.com/document/product/382/116397)。
 	DocumentType *uint64 `json:"DocumentType,omitnil,omitempty" name:"DocumentType"`
 
 	// 是否国际/港澳台短信：
@@ -126,6 +121,9 @@ type AddSmsSignRequest struct {
 
 	// 签名的申请备注。
 	Remark *string `json:"Remark,omitnil,omitempty" name:"Remark"`
+
+	// 已审核通过的国内短信的资质 ID。资质 ID 信息可前往国内短信的 [实名资质管理](https://console.cloud.tencent.com/smsv2/enterprise) 页查看。<dx-alert infotype="notice" title="说明"><ul><li>国内短信需填写资质ID，国际短信无需填写。</li></ul></dx-alert>
+	QualificationId *uint64 `json:"QualificationId,omitnil,omitempty" name:"QualificationId"`
 }
 
 func (r *AddSmsSignRequest) ToJsonString() string {
@@ -148,6 +146,7 @@ func (r *AddSmsSignRequest) FromJsonString(s string) error {
 	delete(f, "ProofImage")
 	delete(f, "CommissionImage")
 	delete(f, "Remark")
+	delete(f, "QualificationId")
 	if len(f) > 0 {
 		return tcerr.NewTencentCloudSDKError("ClientError.BuildRequestError", "AddSmsSignRequest has unknown keys!", "")
 	}
@@ -602,6 +601,18 @@ type DescribeSignListStatus struct {
 
 	// 提交审核时间，UNIX 时间戳（单位：秒）。
 	CreateTime *uint64 `json:"CreateTime,omitnil,omitempty" name:"CreateTime"`
+
+	// 国内短信的资质 ID。资质 ID 信息可前往国内短信的 [实名资质管理](https://console.cloud.tencent.com/smsv2/enterprise) 页查看。
+	// 注：国际短信不涉及，默认为0。
+	QualificationId *uint64 `json:"QualificationId,omitnil,omitempty" name:"QualificationId"`
+
+	// 国内短信的资质名称。
+	// 注：国际短信不涉及，默认为空。
+	QualificationName *string `json:"QualificationName,omitnil,omitempty" name:"QualificationName"`
+
+	// 国内短信的资质状态。其中0表示待审核，1表示已通过，2表示已拒绝，3表示待补充后提交，4表示变更后待审核，5表示变更后被驳回。可参考 [实名资质审核状态说明](https://cloud.tencent.com/document/product/382/13444#.E5.AE.A1.E6.A0.B8.E7.8A.B6.E6.80.81.E8.AF.B4.E6.98.8E) 。
+	// 注：国际短信不涉及，默认为0。
+	QualificationStatusCode *int64 `json:"QualificationStatusCode,omitnil,omitempty" name:"QualificationStatusCode"`
 }
 
 // Predefined struct for user
@@ -801,12 +812,10 @@ type ModifySmsSignRequestParams struct {
 	// 签名类型。其中每种类型后面标注了其可选的 DocumentType（证明类型）：
 	// 0：公司，可选 DocumentType 有（0，1）。
 	// 1：APP，可选 DocumentType 有（0，1，2，3，4） 。
-	// 2：网站，可选 DocumentType 有（0，1，2，3，5）。
-	// 3：公众号，可选 DocumentType 有（0，1，2，3，8）。
 	// 4：商标，可选 DocumentType 有（7）。
 	// 5：政府/机关事业单位/其他机构，可选 DocumentType 有（2，3）。
-	// 6：小程序，可选 DocumentType 有（0，1，2，3，6）。
-	// 注：必须按照对应关系选择证明类型，否则会审核失败。
+	// 注1：必须按照对应关系选择证明类型，否则会审核失败。
+	// 注2：签名类型2（网站）、3（公众号）、6（小程序）已不再支持，具体可参考 [关于腾讯云短信签名申请规则更新的公告](https://cloud.tencent.com/document/product/382/116397)。
 	SignType *uint64 `json:"SignType,omitnil,omitempty" name:"SignType"`
 
 	// 证明类型：
@@ -815,10 +824,8 @@ type ModifySmsSignRequestParams struct {
 	// 2：组织机构代码证书。
 	// 3：社会信用代码证书。
 	// 4：应用后台管理截图（个人开发APP）。
-	// 5：网站备案后台截图（个人开发网站）。
-	// 6：小程序设置页面截图（个人认证小程序）。
 	// 7：商标注册书。
-	// 8：公众号设置页面截图（个人认证公众号）。
+	// 注：证明类型5（网站备案后台截图）、6（小程序设置页面截图）、8（公众号设置页面截图）已不再支持，具体可参考 [关于腾讯云短信签名申请规则更新的公告](https://cloud.tencent.com/document/product/382/116397)。
 	DocumentType *uint64 `json:"DocumentType,omitnil,omitempty" name:"DocumentType"`
 
 	// 是否国际/港澳台短信：
@@ -842,6 +849,9 @@ type ModifySmsSignRequestParams struct {
 
 	// 签名的申请备注。
 	Remark *string `json:"Remark,omitnil,omitempty" name:"Remark"`
+
+	// 已审核通过的国内短信的资质 ID。资质 ID 信息可前往国内短信的 [实名资质管理](https://console.cloud.tencent.com/smsv2/enterprise) 页查看。<dx-alert infotype="notice" title="说明"><ul><li>国内短信需填写资质ID，国际短信无需填写。</li></ul></dx-alert>
+	QualificationId *uint64 `json:"QualificationId,omitnil,omitempty" name:"QualificationId"`
 }
 
 type ModifySmsSignRequest struct {
@@ -856,12 +866,10 @@ type ModifySmsSignRequest struct {
 	// 签名类型。其中每种类型后面标注了其可选的 DocumentType（证明类型）：
 	// 0：公司，可选 DocumentType 有（0，1）。
 	// 1：APP，可选 DocumentType 有（0，1，2，3，4） 。
-	// 2：网站，可选 DocumentType 有（0，1，2，3，5）。
-	// 3：公众号，可选 DocumentType 有（0，1，2，3，8）。
 	// 4：商标，可选 DocumentType 有（7）。
 	// 5：政府/机关事业单位/其他机构，可选 DocumentType 有（2，3）。
-	// 6：小程序，可选 DocumentType 有（0，1，2，3，6）。
-	// 注：必须按照对应关系选择证明类型，否则会审核失败。
+	// 注1：必须按照对应关系选择证明类型，否则会审核失败。
+	// 注2：签名类型2（网站）、3（公众号）、6（小程序）已不再支持，具体可参考 [关于腾讯云短信签名申请规则更新的公告](https://cloud.tencent.com/document/product/382/116397)。
 	SignType *uint64 `json:"SignType,omitnil,omitempty" name:"SignType"`
 
 	// 证明类型：
@@ -870,10 +878,8 @@ type ModifySmsSignRequest struct {
 	// 2：组织机构代码证书。
 	// 3：社会信用代码证书。
 	// 4：应用后台管理截图（个人开发APP）。
-	// 5：网站备案后台截图（个人开发网站）。
-	// 6：小程序设置页面截图（个人认证小程序）。
 	// 7：商标注册书。
-	// 8：公众号设置页面截图（个人认证公众号）。
+	// 注：证明类型5（网站备案后台截图）、6（小程序设置页面截图）、8（公众号设置页面截图）已不再支持，具体可参考 [关于腾讯云短信签名申请规则更新的公告](https://cloud.tencent.com/document/product/382/116397)。
 	DocumentType *uint64 `json:"DocumentType,omitnil,omitempty" name:"DocumentType"`
 
 	// 是否国际/港澳台短信：
@@ -897,6 +903,9 @@ type ModifySmsSignRequest struct {
 
 	// 签名的申请备注。
 	Remark *string `json:"Remark,omitnil,omitempty" name:"Remark"`
+
+	// 已审核通过的国内短信的资质 ID。资质 ID 信息可前往国内短信的 [实名资质管理](https://console.cloud.tencent.com/smsv2/enterprise) 页查看。<dx-alert infotype="notice" title="说明"><ul><li>国内短信需填写资质ID，国际短信无需填写。</li></ul></dx-alert>
+	QualificationId *uint64 `json:"QualificationId,omitnil,omitempty" name:"QualificationId"`
 }
 
 func (r *ModifySmsSignRequest) ToJsonString() string {
@@ -920,6 +929,7 @@ func (r *ModifySmsSignRequest) FromJsonString(s string) error {
 	delete(f, "ProofImage")
 	delete(f, "CommissionImage")
 	delete(f, "Remark")
+	delete(f, "QualificationId")
 	if len(f) > 0 {
 		return tcerr.NewTencentCloudSDKError("ClientError.BuildRequestError", "ModifySmsSignRequest has unknown keys!", "")
 	}

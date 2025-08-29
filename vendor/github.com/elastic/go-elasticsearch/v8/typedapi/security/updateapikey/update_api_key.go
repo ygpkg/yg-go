@@ -15,12 +15,42 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Updates attributes of an existing API key.
+// Update an API key.
+//
+// Update attributes of an existing API key.
+// This API supports updates to an API key's access scope, expiration, and
+// metadata.
+//
+// To use this API, you must have at least the `manage_own_api_key` cluster
+// privilege.
+// Users can only update API keys that they created or that were granted to
+// them.
+// To update another user’s API key, use the `run_as` feature to submit a
+// request on behalf of another user.
+//
+// IMPORTANT: It's not possible to use an API key as the authentication
+// credential for this API. The owner user’s credentials are required.
+//
+// Use this API to update API keys created by the create API key or grant API
+// Key APIs.
+// If you need to apply the same update to many API keys, you can use the bulk
+// update API keys API to reduce overhead.
+// It's not possible to update expired API keys or API keys that have been
+// invalidated by the invalidate API key API.
+//
+// The access scope of an API key is derived from the `role_descriptors` you
+// specify in the request and a snapshot of the owner user's permissions at the
+// time of the request.
+// The snapshot of the owner's permissions is updated automatically on every
+// call.
+//
+// IMPORTANT: If you don't specify `role_descriptors` in the request, a call to
+// this API might still change the API key's access scope.
+// This change can occur if the owner user's permissions have changed since the
+// API key was created or last modified.
 package updateapikey
 
 import (
@@ -29,11 +59,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 const (
@@ -50,14 +83,19 @@ type UpdateApiKey struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
-	req *Request
-	raw json.RawMessage
+	req      *Request
+	deferred []func(request *Request) error
+	buf      *gobytes.Buffer
 
 	paramSet int
 
 	id string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewUpdateApiKey type alias for index.
@@ -69,13 +107,45 @@ func NewUpdateApiKeyFunc(tp elastictransport.Interface) NewUpdateApiKey {
 	return func(id string) *UpdateApiKey {
 		n := New(tp)
 
-		n.Id(id)
+		n._id(id)
 
 		return n
 	}
 }
 
-// Updates attributes of an existing API key.
+// Update an API key.
+//
+// Update attributes of an existing API key.
+// This API supports updates to an API key's access scope, expiration, and
+// metadata.
+//
+// To use this API, you must have at least the `manage_own_api_key` cluster
+// privilege.
+// Users can only update API keys that they created or that were granted to
+// them.
+// To update another user’s API key, use the `run_as` feature to submit a
+// request on behalf of another user.
+//
+// IMPORTANT: It's not possible to use an API key as the authentication
+// credential for this API. The owner user’s credentials are required.
+//
+// Use this API to update API keys created by the create API key or grant API
+// Key APIs.
+// If you need to apply the same update to many API keys, you can use the bulk
+// update API keys API to reduce overhead.
+// It's not possible to update expired API keys or API keys that have been
+// invalidated by the invalidate API key API.
+//
+// The access scope of an API key is derived from the `role_descriptors` you
+// specify in the request and a snapshot of the owner user's permissions at the
+// time of the request.
+// The snapshot of the owner's permissions is updated automatically on every
+// call.
+//
+// IMPORTANT: If you don't specify `role_descriptors` in the request, a call to
+// this API might still change the API key's access scope.
+// This change can occur if the owner user's permissions have changed since the
+// API key was created or last modified.
 //
 // https://www.elastic.co/guide/en/elasticsearch/reference/current/security-api-update-api-key.html
 func New(tp elastictransport.Interface) *UpdateApiKey {
@@ -83,7 +153,14 @@ func New(tp elastictransport.Interface) *UpdateApiKey {
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+
+		buf: gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -91,7 +168,7 @@ func New(tp elastictransport.Interface) *UpdateApiKey {
 
 // Raw takes a json payload as input which is then passed to the http.Request
 // If specified Raw takes precedence on Request method.
-func (r *UpdateApiKey) Raw(raw json.RawMessage) *UpdateApiKey {
+func (r *UpdateApiKey) Raw(raw io.Reader) *UpdateApiKey {
 	r.raw = raw
 
 	return r
@@ -113,9 +190,17 @@ func (r *UpdateApiKey) HttpRequest(ctx context.Context) (*http.Request, error) {
 
 	var err error
 
-	if r.raw != nil {
-		r.buf.Write(r.raw)
-	} else if r.req != nil {
+	if len(r.deferred) > 0 {
+		for _, f := range r.deferred {
+			deferredErr := f(r.req)
+			if deferredErr != nil {
+				return nil, deferredErr
+			}
+		}
+	}
+
+	if r.raw == nil && r.req != nil {
+
 		data, err := json.Marshal(r.req)
 
 		if err != nil {
@@ -123,6 +208,11 @@ func (r *UpdateApiKey) HttpRequest(ctx context.Context) (*http.Request, error) {
 		}
 
 		r.buf.Write(data)
+
+	}
+
+	if r.buf.Len() > 0 {
+		r.raw = r.buf
 	}
 
 	r.path.Scheme = "http"
@@ -135,6 +225,9 @@ func (r *UpdateApiKey) HttpRequest(ctx context.Context) (*http.Request, error) {
 		path.WriteString("api_key")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "id", r.id)
+		}
 		path.WriteString(r.id)
 
 		method = http.MethodPut
@@ -148,15 +241,15 @@ func (r *UpdateApiKey) HttpRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
 
 	if req.Header.Get("Content-Type") == "" {
-		if r.buf.Len() > 0 {
+		if r.raw != nil {
 			req.Header.Set("Content-Type", "application/vnd.elasticsearch+json;compatible-with=8")
 		}
 	}
@@ -172,19 +265,100 @@ func (r *UpdateApiKey) HttpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r UpdateApiKey) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r UpdateApiKey) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "security.update_api_key")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "security.update_api_key")
+		if reader := instrument.RecordRequestBody(ctx, "security.update_api_key", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "security.update_api_key")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the UpdateApiKey query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the UpdateApiKey query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
+}
+
+// Do runs the request through the transport, handle the response and returns a updateapikey.Response
+func (r UpdateApiKey) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "security.update_api_key")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
 }
 
 // Header set a key, value pair in the UpdateApiKey headers map.
@@ -196,9 +370,105 @@ func (r *UpdateApiKey) Header(key, value string) *UpdateApiKey {
 
 // Id The ID of the API key to update.
 // API Name: id
-func (r *UpdateApiKey) Id(v string) *UpdateApiKey {
+func (r *UpdateApiKey) _id(id string) *UpdateApiKey {
 	r.paramSet |= idMask
-	r.id = v
+	r.id = id
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *UpdateApiKey) ErrorTrace(errortrace bool) *UpdateApiKey {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *UpdateApiKey) FilterPath(filterpaths ...string) *UpdateApiKey {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *UpdateApiKey) Human(human bool) *UpdateApiKey {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *UpdateApiKey) Pretty(pretty bool) *UpdateApiKey {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
+
+	return r
+}
+
+// Expiration The expiration time for the API key.
+// By default, API keys never expire.
+// This property can be omitted to leave the expiration unchanged.
+// API name: expiration
+func (r *UpdateApiKey) Expiration(duration types.Duration) *UpdateApiKey {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Expiration = duration
+
+	return r
+}
+
+// Metadata Arbitrary metadata that you want to associate with the API key.
+// It supports a nested data structure.
+// Within the metadata object, keys beginning with `_` are reserved for system
+// usage.
+// When specified, this value fully replaces the metadata previously associated
+// with the API key.
+// API name: metadata
+func (r *UpdateApiKey) Metadata(metadata types.Metadata) *UpdateApiKey {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Metadata = metadata
+
+	return r
+}
+
+// RoleDescriptors The role descriptors to assign to this API key.
+// The API key's effective permissions are an intersection of its assigned
+// privileges and the point in time snapshot of permissions of the owner user.
+// You can assign new privileges by specifying them in this parameter.
+// To remove assigned privileges, you can supply an empty `role_descriptors`
+// parameter, that is to say, an empty object `{}`.
+// If an API key has no assigned privileges, it inherits the owner user's full
+// permissions.
+// The snapshot of the owner's permissions is always updated, whether you supply
+// the `role_descriptors` parameter or not.
+// The structure of a role descriptor is the same as the request for the create
+// API keys API.
+// API name: role_descriptors
+func (r *UpdateApiKey) RoleDescriptors(roledescriptors map[string]types.RoleDescriptor) *UpdateApiKey {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.RoleDescriptors = roledescriptors
 
 	return r
 }

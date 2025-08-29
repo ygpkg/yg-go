@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,15 +23,21 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
 func newMLUpdateTrainedModelDeploymentFunc(t Transport) MLUpdateTrainedModelDeployment {
-	return func(body io.Reader, model_id string, o ...func(*MLUpdateTrainedModelDeploymentRequest)) (*Response, error) {
-		var r = MLUpdateTrainedModelDeploymentRequest{Body: body, ModelID: model_id}
+	return func(model_id string, o ...func(*MLUpdateTrainedModelDeploymentRequest)) (*Response, error) {
+		var r = MLUpdateTrainedModelDeploymentRequest{ModelID: model_id}
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -40,16 +46,16 @@ func newMLUpdateTrainedModelDeploymentFunc(t Transport) MLUpdateTrainedModelDepl
 
 // MLUpdateTrainedModelDeployment - Updates certain properties of trained model deployment.
 //
-// This API is beta.
-//
-// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-update-trained-model-deployment.html.
-type MLUpdateTrainedModelDeployment func(body io.Reader, model_id string, o ...func(*MLUpdateTrainedModelDeploymentRequest)) (*Response, error)
+// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/current/update-trained-model-deployment.html.
+type MLUpdateTrainedModelDeployment func(model_id string, o ...func(*MLUpdateTrainedModelDeploymentRequest)) (*Response, error)
 
 // MLUpdateTrainedModelDeploymentRequest configures the ML Update Trained Model Deployment API request.
 type MLUpdateTrainedModelDeploymentRequest struct {
 	Body io.Reader
 
 	ModelID string
+
+	NumberOfAllocations *int
 
 	Pretty     bool
 	Human      bool
@@ -59,15 +65,26 @@ type MLUpdateTrainedModelDeploymentRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r MLUpdateTrainedModelDeploymentRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r MLUpdateTrainedModelDeploymentRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ml.update_trained_model_deployment")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -79,12 +96,19 @@ func (r MLUpdateTrainedModelDeploymentRequest) Do(ctx context.Context, transport
 	path.WriteString("trained_models")
 	path.WriteString("/")
 	path.WriteString(r.ModelID)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "model_id", r.ModelID)
+	}
 	path.WriteString("/")
 	path.WriteString("deployment")
 	path.WriteString("/")
 	path.WriteString("_update")
 
 	params = make(map[string]string)
+
+	if r.NumberOfAllocations != nil {
+		params["number_of_allocations"] = strconv.FormatInt(int64(*r.NumberOfAllocations), 10)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -104,6 +128,9 @@ func (r MLUpdateTrainedModelDeploymentRequest) Do(ctx context.Context, transport
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -135,8 +162,20 @@ func (r MLUpdateTrainedModelDeploymentRequest) Do(ctx context.Context, transport
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "ml.update_trained_model_deployment")
+		if reader := instrument.RecordRequestBody(ctx, "ml.update_trained_model_deployment", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ml.update_trained_model_deployment")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -153,6 +192,20 @@ func (r MLUpdateTrainedModelDeploymentRequest) Do(ctx context.Context, transport
 func (f MLUpdateTrainedModelDeployment) WithContext(v context.Context) func(*MLUpdateTrainedModelDeploymentRequest) {
 	return func(r *MLUpdateTrainedModelDeploymentRequest) {
 		r.ctx = v
+	}
+}
+
+// WithBody - The updated trained model deployment settings.
+func (f MLUpdateTrainedModelDeployment) WithBody(v io.Reader) func(*MLUpdateTrainedModelDeploymentRequest) {
+	return func(r *MLUpdateTrainedModelDeploymentRequest) {
+		r.Body = v
+	}
+}
+
+// WithNumberOfAllocations - update the model deployment to this number of allocations..
+func (f MLUpdateTrainedModelDeployment) WithNumberOfAllocations(v int) func(*MLUpdateTrainedModelDeploymentRequest) {
+	return func(r *MLUpdateTrainedModelDeploymentRequest) {
+		r.NumberOfAllocations = &v
 	}
 }
 

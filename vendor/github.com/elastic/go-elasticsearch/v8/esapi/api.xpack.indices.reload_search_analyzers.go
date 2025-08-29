@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -33,6 +33,11 @@ func newIndicesReloadSearchAnalyzersFunc(t Transport) IndicesReloadSearchAnalyze
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -51,6 +56,7 @@ type IndicesReloadSearchAnalyzersRequest struct {
 	AllowNoIndices    *bool
 	ExpandWildcards   string
 	IgnoreUnavailable *bool
+	Resource          string
 
 	Pretty     bool
 	Human      bool
@@ -60,15 +66,26 @@ type IndicesReloadSearchAnalyzersRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r IndicesReloadSearchAnalyzersRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r IndicesReloadSearchAnalyzersRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.reload_search_analyzers")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -80,6 +97,9 @@ func (r IndicesReloadSearchAnalyzersRequest) Do(ctx context.Context, transport T
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(strings.Join(r.Index, ","))
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "index", strings.Join(r.Index, ","))
+	}
 	path.WriteString("/")
 	path.WriteString("_reload_search_analyzers")
 
@@ -95,6 +115,10 @@ func (r IndicesReloadSearchAnalyzersRequest) Do(ctx context.Context, transport T
 
 	if r.IgnoreUnavailable != nil {
 		params["ignore_unavailable"] = strconv.FormatBool(*r.IgnoreUnavailable)
+	}
+
+	if r.Resource != "" {
+		params["resource"] = r.Resource
 	}
 
 	if r.Pretty {
@@ -115,6 +139,9 @@ func (r IndicesReloadSearchAnalyzersRequest) Do(ctx context.Context, transport T
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -142,8 +169,17 @@ func (r IndicesReloadSearchAnalyzersRequest) Do(ctx context.Context, transport T
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.reload_search_analyzers")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.reload_search_analyzers")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -181,6 +217,13 @@ func (f IndicesReloadSearchAnalyzers) WithExpandWildcards(v string) func(*Indice
 func (f IndicesReloadSearchAnalyzers) WithIgnoreUnavailable(v bool) func(*IndicesReloadSearchAnalyzersRequest) {
 	return func(r *IndicesReloadSearchAnalyzersRequest) {
 		r.IgnoreUnavailable = &v
+	}
+}
+
+// WithResource - changed resource to reload analyzers from if applicable.
+func (f IndicesReloadSearchAnalyzers) WithResource(v string) func(*IndicesReloadSearchAnalyzersRequest) {
+	return func(r *IndicesReloadSearchAnalyzersRequest) {
+		r.Resource = v
 	}
 }
 

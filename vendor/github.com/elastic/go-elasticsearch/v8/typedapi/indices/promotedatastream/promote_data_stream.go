@@ -15,27 +15,43 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Promotes a data stream from a replicated data stream managed by CCR to a
-// regular data stream
+// Promote a data stream.
+// Promote a data stream from a replicated data stream managed by cross-cluster
+// replication (CCR) to a regular data stream.
+//
+// With CCR auto following, a data stream from a remote cluster can be
+// replicated to the local cluster.
+// These data streams can't be rolled over in the local cluster.
+// These replicated data streams roll over only if the upstream data stream
+// rolls over.
+// In the event that the remote cluster is no longer available, the data stream
+// in the local cluster can be promoted to a regular data stream, which allows
+// these data streams to be rolled over in the local cluster.
+//
+// NOTE: When promoting a data stream, ensure the local cluster has a data
+// stream enabled index template that matches the data stream.
+// If this is missing, the data stream will not be able to roll over until a
+// matching index template is created.
+// This will affect the lifecycle management of the data stream and interfere
+// with the data stream size and retention.
 package promotedatastream
 
 import (
-	gobytes "bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 const (
@@ -52,11 +68,15 @@ type PromoteDataStream struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
 	paramSet int
 
 	name string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewPromoteDataStream type alias for index.
@@ -68,22 +88,44 @@ func NewPromoteDataStreamFunc(tp elastictransport.Interface) NewPromoteDataStrea
 	return func(name string) *PromoteDataStream {
 		n := New(tp)
 
-		n.Name(name)
+		n._name(name)
 
 		return n
 	}
 }
 
-// Promotes a data stream from a replicated data stream managed by CCR to a
-// regular data stream
+// Promote a data stream.
+// Promote a data stream from a replicated data stream managed by cross-cluster
+// replication (CCR) to a regular data stream.
 //
-// https://www.elastic.co/guide/en/elasticsearch/reference/master/data-streams.html
+// With CCR auto following, a data stream from a remote cluster can be
+// replicated to the local cluster.
+// These data streams can't be rolled over in the local cluster.
+// These replicated data streams roll over only if the upstream data stream
+// rolls over.
+// In the event that the remote cluster is no longer available, the data stream
+// in the local cluster can be promoted to a regular data stream, which allows
+// these data streams to be rolled over in the local cluster.
+//
+// NOTE: When promoting a data stream, ensure the local cluster has a data
+// stream enabled index template that matches the data stream.
+// If this is missing, the data stream will not be able to roll over until a
+// matching index template is created.
+// This will affect the lifecycle management of the data stream and interfere
+// with the data stream size and retention.
+//
+// https://www.elastic.co/docs/api/doc/elasticsearch/v8/operation/operation-indices-promote-data-stream
 func New(tp elastictransport.Interface) *PromoteDataStream {
 	r := &PromoteDataStream{
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -108,6 +150,9 @@ func (r *PromoteDataStream) HttpRequest(ctx context.Context) (*http.Request, err
 		path.WriteString("_promote")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "name", r.name)
+		}
 		path.WriteString(r.name)
 
 		method = http.MethodPost
@@ -121,9 +166,9 @@ func (r *PromoteDataStream) HttpRequest(ctx context.Context) (*http.Request, err
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
@@ -139,30 +184,121 @@ func (r *PromoteDataStream) HttpRequest(ctx context.Context) (*http.Request, err
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r PromoteDataStream) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r PromoteDataStream) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "indices.promote_data_stream")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.promote_data_stream")
+		if reader := instrument.RecordRequestBody(ctx, "indices.promote_data_stream", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.promote_data_stream")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the PromoteDataStream query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the PromoteDataStream query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
 }
 
+// Do runs the request through the transport, handle the response and returns a promotedatastream.Response
+func (r PromoteDataStream) Do(providedCtx context.Context) (Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.promote_data_stream")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := new(Response)
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(&response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return *response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
+}
+
 // IsSuccess allows to run a query with a context and retrieve the result as a boolean.
 // This only exists for endpoints without a request payload and allows for quick control flow.
-func (r PromoteDataStream) IsSuccess(ctx context.Context) (bool, error) {
-	res, err := r.Do(ctx)
+func (r PromoteDataStream) IsSuccess(providedCtx context.Context) (bool, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.promote_data_stream")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	res, err := r.Perform(ctx)
 
 	if err != nil {
 		return false, err
 	}
-	io.Copy(ioutil.Discard, res.Body)
+	io.Copy(io.Discard, res.Body)
 	err = res.Body.Close()
 	if err != nil {
 		return false, err
@@ -170,6 +306,14 @@ func (r PromoteDataStream) IsSuccess(ctx context.Context) (bool, error) {
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
+	}
+
+	if res.StatusCode != 404 {
+		err := fmt.Errorf("an error happened during the PromoteDataStream query execution, status code: %d", res.StatusCode)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return false, err
 	}
 
 	return false, nil
@@ -184,9 +328,62 @@ func (r *PromoteDataStream) Header(key, value string) *PromoteDataStream {
 
 // Name The name of the data stream
 // API Name: name
-func (r *PromoteDataStream) Name(v string) *PromoteDataStream {
+func (r *PromoteDataStream) _name(name string) *PromoteDataStream {
 	r.paramSet |= nameMask
-	r.name = v
+	r.name = name
+
+	return r
+}
+
+// MasterTimeout Period to wait for a connection to the master node. If no response is
+// received before the timeout expires, the request fails and returns an error.
+// API name: master_timeout
+func (r *PromoteDataStream) MasterTimeout(duration string) *PromoteDataStream {
+	r.values.Set("master_timeout", duration)
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *PromoteDataStream) ErrorTrace(errortrace bool) *PromoteDataStream {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *PromoteDataStream) FilterPath(filterpaths ...string) *PromoteDataStream {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *PromoteDataStream) Human(human bool) *PromoteDataStream {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *PromoteDataStream) Pretty(pretty bool) *PromoteDataStream {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
 
 	return r
 }

@@ -84,9 +84,9 @@ type QuerySendDetailsRequest struct {
 // QuerySendDetailsResponse is the response struct for api QuerySendDetails
 type QuerySendDetailsResponse struct {
 	*responses.BaseResponse
-	RequestId         string            `json:"RequestId" xml:"RequestId"`
 	Code              string            `json:"Code" xml:"Code"`
 	Message           string            `json:"Message" xml:"Message"`
+	RequestId         string            `json:"RequestId" xml:"RequestId"`
 	TotalCount        string            `json:"TotalCount" xml:"TotalCount"`
 	SmsSendDetailDTOs SmsSendDetailDTOs `json:"SmsSendDetailDTOs" xml:"SmsSendDetailDTOs"`
 }
@@ -96,7 +96,7 @@ func CreateQuerySendDetailsRequest() (request *QuerySendDetailsRequest) {
 	request = &QuerySendDetailsRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySendDetails", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySendDetails", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

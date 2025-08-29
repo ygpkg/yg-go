@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // DatafeedConfig type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/_types/Datafeed.ts#L60-L117
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/_types/Datafeed.ts#L63-L120
 type DatafeedConfig struct {
 	// Aggregations If set, the datafeed performs aggregation searches. Support for aggregations
 	// is limited and should be used only with low cardinality data.
@@ -56,12 +63,11 @@ type DatafeedConfig struct {
 	// overwritten by the full bucket results. If the datafeed uses aggregations,
 	// this value must be divisible by the interval of the date histogram
 	// aggregation.
-	Frequency *Duration `json:"frequency,omitempty"`
-	Indexes   []string  `json:"indexes,omitempty"`
+	Frequency Duration `json:"frequency,omitempty"`
 	// Indices An array of index names. Wildcards are supported. If any indices are in
 	// remote clusters, the machine learning nodes must have the
 	// `remote_cluster_client` role.
-	Indices []string `json:"indices"`
+	Indices []string `json:"indices,omitempty"`
 	// IndicesOptions Specifies index expansion options that are used during search.
 	IndicesOptions *IndicesOptions `json:"indices_options,omitempty"`
 	JobId          *string         `json:"job_id,omitempty"`
@@ -76,15 +82,15 @@ type DatafeedConfig struct {
 	// corresponds to the query object in an Elasticsearch search POST body. All the
 	// options that are supported by Elasticsearch can be used, as this object is
 	// passed verbatim to Elasticsearch.
-	Query Query `json:"query"`
+	Query *Query `json:"query,omitempty"`
 	// QueryDelay The number of seconds behind real time that data is queried. For example, if
 	// data from 10:04 a.m. might not be searchable in Elasticsearch until 10:06
 	// a.m., set this property to 120 seconds. The default value is randomly
 	// selected between `60s` and `120s`. This randomness improves the query
 	// performance when there are multiple jobs running on the same node.
-	QueryDelay *Duration `json:"query_delay,omitempty"`
+	QueryDelay Duration `json:"query_delay,omitempty"`
 	// RuntimeMappings Specifies runtime fields for the datafeed search.
-	RuntimeMappings map[string]RuntimeField `json:"runtime_mappings,omitempty"`
+	RuntimeMappings RuntimeFields `json:"runtime_mappings,omitempty"`
 	// ScriptFields Specifies scripts that evaluate custom expressions and returns script fields
 	// to the datafeed. The detector configuration objects in a job can contain
 	// functions that use these script fields.
@@ -95,11 +101,140 @@ type DatafeedConfig struct {
 	ScrollSize *int `json:"scroll_size,omitempty"`
 }
 
+func (s *DatafeedConfig) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "aggregations", "aggs":
+			if s.Aggregations == nil {
+				s.Aggregations = make(map[string]Aggregations, 0)
+			}
+			if err := dec.Decode(&s.Aggregations); err != nil {
+				return fmt.Errorf("%s | %w", "Aggregations", err)
+			}
+
+		case "chunking_config":
+			if err := dec.Decode(&s.ChunkingConfig); err != nil {
+				return fmt.Errorf("%s | %w", "ChunkingConfig", err)
+			}
+
+		case "datafeed_id":
+			if err := dec.Decode(&s.DatafeedId); err != nil {
+				return fmt.Errorf("%s | %w", "DatafeedId", err)
+			}
+
+		case "delayed_data_check_config":
+			if err := dec.Decode(&s.DelayedDataCheckConfig); err != nil {
+				return fmt.Errorf("%s | %w", "DelayedDataCheckConfig", err)
+			}
+
+		case "frequency":
+			if err := dec.Decode(&s.Frequency); err != nil {
+				return fmt.Errorf("%s | %w", "Frequency", err)
+			}
+
+		case "indices", "indexes":
+			rawMsg := json.RawMessage{}
+			dec.Decode(&rawMsg)
+			if !bytes.HasPrefix(rawMsg, []byte("[")) {
+				o := new(string)
+				if err := json.NewDecoder(bytes.NewReader(rawMsg)).Decode(&o); err != nil {
+					return fmt.Errorf("%s | %w", "Indices", err)
+				}
+
+				s.Indices = append(s.Indices, *o)
+			} else {
+				if err := json.NewDecoder(bytes.NewReader(rawMsg)).Decode(&s.Indices); err != nil {
+					return fmt.Errorf("%s | %w", "Indices", err)
+				}
+			}
+
+		case "indices_options":
+			if err := dec.Decode(&s.IndicesOptions); err != nil {
+				return fmt.Errorf("%s | %w", "IndicesOptions", err)
+			}
+
+		case "job_id":
+			if err := dec.Decode(&s.JobId); err != nil {
+				return fmt.Errorf("%s | %w", "JobId", err)
+			}
+
+		case "max_empty_searches":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MaxEmptySearches", err)
+				}
+				s.MaxEmptySearches = &value
+			case float64:
+				f := int(v)
+				s.MaxEmptySearches = &f
+			}
+
+		case "query":
+			if err := dec.Decode(&s.Query); err != nil {
+				return fmt.Errorf("%s | %w", "Query", err)
+			}
+
+		case "query_delay":
+			if err := dec.Decode(&s.QueryDelay); err != nil {
+				return fmt.Errorf("%s | %w", "QueryDelay", err)
+			}
+
+		case "runtime_mappings":
+			if err := dec.Decode(&s.RuntimeMappings); err != nil {
+				return fmt.Errorf("%s | %w", "RuntimeMappings", err)
+			}
+
+		case "script_fields":
+			if s.ScriptFields == nil {
+				s.ScriptFields = make(map[string]ScriptField, 0)
+			}
+			if err := dec.Decode(&s.ScriptFields); err != nil {
+				return fmt.Errorf("%s | %w", "ScriptFields", err)
+			}
+
+		case "scroll_size":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "ScrollSize", err)
+				}
+				s.ScrollSize = &value
+			case float64:
+				f := int(v)
+				s.ScrollSize = &f
+			}
+
+		}
+	}
+	return nil
+}
+
 // NewDatafeedConfig returns a DatafeedConfig.
 func NewDatafeedConfig() *DatafeedConfig {
 	r := &DatafeedConfig{
-		Aggregations: make(map[string]Aggregations, 0),
-		ScriptFields: make(map[string]ScriptField, 0),
+		Aggregations: make(map[string]Aggregations),
+		ScriptFields: make(map[string]ScriptField),
 	}
 
 	return r

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -31,6 +31,11 @@ func newSecurityCreateServiceTokenFunc(t Transport) SecurityCreateServiceToken {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -58,17 +63,32 @@ type SecurityCreateServiceTokenRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r SecurityCreateServiceTokenRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r SecurityCreateServiceTokenRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
 
-	method = "PUT"
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "security.create_service_token")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	if r.Name != "" {
+		method = "POST"
+	} else {
+		method = "PUT"
+	}
 
 	path.Grow(7 + 1 + len("_security") + 1 + len("service") + 1 + len(r.Namespace) + 1 + len(r.Service) + 1 + len("credential") + 1 + len("token") + 1 + len(r.Name))
 	path.WriteString("http://")
@@ -78,8 +98,14 @@ func (r SecurityCreateServiceTokenRequest) Do(ctx context.Context, transport Tra
 	path.WriteString("service")
 	path.WriteString("/")
 	path.WriteString(r.Namespace)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "namespace", r.Namespace)
+	}
 	path.WriteString("/")
 	path.WriteString(r.Service)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "service", r.Service)
+	}
 	path.WriteString("/")
 	path.WriteString("credential")
 	path.WriteString("/")
@@ -87,6 +113,9 @@ func (r SecurityCreateServiceTokenRequest) Do(ctx context.Context, transport Tra
 	if r.Name != "" {
 		path.WriteString("/")
 		path.WriteString(r.Name)
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "name", r.Name)
+		}
 	}
 
 	params = make(map[string]string)
@@ -113,6 +142,9 @@ func (r SecurityCreateServiceTokenRequest) Do(ctx context.Context, transport Tra
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -140,8 +172,17 @@ func (r SecurityCreateServiceTokenRequest) Do(ctx context.Context, transport Tra
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "security.create_service_token")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "security.create_service_token")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 

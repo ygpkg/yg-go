@@ -15,21 +15,96 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // IntervalsAllOf type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/query_dsl/fulltext.ts#L49-L56
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/query_dsl/fulltext.ts#L50-L70
 type IntervalsAllOf struct {
-	Filter    *IntervalsFilter `json:"filter,omitempty"`
-	Intervals []Intervals      `json:"intervals"`
-	MaxGaps   *int             `json:"max_gaps,omitempty"`
-	Ordered   *bool            `json:"ordered,omitempty"`
+	// Filter Rule used to filter returned intervals.
+	Filter *IntervalsFilter `json:"filter,omitempty"`
+	// Intervals An array of rules to combine. All rules must produce a match in a document
+	// for the overall source to match.
+	Intervals []Intervals `json:"intervals"`
+	// MaxGaps Maximum number of positions between the matching terms.
+	// Intervals produced by the rules further apart than this are not considered
+	// matches.
+	MaxGaps *int `json:"max_gaps,omitempty"`
+	// Ordered If `true`, intervals produced by the rules should appear in the order in
+	// which they are specified.
+	Ordered *bool `json:"ordered,omitempty"`
+}
+
+func (s *IntervalsAllOf) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "filter":
+			if err := dec.Decode(&s.Filter); err != nil {
+				return fmt.Errorf("%s | %w", "Filter", err)
+			}
+
+		case "intervals":
+			if err := dec.Decode(&s.Intervals); err != nil {
+				return fmt.Errorf("%s | %w", "Intervals", err)
+			}
+
+		case "max_gaps":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MaxGaps", err)
+				}
+				s.MaxGaps = &value
+			case float64:
+				f := int(v)
+				s.MaxGaps = &f
+			}
+
+		case "ordered":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Ordered", err)
+				}
+				s.Ordered = &value
+			case bool:
+				s.Ordered = &v
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewIntervalsAllOf returns a IntervalsAllOf.

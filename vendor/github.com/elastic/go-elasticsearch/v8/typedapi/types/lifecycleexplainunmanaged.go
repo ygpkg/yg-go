@@ -15,26 +15,73 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+)
+
 // LifecycleExplainUnmanaged type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ilm/explain_lifecycle/types.ts#L54-L57
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ilm/explain_lifecycle/types.ts#L60-L63
 type LifecycleExplainUnmanaged struct {
 	Index   string `json:"index"`
-	Managed string `json:"managed,omitempty"`
+	Managed bool   `json:"managed,omitempty"`
+}
+
+func (s *LifecycleExplainUnmanaged) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "index":
+			if err := dec.Decode(&s.Index); err != nil {
+				return fmt.Errorf("%s | %w", "Index", err)
+			}
+
+		case "managed":
+			if err := dec.Decode(&s.Managed); err != nil {
+				return fmt.Errorf("%s | %w", "Managed", err)
+			}
+
+		}
+	}
+	return nil
+}
+
+// MarshalJSON override marshalling to include literal value
+func (s LifecycleExplainUnmanaged) MarshalJSON() ([]byte, error) {
+	type innerLifecycleExplainUnmanaged LifecycleExplainUnmanaged
+	tmp := innerLifecycleExplainUnmanaged{
+		Index:   s.Index,
+		Managed: s.Managed,
+	}
+
+	tmp.Managed = false
+
+	return json.Marshal(tmp)
 }
 
 // NewLifecycleExplainUnmanaged returns a LifecycleExplainUnmanaged.
 func NewLifecycleExplainUnmanaged() *LifecycleExplainUnmanaged {
 	r := &LifecycleExplainUnmanaged{}
-
-	r.Managed = "false"
 
 	return r
 }

@@ -15,25 +15,100 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // TotalFeatureImportanceStatistics type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/_types/TrainedModel.ts#L237-L244
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/_types/TrainedModel.ts#L306-L313
 type TotalFeatureImportanceStatistics struct {
 	// Max The maximum importance value across all the training data for this feature.
 	Max int `json:"max"`
 	// MeanMagnitude The average magnitude of this feature across all the training data. This
 	// value is the average of the absolute values of the importance for this
 	// feature.
-	MeanMagnitude float64 `json:"mean_magnitude"`
+	MeanMagnitude Float64 `json:"mean_magnitude"`
 	// Min The minimum importance value across all the training data for this feature.
 	Min int `json:"min"`
+}
+
+func (s *TotalFeatureImportanceStatistics) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "max":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Max", err)
+				}
+				s.Max = value
+			case float64:
+				f := int(v)
+				s.Max = f
+			}
+
+		case "mean_magnitude":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MeanMagnitude", err)
+				}
+				f := Float64(value)
+				s.MeanMagnitude = f
+			case float64:
+				f := Float64(v)
+				s.MeanMagnitude = f
+			}
+
+		case "min":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Min", err)
+				}
+				s.Min = value
+			case float64:
+				f := int(v)
+				s.Min = f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewTotalFeatureImportanceStatistics returns a TotalFeatureImportanceStatistics.

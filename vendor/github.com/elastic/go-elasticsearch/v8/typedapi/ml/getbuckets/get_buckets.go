@@ -15,12 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Retrieves anomaly detection job results for one or more buckets.
+// Get anomaly detection job results for buckets.
+// The API presents a chronological view of the records, grouped by bucket.
 package getbuckets
 
 import (
@@ -29,12 +28,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 const (
@@ -53,15 +54,20 @@ type GetBuckets struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
-	req *Request
-	raw json.RawMessage
+	req      *Request
+	deferred []func(request *Request) error
+	buf      *gobytes.Buffer
 
 	paramSet int
 
 	jobid     string
 	timestamp string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewGetBuckets type alias for index.
@@ -73,13 +79,14 @@ func NewGetBucketsFunc(tp elastictransport.Interface) NewGetBuckets {
 	return func(jobid string) *GetBuckets {
 		n := New(tp)
 
-		n.JobId(jobid)
+		n._jobid(jobid)
 
 		return n
 	}
 }
 
-// Retrieves anomaly detection job results for one or more buckets.
+// Get anomaly detection job results for buckets.
+// The API presents a chronological view of the records, grouped by bucket.
 //
 // https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-get-bucket.html
 func New(tp elastictransport.Interface) *GetBuckets {
@@ -87,7 +94,14 @@ func New(tp elastictransport.Interface) *GetBuckets {
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+
+		buf: gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -95,7 +109,7 @@ func New(tp elastictransport.Interface) *GetBuckets {
 
 // Raw takes a json payload as input which is then passed to the http.Request
 // If specified Raw takes precedence on Request method.
-func (r *GetBuckets) Raw(raw json.RawMessage) *GetBuckets {
+func (r *GetBuckets) Raw(raw io.Reader) *GetBuckets {
 	r.raw = raw
 
 	return r
@@ -117,9 +131,17 @@ func (r *GetBuckets) HttpRequest(ctx context.Context) (*http.Request, error) {
 
 	var err error
 
-	if r.raw != nil {
-		r.buf.Write(r.raw)
-	} else if r.req != nil {
+	if len(r.deferred) > 0 {
+		for _, f := range r.deferred {
+			deferredErr := f(r.req)
+			if deferredErr != nil {
+				return nil, deferredErr
+			}
+		}
+	}
+
+	if r.raw == nil && r.req != nil {
+
 		data, err := json.Marshal(r.req)
 
 		if err != nil {
@@ -127,6 +149,11 @@ func (r *GetBuckets) HttpRequest(ctx context.Context) (*http.Request, error) {
 		}
 
 		r.buf.Write(data)
+
+	}
+
+	if r.buf.Len() > 0 {
+		r.raw = r.buf
 	}
 
 	r.path.Scheme = "http"
@@ -139,6 +166,9 @@ func (r *GetBuckets) HttpRequest(ctx context.Context) (*http.Request, error) {
 		path.WriteString("anomaly_detectors")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "jobid", r.jobid)
+		}
 		path.WriteString(r.jobid)
 		path.WriteString("/")
 		path.WriteString("results")
@@ -146,6 +176,9 @@ func (r *GetBuckets) HttpRequest(ctx context.Context) (*http.Request, error) {
 		path.WriteString("buckets")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "timestamp", r.timestamp)
+		}
 		path.WriteString(r.timestamp)
 
 		method = http.MethodPost
@@ -156,6 +189,9 @@ func (r *GetBuckets) HttpRequest(ctx context.Context) (*http.Request, error) {
 		path.WriteString("anomaly_detectors")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "jobid", r.jobid)
+		}
 		path.WriteString(r.jobid)
 		path.WriteString("/")
 		path.WriteString("results")
@@ -173,15 +209,15 @@ func (r *GetBuckets) HttpRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
 
 	if req.Header.Get("Content-Type") == "" {
-		if r.buf.Len() > 0 {
+		if r.raw != nil {
 			req.Header.Set("Content-Type", "application/vnd.elasticsearch+json;compatible-with=8")
 		}
 	}
@@ -197,19 +233,100 @@ func (r *GetBuckets) HttpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r GetBuckets) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r GetBuckets) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "ml.get_buckets")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "ml.get_buckets")
+		if reader := instrument.RecordRequestBody(ctx, "ml.get_buckets", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ml.get_buckets")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the GetBuckets query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the GetBuckets query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
+}
+
+// Do runs the request through the transport, handle the response and returns a getbuckets.Response
+func (r GetBuckets) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ml.get_buckets")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
 }
 
 // Header set a key, value pair in the GetBuckets headers map.
@@ -221,9 +338,9 @@ func (r *GetBuckets) Header(key, value string) *GetBuckets {
 
 // JobId Identifier for the anomaly detection job.
 // API Name: jobid
-func (r *GetBuckets) JobId(v string) *GetBuckets {
+func (r *GetBuckets) _jobid(jobid string) *GetBuckets {
 	r.paramSet |= jobidMask
-	r.jobid = v
+	r.jobid = jobid
 
 	return r
 }
@@ -231,83 +348,158 @@ func (r *GetBuckets) JobId(v string) *GetBuckets {
 // Timestamp The timestamp of a single bucket result. If you do not specify this
 // parameter, the API returns information about all buckets.
 // API Name: timestamp
-func (r *GetBuckets) Timestamp(v string) *GetBuckets {
+func (r *GetBuckets) Timestamp(timestamp string) *GetBuckets {
 	r.paramSet |= timestampMask
-	r.timestamp = v
-
-	return r
-}
-
-// AnomalyScore Returns buckets with anomaly scores greater or equal than this value.
-// API name: anomaly_score
-func (r *GetBuckets) AnomalyScore(value string) *GetBuckets {
-	r.values.Set("anomaly_score", value)
-
-	return r
-}
-
-// Desc If `true`, the buckets are sorted in descending order.
-// API name: desc
-func (r *GetBuckets) Desc(b bool) *GetBuckets {
-	r.values.Set("desc", strconv.FormatBool(b))
-
-	return r
-}
-
-// End Returns buckets with timestamps earlier than this time. `-1` means it is
-// unset and results are not limited to specific timestamps.
-// API name: end
-func (r *GetBuckets) End(value string) *GetBuckets {
-	r.values.Set("end", value)
-
-	return r
-}
-
-// ExcludeInterim If `true`, the output excludes interim results.
-// API name: exclude_interim
-func (r *GetBuckets) ExcludeInterim(b bool) *GetBuckets {
-	r.values.Set("exclude_interim", strconv.FormatBool(b))
-
-	return r
-}
-
-// Expand If true, the output includes anomaly records.
-// API name: expand
-func (r *GetBuckets) Expand(b bool) *GetBuckets {
-	r.values.Set("expand", strconv.FormatBool(b))
+	r.timestamp = timestamp
 
 	return r
 }
 
 // From Skips the specified number of buckets.
 // API name: from
-func (r *GetBuckets) From(i int) *GetBuckets {
-	r.values.Set("from", strconv.Itoa(i))
+func (r *GetBuckets) From(from int) *GetBuckets {
+	r.values.Set("from", strconv.Itoa(from))
 
 	return r
 }
 
 // Size Specifies the maximum number of buckets to obtain.
 // API name: size
-func (r *GetBuckets) Size(i int) *GetBuckets {
-	r.values.Set("size", strconv.Itoa(i))
+func (r *GetBuckets) Size(size int) *GetBuckets {
+	r.values.Set("size", strconv.Itoa(size))
 
 	return r
 }
 
-// Sort Specifies the sort field for the requested buckets.
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *GetBuckets) ErrorTrace(errortrace bool) *GetBuckets {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *GetBuckets) FilterPath(filterpaths ...string) *GetBuckets {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *GetBuckets) Human(human bool) *GetBuckets {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *GetBuckets) Pretty(pretty bool) *GetBuckets {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
+
+	return r
+}
+
+// AnomalyScore Refer to the description for the `anomaly_score` query parameter.
+// API name: anomaly_score
+func (r *GetBuckets) AnomalyScore(anomalyscore types.Float64) *GetBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.AnomalyScore = &anomalyscore
+
+	return r
+}
+
+// Desc Refer to the description for the `desc` query parameter.
+// API name: desc
+func (r *GetBuckets) Desc(desc bool) *GetBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Desc = &desc
+
+	return r
+}
+
+// End Refer to the description for the `end` query parameter.
+// API name: end
+func (r *GetBuckets) End(datetime types.DateTime) *GetBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.End = datetime
+
+	return r
+}
+
+// ExcludeInterim Refer to the description for the `exclude_interim` query parameter.
+// API name: exclude_interim
+func (r *GetBuckets) ExcludeInterim(excludeinterim bool) *GetBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.ExcludeInterim = &excludeinterim
+
+	return r
+}
+
+// Expand Refer to the description for the `expand` query parameter.
+// API name: expand
+func (r *GetBuckets) Expand(expand bool) *GetBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Expand = &expand
+
+	return r
+}
+
+// API name: page
+func (r *GetBuckets) Page(page *types.Page) *GetBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.Page = page
+
+	return r
+}
+
+// Sort Refer to the desription for the `sort` query parameter.
 // API name: sort
-func (r *GetBuckets) Sort(value string) *GetBuckets {
-	r.values.Set("sort", value)
+func (r *GetBuckets) Sort(field string) *GetBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Sort = &field
 
 	return r
 }
 
-// Start Returns buckets with timestamps after this time. `-1` means it is unset
-// and results are not limited to specific timestamps.
+// Start Refer to the description for the `start` query parameter.
 // API name: start
-func (r *GetBuckets) Start(value string) *GetBuckets {
-	r.values.Set("start", value)
+func (r *GetBuckets) Start(datetime types.DateTime) *GetBuckets {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Start = datetime
 
 	return r
 }

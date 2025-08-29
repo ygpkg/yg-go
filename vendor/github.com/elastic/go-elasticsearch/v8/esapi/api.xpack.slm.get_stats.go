@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newSlmGetStatsFunc(t Transport) SlmGetStats {
@@ -31,6 +32,11 @@ func newSlmGetStatsFunc(t Transport) SlmGetStats {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -44,6 +50,9 @@ type SlmGetStats func(o ...func(*SlmGetStatsRequest)) (*Response, error)
 
 // SlmGetStatsRequest configures the Slm Get Stats API request.
 type SlmGetStatsRequest struct {
+	MasterTimeout time.Duration
+	Timeout       time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -52,15 +61,26 @@ type SlmGetStatsRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r SlmGetStatsRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r SlmGetStatsRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "slm.get_stats")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -69,6 +89,14 @@ func (r SlmGetStatsRequest) Do(ctx context.Context, transport Transport) (*Respo
 	path.WriteString("/_slm/stats")
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -88,6 +116,9 @@ func (r SlmGetStatsRequest) Do(ctx context.Context, transport Transport) (*Respo
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -115,8 +146,17 @@ func (r SlmGetStatsRequest) Do(ctx context.Context, transport Transport) (*Respo
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "slm.get_stats")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "slm.get_stats")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -133,6 +173,20 @@ func (r SlmGetStatsRequest) Do(ctx context.Context, transport Transport) (*Respo
 func (f SlmGetStats) WithContext(v context.Context) func(*SlmGetStatsRequest) {
 	return func(r *SlmGetStatsRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - explicit operation timeout for connection to master node.
+func (f SlmGetStats) WithMasterTimeout(v time.Duration) func(*SlmGetStatsRequest) {
+	return func(r *SlmGetStatsRequest) {
+		r.MasterTimeout = v
+	}
+}
+
+// WithTimeout - explicit operation timeout.
+func (f SlmGetStats) WithTimeout(v time.Duration) func(*SlmGetStatsRequest) {
+	return func(r *SlmGetStatsRequest) {
+		r.Timeout = v
 	}
 }
 

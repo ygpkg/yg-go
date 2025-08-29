@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -34,6 +34,11 @@ func newIndicesPutTemplateFunc(t Transport) IndicesPutTemplate {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -42,7 +47,7 @@ func newIndicesPutTemplateFunc(t Transport) IndicesPutTemplate {
 
 // IndicesPutTemplate creates or updates an index template.
 //
-// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/master/indices-templates.html.
+// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/master/indices-templates-v1.html.
 type IndicesPutTemplate func(name string, body io.Reader, o ...func(*IndicesPutTemplateRequest)) (*Response, error)
 
 // IndicesPutTemplateRequest configures the Indices Put Template API request.
@@ -51,6 +56,7 @@ type IndicesPutTemplateRequest struct {
 
 	Name string
 
+	Cause         string
 	Create        *bool
 	MasterTimeout time.Duration
 	Order         *int
@@ -63,15 +69,26 @@ type IndicesPutTemplateRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r IndicesPutTemplateRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r IndicesPutTemplateRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.put_template")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "PUT"
 
@@ -81,8 +98,15 @@ func (r IndicesPutTemplateRequest) Do(ctx context.Context, transport Transport) 
 	path.WriteString("_template")
 	path.WriteString("/")
 	path.WriteString(r.Name)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "name", r.Name)
+	}
 
 	params = make(map[string]string)
+
+	if r.Cause != "" {
+		params["cause"] = r.Cause
+	}
 
 	if r.Create != nil {
 		params["create"] = strconv.FormatBool(*r.Create)
@@ -114,6 +138,9 @@ func (r IndicesPutTemplateRequest) Do(ctx context.Context, transport Transport) 
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -145,8 +172,20 @@ func (r IndicesPutTemplateRequest) Do(ctx context.Context, transport Transport) 
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.put_template")
+		if reader := instrument.RecordRequestBody(ctx, "indices.put_template", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.put_template")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -163,6 +202,13 @@ func (r IndicesPutTemplateRequest) Do(ctx context.Context, transport Transport) 
 func (f IndicesPutTemplate) WithContext(v context.Context) func(*IndicesPutTemplateRequest) {
 	return func(r *IndicesPutTemplateRequest) {
 		r.ctx = v
+	}
+}
+
+// WithCause - user defined reason for creating/updating the index template.
+func (f IndicesPutTemplate) WithCause(v string) func(*IndicesPutTemplateRequest) {
+	return func(r *IndicesPutTemplateRequest) {
+		r.Cause = v
 	}
 }
 

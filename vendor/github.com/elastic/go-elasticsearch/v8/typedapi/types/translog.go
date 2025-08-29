@@ -15,20 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/translogdurability"
 )
 
 // Translog type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/_types/IndexSettings.ts#L332-L354
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/_types/IndexSettings.ts#L355-L377
 type Translog struct {
 	// Durability Whether or not to `fsync` and commit the translog after every index, delete,
 	// update, or bulk request.
@@ -43,12 +47,52 @@ type Translog struct {
 	// long. Once the
 	// maximum size has been reached a flush will happen, generating a new Lucene
 	// commit point.
-	FlushThresholdSize *ByteSize          `json:"flush_threshold_size,omitempty"`
+	FlushThresholdSize ByteSize           `json:"flush_threshold_size,omitempty"`
 	Retention          *TranslogRetention `json:"retention,omitempty"`
 	// SyncInterval How often the translog is fsynced to disk and committed, regardless of write
 	// operations.
 	// Values less than 100ms are not allowed.
-	SyncInterval *Duration `json:"sync_interval,omitempty"`
+	SyncInterval Duration `json:"sync_interval,omitempty"`
+}
+
+func (s *Translog) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "durability":
+			if err := dec.Decode(&s.Durability); err != nil {
+				return fmt.Errorf("%s | %w", "Durability", err)
+			}
+
+		case "flush_threshold_size":
+			if err := dec.Decode(&s.FlushThresholdSize); err != nil {
+				return fmt.Errorf("%s | %w", "FlushThresholdSize", err)
+			}
+
+		case "retention":
+			if err := dec.Decode(&s.Retention); err != nil {
+				return fmt.Errorf("%s | %w", "Retention", err)
+			}
+
+		case "sync_interval":
+			if err := dec.Decode(&s.SyncInterval); err != nil {
+				return fmt.Errorf("%s | %w", "SyncInterval", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewTranslog returns a Translog.

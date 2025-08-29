@@ -17,12 +17,12 @@ package dysmsapi
 
 // SmsSendDetailDTO is a nested struct in dysmsapi response
 type SmsSendDetailDTO struct {
-	PhoneNum     string `json:"PhoneNum" xml:"PhoneNum"`
-	SendStatus   int64  `json:"SendStatus" xml:"SendStatus"`
 	ErrCode      string `json:"ErrCode" xml:"ErrCode"`
 	TemplateCode string `json:"TemplateCode" xml:"TemplateCode"`
-	Content      string `json:"Content" xml:"Content"`
-	SendDate     string `json:"SendDate" xml:"SendDate"`
-	ReceiveDate  string `json:"ReceiveDate" xml:"ReceiveDate"`
 	OutId        string `json:"OutId" xml:"OutId"`
+	ReceiveDate  string `json:"ReceiveDate" xml:"ReceiveDate"`
+	SendDate     string `json:"SendDate" xml:"SendDate"`
+	PhoneNum     string `json:"PhoneNum" xml:"PhoneNum"`
+	Content      string `json:"Content" xml:"Content"`
+	SendStatus   int64  `json:"SendStatus" xml:"SendStatus"`
 }
