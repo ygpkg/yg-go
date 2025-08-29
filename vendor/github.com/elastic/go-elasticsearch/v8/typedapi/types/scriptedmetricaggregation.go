@@ -15,31 +15,117 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+)
+
 // ScriptedMetricAggregation type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/metric.ts#L137-L143
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/metric.ts#L286-L312
 type ScriptedMetricAggregation struct {
-	CombineScript *Script                `json:"combine_script,omitempty"`
-	Field         *string                `json:"field,omitempty"`
-	InitScript    *Script                `json:"init_script,omitempty"`
-	MapScript     *Script                `json:"map_script,omitempty"`
-	Missing       *Missing               `json:"missing,omitempty"`
-	Params        map[string]interface{} `json:"params,omitempty"`
-	ReduceScript  *Script                `json:"reduce_script,omitempty"`
-	Script        *Script                `json:"script,omitempty"`
+	// CombineScript Runs once on each shard after document collection is complete.
+	// Allows the aggregation to consolidate the state returned from each shard.
+	CombineScript *Script `json:"combine_script,omitempty"`
+	// Field The field on which to run the aggregation.
+	Field *string `json:"field,omitempty"`
+	// InitScript Runs prior to any collection of documents.
+	// Allows the aggregation to set up any initial state.
+	InitScript *Script `json:"init_script,omitempty"`
+	// MapScript Run once per document collected.
+	// If no `combine_script` is specified, the resulting state needs to be stored
+	// in the `state` object.
+	MapScript *Script `json:"map_script,omitempty"`
+	// Missing The value to apply to documents that do not have a value.
+	// By default, documents without a value are ignored.
+	Missing Missing `json:"missing,omitempty"`
+	// Params A global object with script parameters for `init`, `map` and `combine`
+	// scripts.
+	// It is shared between the scripts.
+	Params map[string]json.RawMessage `json:"params,omitempty"`
+	// ReduceScript Runs once on the coordinating node after all shards have returned their
+	// results.
+	// The script is provided with access to a variable `states`, which is an array
+	// of the result of the `combine_script` on each shard.
+	ReduceScript *Script `json:"reduce_script,omitempty"`
+	Script       *Script `json:"script,omitempty"`
+}
+
+func (s *ScriptedMetricAggregation) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "combine_script":
+			if err := dec.Decode(&s.CombineScript); err != nil {
+				return fmt.Errorf("%s | %w", "CombineScript", err)
+			}
+
+		case "field":
+			if err := dec.Decode(&s.Field); err != nil {
+				return fmt.Errorf("%s | %w", "Field", err)
+			}
+
+		case "init_script":
+			if err := dec.Decode(&s.InitScript); err != nil {
+				return fmt.Errorf("%s | %w", "InitScript", err)
+			}
+
+		case "map_script":
+			if err := dec.Decode(&s.MapScript); err != nil {
+				return fmt.Errorf("%s | %w", "MapScript", err)
+			}
+
+		case "missing":
+			if err := dec.Decode(&s.Missing); err != nil {
+				return fmt.Errorf("%s | %w", "Missing", err)
+			}
+
+		case "params":
+			if s.Params == nil {
+				s.Params = make(map[string]json.RawMessage, 0)
+			}
+			if err := dec.Decode(&s.Params); err != nil {
+				return fmt.Errorf("%s | %w", "Params", err)
+			}
+
+		case "reduce_script":
+			if err := dec.Decode(&s.ReduceScript); err != nil {
+				return fmt.Errorf("%s | %w", "ReduceScript", err)
+			}
+
+		case "script":
+			if err := dec.Decode(&s.Script); err != nil {
+				return fmt.Errorf("%s | %w", "Script", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewScriptedMetricAggregation returns a ScriptedMetricAggregation.
 func NewScriptedMetricAggregation() *ScriptedMetricAggregation {
 	r := &ScriptedMetricAggregation{
-		Params: make(map[string]interface{}, 0),
+		Params: make(map[string]json.RawMessage),
 	}
 
 	return r

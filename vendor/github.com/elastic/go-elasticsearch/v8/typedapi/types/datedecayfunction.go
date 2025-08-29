@@ -15,10 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
@@ -31,17 +29,19 @@ import (
 
 // DateDecayFunction type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/query_dsl/compound.ts#L92-L94
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/query_dsl/compound.ts#L209-L209
 type DateDecayFunction struct {
-	DateDecayFunction map[string]DecayPlacementDateMathDuration `json:"-"`
-	MultiValueMode    *multivaluemode.MultiValueMode            `json:"multi_value_mode,omitempty"`
+	DecayFunctionBaseDateMathDuration map[string]DecayPlacementDateMathDuration `json:"-"`
+	// MultiValueMode Determines how the distance is calculated when a field used for computing the
+	// decay contains multiple values.
+	MultiValueMode *multivaluemode.MultiValueMode `json:"multi_value_mode,omitempty"`
 }
 
 // MarhsalJSON overrides marshalling for types with additional properties
 func (s DateDecayFunction) MarshalJSON() ([]byte, error) {
 	type opt DateDecayFunction
 	// We transform the struct to a map without the embedded additional properties map
-	tmp := make(map[string]interface{}, 0)
+	tmp := make(map[string]any, 0)
 
 	data, err := json.Marshal(opt(s))
 	if err != nil {
@@ -53,9 +53,10 @@ func (s DateDecayFunction) MarshalJSON() ([]byte, error) {
 	}
 
 	// We inline the additional fields from the underlying map
-	for key, value := range s.DateDecayFunction {
+	for key, value := range s.DecayFunctionBaseDateMathDuration {
 		tmp[fmt.Sprintf("%s", key)] = value
 	}
+	delete(tmp, "DecayFunctionBaseDateMathDuration")
 
 	data, err = json.Marshal(tmp)
 	if err != nil {
@@ -68,7 +69,7 @@ func (s DateDecayFunction) MarshalJSON() ([]byte, error) {
 // NewDateDecayFunction returns a DateDecayFunction.
 func NewDateDecayFunction() *DateDecayFunction {
 	r := &DateDecayFunction{
-		DateDecayFunction: make(map[string]DecayPlacementDateMathDuration, 0),
+		DecayFunctionBaseDateMathDuration: make(map[string]DecayPlacementDateMathDuration),
 	}
 
 	return r

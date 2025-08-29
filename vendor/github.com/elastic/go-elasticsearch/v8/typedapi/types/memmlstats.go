@@ -15,43 +15,175 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // MemMlStats type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/get_memory_stats/types.ts#L90-L111
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/get_memory_stats/types.ts#L90-L111
 type MemMlStats struct {
 	// AnomalyDetectors Amount of native memory set aside for anomaly detection jobs.
-	AnomalyDetectors *ByteSize `json:"anomaly_detectors,omitempty"`
+	AnomalyDetectors ByteSize `json:"anomaly_detectors,omitempty"`
 	// AnomalyDetectorsInBytes Amount of native memory, in bytes, set aside for anomaly detection jobs.
 	AnomalyDetectorsInBytes int `json:"anomaly_detectors_in_bytes"`
 	// DataFrameAnalytics Amount of native memory set aside for data frame analytics jobs.
-	DataFrameAnalytics *ByteSize `json:"data_frame_analytics,omitempty"`
+	DataFrameAnalytics ByteSize `json:"data_frame_analytics,omitempty"`
 	// DataFrameAnalyticsInBytes Amount of native memory, in bytes, set aside for data frame analytics jobs.
 	DataFrameAnalyticsInBytes int `json:"data_frame_analytics_in_bytes"`
 	// Max Maximum amount of native memory (separate to the JVM heap) that may be used
 	// by machine learning native processes.
-	Max *ByteSize `json:"max,omitempty"`
+	Max ByteSize `json:"max,omitempty"`
 	// MaxInBytes Maximum amount of native memory (separate to the JVM heap), in bytes, that
 	// may be used by machine learning native processes.
 	MaxInBytes int `json:"max_in_bytes"`
 	// NativeCodeOverhead Amount of native memory set aside for loading machine learning native code
 	// shared libraries.
-	NativeCodeOverhead *ByteSize `json:"native_code_overhead,omitempty"`
+	NativeCodeOverhead ByteSize `json:"native_code_overhead,omitempty"`
 	// NativeCodeOverheadInBytes Amount of native memory, in bytes, set aside for loading machine learning
 	// native code shared libraries.
 	NativeCodeOverheadInBytes int `json:"native_code_overhead_in_bytes"`
 	// NativeInference Amount of native memory set aside for trained models that have a PyTorch
 	// model_type.
-	NativeInference *ByteSize `json:"native_inference,omitempty"`
+	NativeInference ByteSize `json:"native_inference,omitempty"`
 	// NativeInferenceInBytes Amount of native memory, in bytes, set aside for trained models that have a
 	// PyTorch model_type.
 	NativeInferenceInBytes int `json:"native_inference_in_bytes"`
+}
+
+func (s *MemMlStats) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "anomaly_detectors":
+			if err := dec.Decode(&s.AnomalyDetectors); err != nil {
+				return fmt.Errorf("%s | %w", "AnomalyDetectors", err)
+			}
+
+		case "anomaly_detectors_in_bytes":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "AnomalyDetectorsInBytes", err)
+				}
+				s.AnomalyDetectorsInBytes = value
+			case float64:
+				f := int(v)
+				s.AnomalyDetectorsInBytes = f
+			}
+
+		case "data_frame_analytics":
+			if err := dec.Decode(&s.DataFrameAnalytics); err != nil {
+				return fmt.Errorf("%s | %w", "DataFrameAnalytics", err)
+			}
+
+		case "data_frame_analytics_in_bytes":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "DataFrameAnalyticsInBytes", err)
+				}
+				s.DataFrameAnalyticsInBytes = value
+			case float64:
+				f := int(v)
+				s.DataFrameAnalyticsInBytes = f
+			}
+
+		case "max":
+			if err := dec.Decode(&s.Max); err != nil {
+				return fmt.Errorf("%s | %w", "Max", err)
+			}
+
+		case "max_in_bytes":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MaxInBytes", err)
+				}
+				s.MaxInBytes = value
+			case float64:
+				f := int(v)
+				s.MaxInBytes = f
+			}
+
+		case "native_code_overhead":
+			if err := dec.Decode(&s.NativeCodeOverhead); err != nil {
+				return fmt.Errorf("%s | %w", "NativeCodeOverhead", err)
+			}
+
+		case "native_code_overhead_in_bytes":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "NativeCodeOverheadInBytes", err)
+				}
+				s.NativeCodeOverheadInBytes = value
+			case float64:
+				f := int(v)
+				s.NativeCodeOverheadInBytes = f
+			}
+
+		case "native_inference":
+			if err := dec.Decode(&s.NativeInference); err != nil {
+				return fmt.Errorf("%s | %w", "NativeInference", err)
+			}
+
+		case "native_inference_in_bytes":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "NativeInferenceInBytes", err)
+				}
+				s.NativeInferenceInBytes = value
+			case float64:
+				f := int(v)
+				s.NativeInferenceInBytes = f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewMemMlStats returns a MemMlStats.

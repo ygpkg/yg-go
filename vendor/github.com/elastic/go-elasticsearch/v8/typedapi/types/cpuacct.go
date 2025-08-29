@@ -15,19 +15,66 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // CpuAcct type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/nodes/_types/Stats.ts#L188-L191
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/nodes/_types/Stats.ts#L514-L523
 type CpuAcct struct {
+	// ControlGroup The `cpuacct` control group to which the Elasticsearch process belongs.
 	ControlGroup *string `json:"control_group,omitempty"`
-	UsageNanos   *int64  `json:"usage_nanos,omitempty"`
+	// UsageNanos The total CPU time, in nanoseconds, consumed by all tasks in the same cgroup
+	// as the Elasticsearch process.
+	UsageNanos *int64 `json:"usage_nanos,omitempty"`
+}
+
+func (s *CpuAcct) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "control_group":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "ControlGroup", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.ControlGroup = &o
+
+		case "usage_nanos":
+			if err := dec.Decode(&s.UsageNanos); err != nil {
+				return fmt.Errorf("%s | %w", "UsageNanos", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewCpuAcct returns a CpuAcct.

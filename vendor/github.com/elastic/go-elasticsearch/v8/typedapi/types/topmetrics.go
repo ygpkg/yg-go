@@ -15,16 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 // TopMetrics type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/Aggregate.ts#L720-L724
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/Aggregate.ts#L834-L838
 type TopMetrics struct {
 	Metrics map[string]FieldValue `json:"metrics"`
 	Sort    []FieldValue          `json:"sort"`
@@ -33,7 +31,7 @@ type TopMetrics struct {
 // NewTopMetrics returns a TopMetrics.
 func NewTopMetrics() *TopMetrics {
 	r := &TopMetrics{
-		Metrics: make(map[string]FieldValue, 0),
+		Metrics: make(map[string]FieldValue),
 	}
 
 	return r

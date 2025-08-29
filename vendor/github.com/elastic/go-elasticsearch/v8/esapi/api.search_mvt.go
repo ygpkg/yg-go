@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -35,6 +35,11 @@ func newSearchMvtFunc(t Transport) SearchMvt {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -61,6 +66,7 @@ type SearchMvtRequest struct {
 
 	ExactBounds    *bool
 	Extent         *int
+	GridAgg        string
 	GridPrecision  *int
 	GridType       string
 	Size           *int
@@ -75,15 +81,26 @@ type SearchMvtRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r SearchMvtRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r SearchMvtRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "search_mvt")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -104,16 +121,31 @@ func (r SearchMvtRequest) Do(ctx context.Context, transport Transport) (*Respons
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(strings.Join(r.Index, ","))
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "index", strings.Join(r.Index, ","))
+	}
 	path.WriteString("/")
 	path.WriteString("_mvt")
 	path.WriteString("/")
 	path.WriteString(r.Field)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "field", r.Field)
+	}
 	path.WriteString("/")
 	path.WriteString(strconv.Itoa(*r.Zoom))
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "zoom", strconv.Itoa(*r.Zoom))
+	}
 	path.WriteString("/")
 	path.WriteString(strconv.Itoa(*r.X))
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "x", strconv.Itoa(*r.X))
+	}
 	path.WriteString("/")
 	path.WriteString(strconv.Itoa(*r.Y))
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "y", strconv.Itoa(*r.Y))
+	}
 
 	params = make(map[string]string)
 
@@ -123,6 +155,10 @@ func (r SearchMvtRequest) Do(ctx context.Context, transport Transport) (*Respons
 
 	if r.Extent != nil {
 		params["extent"] = strconv.FormatInt(int64(*r.Extent), 10)
+	}
+
+	if r.GridAgg != "" {
+		params["grid_agg"] = r.GridAgg
 	}
 
 	if r.GridPrecision != nil {
@@ -163,6 +199,9 @@ func (r SearchMvtRequest) Do(ctx context.Context, transport Transport) (*Respons
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -194,8 +233,20 @@ func (r SearchMvtRequest) Do(ctx context.Context, transport Transport) (*Respons
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "search_mvt")
+		if reader := instrument.RecordRequestBody(ctx, "search_mvt", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "search_mvt")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -233,6 +284,13 @@ func (f SearchMvt) WithExactBounds(v bool) func(*SearchMvtRequest) {
 func (f SearchMvt) WithExtent(v int) func(*SearchMvtRequest) {
 	return func(r *SearchMvtRequest) {
 		r.Extent = &v
+	}
+}
+
+// WithGridAgg - aggregation used to create a grid for `field`..
+func (f SearchMvt) WithGridAgg(v string) func(*SearchMvtRequest) {
+	return func(r *SearchMvtRequest) {
+		r.GridAgg = v
 	}
 }
 

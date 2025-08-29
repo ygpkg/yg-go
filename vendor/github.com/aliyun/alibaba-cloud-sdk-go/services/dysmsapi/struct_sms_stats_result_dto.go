@@ -17,12 +17,13 @@ package dysmsapi
 
 // SmsStatsResultDTO is a nested struct in dysmsapi response
 type SmsStatsResultDTO struct {
-	TemplateCode    string `json:"TemplateCode" xml:"TemplateCode"`
-	TemplateName    string `json:"TemplateName" xml:"TemplateName"`
-	TemplateType    int    `json:"TemplateType" xml:"TemplateType"`
-	AuditStatus     string `json:"AuditStatus" xml:"AuditStatus"`
-	TemplateContent string `json:"TemplateContent" xml:"TemplateContent"`
-	CreateDate      string `json:"CreateDate" xml:"CreateDate"`
-	OrderId         string `json:"OrderId" xml:"OrderId"`
-	Reason          Reason `json:"Reason" xml:"Reason"`
+	TemplateCode      string `json:"TemplateCode" xml:"TemplateCode"`
+	TemplateName      string `json:"TemplateName" xml:"TemplateName"`
+	OuterTemplateType int    `json:"OuterTemplateType" xml:"OuterTemplateType"`
+	AuditStatus       string `json:"AuditStatus" xml:"AuditStatus"`
+	TemplateContent   string `json:"TemplateContent" xml:"TemplateContent"`
+	CreateDate        string `json:"CreateDate" xml:"CreateDate"`
+	OrderId           string `json:"OrderId" xml:"OrderId"`
+	TemplateType      int    `json:"TemplateType" xml:"TemplateType"`
+	Reason            Reason `json:"Reason" xml:"Reason"`
 }

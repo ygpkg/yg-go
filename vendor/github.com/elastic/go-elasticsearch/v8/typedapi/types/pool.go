@@ -15,21 +15,112 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // Pool type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/nodes/_types/Stats.ts#L339-L344
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/nodes/_types/Stats.ts#L956-L973
 type Pool struct {
-	MaxInBytes      *int64 `json:"max_in_bytes,omitempty"`
-	PeakMaxInBytes  *int64 `json:"peak_max_in_bytes,omitempty"`
+	// MaxInBytes Maximum amount of memory, in bytes, available for use by the heap.
+	MaxInBytes *int64 `json:"max_in_bytes,omitempty"`
+	// PeakMaxInBytes Largest amount of memory, in bytes, historically used by the heap.
+	PeakMaxInBytes *int64 `json:"peak_max_in_bytes,omitempty"`
+	// PeakUsedInBytes Largest amount of memory, in bytes, historically used by the heap.
 	PeakUsedInBytes *int64 `json:"peak_used_in_bytes,omitempty"`
-	UsedInBytes     *int64 `json:"used_in_bytes,omitempty"`
+	// UsedInBytes Memory, in bytes, used by the heap.
+	UsedInBytes *int64 `json:"used_in_bytes,omitempty"`
+}
+
+func (s *Pool) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "max_in_bytes":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MaxInBytes", err)
+				}
+				s.MaxInBytes = &value
+			case float64:
+				f := int64(v)
+				s.MaxInBytes = &f
+			}
+
+		case "peak_max_in_bytes":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "PeakMaxInBytes", err)
+				}
+				s.PeakMaxInBytes = &value
+			case float64:
+				f := int64(v)
+				s.PeakMaxInBytes = &f
+			}
+
+		case "peak_used_in_bytes":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "PeakUsedInBytes", err)
+				}
+				s.PeakUsedInBytes = &value
+			case float64:
+				f := int64(v)
+				s.PeakUsedInBytes = &f
+			}
+
+		case "used_in_bytes":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "UsedInBytes", err)
+				}
+				s.UsedInBytes = &value
+			case float64:
+				f := int64(v)
+				s.UsedInBytes = &f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewPool returns a Pool.

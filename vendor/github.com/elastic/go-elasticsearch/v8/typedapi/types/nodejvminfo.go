@@ -15,18 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // NodeJvmInfo type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/nodes/info/types.ts#L348-L362
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/nodes/info/types.ts#L368-L381
 type NodeJvmInfo struct {
-	BundledJdk                            bool              `json:"bundled_jdk"`
 	GcCollectors                          []string          `json:"gc_collectors"`
 	InputArguments                        []string          `json:"input_arguments"`
 	Mem                                   NodeInfoJvmMemory `json:"mem"`
@@ -34,11 +40,125 @@ type NodeJvmInfo struct {
 	Pid                                   int               `json:"pid"`
 	StartTimeInMillis                     int64             `json:"start_time_in_millis"`
 	UsingBundledJdk                       bool              `json:"using_bundled_jdk"`
-	UsingCompressedOrdinaryObjectPointers string            `json:"using_compressed_ordinary_object_pointers,omitempty"`
+	UsingCompressedOrdinaryObjectPointers *string           `json:"using_compressed_ordinary_object_pointers,omitempty"`
 	Version                               string            `json:"version"`
 	VmName                                string            `json:"vm_name"`
 	VmVendor                              string            `json:"vm_vendor"`
 	VmVersion                             string            `json:"vm_version"`
+}
+
+func (s *NodeJvmInfo) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "gc_collectors":
+			if err := dec.Decode(&s.GcCollectors); err != nil {
+				return fmt.Errorf("%s | %w", "GcCollectors", err)
+			}
+
+		case "input_arguments":
+			if err := dec.Decode(&s.InputArguments); err != nil {
+				return fmt.Errorf("%s | %w", "InputArguments", err)
+			}
+
+		case "mem":
+			if err := dec.Decode(&s.Mem); err != nil {
+				return fmt.Errorf("%s | %w", "Mem", err)
+			}
+
+		case "memory_pools":
+			if err := dec.Decode(&s.MemoryPools); err != nil {
+				return fmt.Errorf("%s | %w", "MemoryPools", err)
+			}
+
+		case "pid":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Pid", err)
+				}
+				s.Pid = value
+			case float64:
+				f := int(v)
+				s.Pid = f
+			}
+
+		case "start_time_in_millis":
+			if err := dec.Decode(&s.StartTimeInMillis); err != nil {
+				return fmt.Errorf("%s | %w", "StartTimeInMillis", err)
+			}
+
+		case "using_bundled_jdk":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "UsingBundledJdk", err)
+				}
+				s.UsingBundledJdk = value
+			case bool:
+				s.UsingBundledJdk = v
+			}
+
+		case "using_compressed_ordinary_object_pointers":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "UsingCompressedOrdinaryObjectPointers", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.UsingCompressedOrdinaryObjectPointers = &o
+
+		case "version":
+			if err := dec.Decode(&s.Version); err != nil {
+				return fmt.Errorf("%s | %w", "Version", err)
+			}
+
+		case "vm_name":
+			if err := dec.Decode(&s.VmName); err != nil {
+				return fmt.Errorf("%s | %w", "VmName", err)
+			}
+
+		case "vm_vendor":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "VmVendor", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.VmVendor = o
+
+		case "vm_version":
+			if err := dec.Decode(&s.VmVersion); err != nil {
+				return fmt.Errorf("%s | %w", "VmVersion", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewNodeJvmInfo returns a NodeJvmInfo.

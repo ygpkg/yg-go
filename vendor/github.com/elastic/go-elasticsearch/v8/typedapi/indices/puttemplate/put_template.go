@@ -15,12 +15,41 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Creates or updates an index template.
+// Create or update a legacy index template.
+// Index templates define settings, mappings, and aliases that can be applied
+// automatically to new indices.
+// Elasticsearch applies templates to new indices based on an index pattern that
+// matches the index name.
+//
+// IMPORTANT: This documentation is about legacy index templates, which are
+// deprecated and will be replaced by the composable templates introduced in
+// Elasticsearch 7.8.
+//
+// Composable templates always take precedence over legacy templates.
+// If no composable template matches a new index, matching legacy templates are
+// applied according to their order.
+//
+// Index templates are only applied during index creation.
+// Changes to index templates do not affect existing indices.
+// Settings and mappings specified in create index API requests override any
+// settings or mappings specified in an index template.
+//
+// You can use C-style `/* *\/` block comments in index templates.
+// You can include comments anywhere in the request body, except before the
+// opening curly bracket.
+//
+// **Indices matching multiple templates**
+//
+// Multiple index templates can potentially match an index, in this case, both
+// the settings and mappings are merged into the final configuration of the
+// index.
+// The order of the merging can be controlled using the order parameter, with
+// lower order being applied first, and higher orders overriding them.
+// NOTE: Multiple matching templates with the same order value will result in a
+// non-deterministic merging order.
 package puttemplate
 
 import (
@@ -29,12 +58,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 const (
@@ -51,14 +82,19 @@ type PutTemplate struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
-	req *Request
-	raw json.RawMessage
+	req      *Request
+	deferred []func(request *Request) error
+	buf      *gobytes.Buffer
 
 	paramSet int
 
 	name string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewPutTemplate type alias for index.
@@ -70,21 +106,59 @@ func NewPutTemplateFunc(tp elastictransport.Interface) NewPutTemplate {
 	return func(name string) *PutTemplate {
 		n := New(tp)
 
-		n.Name(name)
+		n._name(name)
 
 		return n
 	}
 }
 
-// Creates or updates an index template.
+// Create or update a legacy index template.
+// Index templates define settings, mappings, and aliases that can be applied
+// automatically to new indices.
+// Elasticsearch applies templates to new indices based on an index pattern that
+// matches the index name.
 //
-// https://www.elastic.co/guide/en/elasticsearch/reference/master/indices-templates.html
+// IMPORTANT: This documentation is about legacy index templates, which are
+// deprecated and will be replaced by the composable templates introduced in
+// Elasticsearch 7.8.
+//
+// Composable templates always take precedence over legacy templates.
+// If no composable template matches a new index, matching legacy templates are
+// applied according to their order.
+//
+// Index templates are only applied during index creation.
+// Changes to index templates do not affect existing indices.
+// Settings and mappings specified in create index API requests override any
+// settings or mappings specified in an index template.
+//
+// You can use C-style `/* *\/` block comments in index templates.
+// You can include comments anywhere in the request body, except before the
+// opening curly bracket.
+//
+// **Indices matching multiple templates**
+//
+// Multiple index templates can potentially match an index, in this case, both
+// the settings and mappings are merged into the final configuration of the
+// index.
+// The order of the merging can be controlled using the order parameter, with
+// lower order being applied first, and higher orders overriding them.
+// NOTE: Multiple matching templates with the same order value will result in a
+// non-deterministic merging order.
+//
+// https://www.elastic.co/guide/en/elasticsearch/reference/current/indices-templates-v1.html
 func New(tp elastictransport.Interface) *PutTemplate {
 	r := &PutTemplate{
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+
+		buf: gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -92,7 +166,7 @@ func New(tp elastictransport.Interface) *PutTemplate {
 
 // Raw takes a json payload as input which is then passed to the http.Request
 // If specified Raw takes precedence on Request method.
-func (r *PutTemplate) Raw(raw json.RawMessage) *PutTemplate {
+func (r *PutTemplate) Raw(raw io.Reader) *PutTemplate {
 	r.raw = raw
 
 	return r
@@ -114,9 +188,17 @@ func (r *PutTemplate) HttpRequest(ctx context.Context) (*http.Request, error) {
 
 	var err error
 
-	if r.raw != nil {
-		r.buf.Write(r.raw)
-	} else if r.req != nil {
+	if len(r.deferred) > 0 {
+		for _, f := range r.deferred {
+			deferredErr := f(r.req)
+			if deferredErr != nil {
+				return nil, deferredErr
+			}
+		}
+	}
+
+	if r.raw == nil && r.req != nil {
+
 		data, err := json.Marshal(r.req)
 
 		if err != nil {
@@ -124,6 +206,11 @@ func (r *PutTemplate) HttpRequest(ctx context.Context) (*http.Request, error) {
 		}
 
 		r.buf.Write(data)
+
+	}
+
+	if r.buf.Len() > 0 {
+		r.raw = r.buf
 	}
 
 	r.path.Scheme = "http"
@@ -134,6 +221,9 @@ func (r *PutTemplate) HttpRequest(ctx context.Context) (*http.Request, error) {
 		path.WriteString("_template")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "name", r.name)
+		}
 		path.WriteString(r.name)
 
 		method = http.MethodPut
@@ -147,15 +237,15 @@ func (r *PutTemplate) HttpRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
 
 	if req.Header.Get("Content-Type") == "" {
-		if r.buf.Len() > 0 {
+		if r.raw != nil {
 			req.Header.Set("Content-Type", "application/vnd.elasticsearch+json;compatible-with=8")
 		}
 	}
@@ -171,19 +261,100 @@ func (r *PutTemplate) HttpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r PutTemplate) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r PutTemplate) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "indices.put_template")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.put_template")
+		if reader := instrument.RecordRequestBody(ctx, "indices.put_template", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.put_template")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the PutTemplate query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the PutTemplate query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
+}
+
+// Do runs the request through the transport, handle the response and returns a puttemplate.Response
+func (r PutTemplate) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.put_template")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
 }
 
 // Header set a key, value pair in the PutTemplate headers map.
@@ -195,24 +366,17 @@ func (r *PutTemplate) Header(key, value string) *PutTemplate {
 
 // Name The name of the template
 // API Name: name
-func (r *PutTemplate) Name(v string) *PutTemplate {
+func (r *PutTemplate) _name(name string) *PutTemplate {
 	r.paramSet |= nameMask
-	r.name = v
+	r.name = name
 
 	return r
 }
 
 // Create If true, this request cannot replace or update existing index templates.
 // API name: create
-func (r *PutTemplate) Create(b bool) *PutTemplate {
-	r.values.Set("create", strconv.FormatBool(b))
-
-	return r
-}
-
-// API name: flat_settings
-func (r *PutTemplate) FlatSettings(b bool) *PutTemplate {
-	r.values.Set("flat_settings", strconv.FormatBool(b))
+func (r *PutTemplate) Create(create bool) *PutTemplate {
+	r.values.Set("create", strconv.FormatBool(create))
 
 	return r
 }
@@ -220,15 +384,96 @@ func (r *PutTemplate) FlatSettings(b bool) *PutTemplate {
 // MasterTimeout Period to wait for a connection to the master node. If no response is
 // received before the timeout expires, the request fails and returns an error.
 // API name: master_timeout
-func (r *PutTemplate) MasterTimeout(value string) *PutTemplate {
-	r.values.Set("master_timeout", value)
+func (r *PutTemplate) MasterTimeout(duration string) *PutTemplate {
+	r.values.Set("master_timeout", duration)
 
 	return r
 }
 
-// API name: timeout
-func (r *PutTemplate) Timeout(value string) *PutTemplate {
-	r.values.Set("timeout", value)
+// Cause User defined reason for creating/updating the index template
+// API name: cause
+func (r *PutTemplate) Cause(cause string) *PutTemplate {
+	r.values.Set("cause", cause)
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *PutTemplate) ErrorTrace(errortrace bool) *PutTemplate {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *PutTemplate) FilterPath(filterpaths ...string) *PutTemplate {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *PutTemplate) Human(human bool) *PutTemplate {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *PutTemplate) Pretty(pretty bool) *PutTemplate {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
+
+	return r
+}
+
+// Aliases Aliases for the index.
+// API name: aliases
+func (r *PutTemplate) Aliases(aliases map[string]types.Alias) *PutTemplate {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.Aliases = aliases
+
+	return r
+}
+
+// IndexPatterns Array of wildcard expressions used to match the names
+// of indices during creation.
+// API name: index_patterns
+func (r *PutTemplate) IndexPatterns(indexpatterns ...string) *PutTemplate {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.IndexPatterns = indexpatterns
+
+	return r
+}
+
+// Mappings Mapping for fields in the index.
+// API name: mappings
+func (r *PutTemplate) Mappings(mappings *types.TypeMapping) *PutTemplate {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.Mappings = mappings
 
 	return r
 }
@@ -239,8 +484,36 @@ func (r *PutTemplate) Timeout(value string) *PutTemplate {
 // Templates with lower 'order' values are merged first. Templates with higher
 // 'order' values are merged later, overriding templates with lower values.
 // API name: order
-func (r *PutTemplate) Order(i int) *PutTemplate {
-	r.values.Set("order", strconv.Itoa(i))
+func (r *PutTemplate) Order(order int) *PutTemplate {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Order = &order
+
+	return r
+}
+
+// Settings Configuration options for the index.
+// API name: settings
+func (r *PutTemplate) Settings(settings *types.IndexSettings) *PutTemplate {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+
+	r.req.Settings = settings
+
+	return r
+}
+
+// Version Version number used to manage index templates externally. This number
+// is not automatically generated by Elasticsearch.
+// To unset a version, replace the template without specifying one.
+// API name: version
+func (r *PutTemplate) Version(versionnumber int64) *PutTemplate {
+	if r.req == nil {
+		r.req = NewRequest()
+	}
+	r.req.Version = &versionnumber
 
 	return r
 }

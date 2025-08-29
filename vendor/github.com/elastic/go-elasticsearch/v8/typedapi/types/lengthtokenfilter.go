@@ -15,28 +15,114 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // LengthTokenFilter type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/analysis/token_filters.ts#L242-L246
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/analysis/token_filters.ts#L328-L334
 type LengthTokenFilter struct {
-	Max     *int    `json:"max,omitempty"`
+	// Max Maximum character length of a token. Longer tokens are excluded from the
+	// output. Defaults to `Integer.MAX_VALUE`, which is `2^31-1` or `2147483647`.
+	Max *int `json:"max,omitempty"`
+	// Min Minimum character length of a token. Shorter tokens are excluded from the
+	// output. Defaults to `0`.
 	Min     *int    `json:"min,omitempty"`
 	Type    string  `json:"type,omitempty"`
 	Version *string `json:"version,omitempty"`
 }
 
+func (s *LengthTokenFilter) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "max":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Max", err)
+				}
+				s.Max = &value
+			case float64:
+				f := int(v)
+				s.Max = &f
+			}
+
+		case "min":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Min", err)
+				}
+				s.Min = &value
+			case float64:
+				f := int(v)
+				s.Min = &f
+			}
+
+		case "type":
+			if err := dec.Decode(&s.Type); err != nil {
+				return fmt.Errorf("%s | %w", "Type", err)
+			}
+
+		case "version":
+			if err := dec.Decode(&s.Version); err != nil {
+				return fmt.Errorf("%s | %w", "Version", err)
+			}
+
+		}
+	}
+	return nil
+}
+
+// MarshalJSON override marshalling to include literal value
+func (s LengthTokenFilter) MarshalJSON() ([]byte, error) {
+	type innerLengthTokenFilter LengthTokenFilter
+	tmp := innerLengthTokenFilter{
+		Max:     s.Max,
+		Min:     s.Min,
+		Type:    s.Type,
+		Version: s.Version,
+	}
+
+	tmp.Type = "length"
+
+	return json.Marshal(tmp)
+}
+
 // NewLengthTokenFilter returns a LengthTokenFilter.
 func NewLengthTokenFilter() *LengthTokenFilter {
 	r := &LengthTokenFilter{}
-
-	r.Type = "length"
 
 	return r
 }

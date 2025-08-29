@@ -15,24 +15,61 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // InferenceConfig type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ingest/_types/Processors.ts#L244-L250
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ingest/_types/Processors.ts#L1066-L1078
 type InferenceConfig struct {
+	AdditionalInferenceConfigProperty map[string]json.RawMessage `json:"-"`
+	// Classification Classification configuration for inference.
 	Classification *InferenceConfigClassification `json:"classification,omitempty"`
-	Regression     *InferenceConfigRegression     `json:"regression,omitempty"`
+	// Regression Regression configuration for inference.
+	Regression *InferenceConfigRegression `json:"regression,omitempty"`
+}
+
+// MarhsalJSON overrides marshalling for types with additional properties
+func (s InferenceConfig) MarshalJSON() ([]byte, error) {
+	type opt InferenceConfig
+	// We transform the struct to a map without the embedded additional properties map
+	tmp := make(map[string]any, 0)
+
+	data, err := json.Marshal(opt(s))
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(data, &tmp)
+	if err != nil {
+		return nil, err
+	}
+
+	// We inline the additional fields from the underlying map
+	for key, value := range s.AdditionalInferenceConfigProperty {
+		tmp[fmt.Sprintf("%s", key)] = value
+	}
+	delete(tmp, "AdditionalInferenceConfigProperty")
+
+	data, err = json.Marshal(tmp)
+	if err != nil {
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // NewInferenceConfig returns a InferenceConfig.
 func NewInferenceConfig() *InferenceConfig {
-	r := &InferenceConfig{}
+	r := &InferenceConfig{
+		AdditionalInferenceConfigProperty: make(map[string]json.RawMessage),
+	}
 
 	return r
 }

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -24,6 +24,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newIndicesDeleteDataStreamFunc(t Transport) IndicesDeleteDataStream {
@@ -32,6 +33,11 @@ func newIndicesDeleteDataStreamFunc(t Transport) IndicesDeleteDataStream {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -48,6 +54,7 @@ type IndicesDeleteDataStreamRequest struct {
 	Name []string
 
 	ExpandWildcards string
+	MasterTimeout   time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -57,15 +64,26 @@ type IndicesDeleteDataStreamRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r IndicesDeleteDataStreamRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r IndicesDeleteDataStreamRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.delete_data_stream")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "DELETE"
 
@@ -79,11 +97,18 @@ func (r IndicesDeleteDataStreamRequest) Do(ctx context.Context, transport Transp
 	path.WriteString("_data_stream")
 	path.WriteString("/")
 	path.WriteString(strings.Join(r.Name, ","))
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "name", strings.Join(r.Name, ","))
+	}
 
 	params = make(map[string]string)
 
 	if r.ExpandWildcards != "" {
 		params["expand_wildcards"] = r.ExpandWildcards
+	}
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
 	}
 
 	if r.Pretty {
@@ -104,6 +129,9 @@ func (r IndicesDeleteDataStreamRequest) Do(ctx context.Context, transport Transp
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -131,8 +159,17 @@ func (r IndicesDeleteDataStreamRequest) Do(ctx context.Context, transport Transp
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.delete_data_stream")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.delete_data_stream")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -156,6 +193,13 @@ func (f IndicesDeleteDataStream) WithContext(v context.Context) func(*IndicesDel
 func (f IndicesDeleteDataStream) WithExpandWildcards(v string) func(*IndicesDeleteDataStreamRequest) {
 	return func(r *IndicesDeleteDataStreamRequest) {
 		r.ExpandWildcards = v
+	}
+}
+
+// WithMasterTimeout - specify timeout for connection to master.
+func (f IndicesDeleteDataStream) WithMasterTimeout(v time.Duration) func(*IndicesDeleteDataStreamRequest) {
+	return func(r *IndicesDeleteDataStreamRequest) {
+		r.MasterTimeout = v
 	}
 }
 

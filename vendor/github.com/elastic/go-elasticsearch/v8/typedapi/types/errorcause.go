@@ -15,25 +15,27 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"strconv"
 )
 
 // ErrorCause type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/Errors.ts#L25-L48
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/Errors.ts#L25-L50
 type ErrorCause struct {
-	CausedBy *ErrorCause            `json:"caused_by,omitempty"`
-	Metadata map[string]interface{} `json:"-"`
-	// Reason A human-readable explanation of the error, in english
+	CausedBy *ErrorCause                `json:"caused_by,omitempty"`
+	Metadata map[string]json.RawMessage `json:"-"`
+	// Reason A human-readable explanation of the error, in English.
 	Reason    *string      `json:"reason,omitempty"`
 	RootCause []ErrorCause `json:"root_cause,omitempty"`
 	// StackTrace The server stack trace. Present only if the `error_trace=true` parameter was
@@ -44,11 +46,101 @@ type ErrorCause struct {
 	Type string `json:"type"`
 }
 
+func (s *ErrorCause) UnmarshalJSON(data []byte) error {
+
+	if bytes.HasPrefix(data, []byte(`"`)) {
+		reason := string(data)
+		s.Reason = &reason
+		return nil
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "caused_by":
+			if err := dec.Decode(&s.CausedBy); err != nil {
+				return fmt.Errorf("%s | %w", "CausedBy", err)
+			}
+
+		case "reason":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Reason", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Reason = &o
+
+		case "root_cause":
+			if err := dec.Decode(&s.RootCause); err != nil {
+				return fmt.Errorf("%s | %w", "RootCause", err)
+			}
+
+		case "stack_trace":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "StackTrace", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.StackTrace = &o
+
+		case "suppressed":
+			if err := dec.Decode(&s.Suppressed); err != nil {
+				return fmt.Errorf("%s | %w", "Suppressed", err)
+			}
+
+		case "type":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Type", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Type = o
+
+		default:
+
+			if key, ok := t.(string); ok {
+				if s.Metadata == nil {
+					s.Metadata = make(map[string]json.RawMessage, 0)
+				}
+				raw := new(json.RawMessage)
+				if err := dec.Decode(&raw); err != nil {
+					return fmt.Errorf("%s | %w", "Metadata", err)
+				}
+				s.Metadata[key] = *raw
+			}
+
+		}
+	}
+	return nil
+}
+
 // MarhsalJSON overrides marshalling for types with additional properties
 func (s ErrorCause) MarshalJSON() ([]byte, error) {
 	type opt ErrorCause
 	// We transform the struct to a map without the embedded additional properties map
-	tmp := make(map[string]interface{}, 0)
+	tmp := make(map[string]any, 0)
 
 	data, err := json.Marshal(opt(s))
 	if err != nil {
@@ -63,6 +155,7 @@ func (s ErrorCause) MarshalJSON() ([]byte, error) {
 	for key, value := range s.Metadata {
 		tmp[fmt.Sprintf("%s", key)] = value
 	}
+	delete(tmp, "Metadata")
 
 	data, err = json.Marshal(tmp)
 	if err != nil {
@@ -75,7 +168,7 @@ func (s ErrorCause) MarshalJSON() ([]byte, error) {
 // NewErrorCause returns a ErrorCause.
 func NewErrorCause() *ErrorCause {
 	r := &ErrorCause{
-		Metadata: make(map[string]interface{}, 0),
+		Metadata: make(map[string]json.RawMessage),
 	}
 
 	return r

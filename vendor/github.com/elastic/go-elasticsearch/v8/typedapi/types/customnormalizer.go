@@ -15,27 +15,41 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"encoding/json"
+)
+
 // CustomNormalizer type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/analysis/normalizers.ts#L30-L34
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/analysis/normalizers.ts#L30-L34
 type CustomNormalizer struct {
 	CharFilter []string `json:"char_filter,omitempty"`
 	Filter     []string `json:"filter,omitempty"`
 	Type       string   `json:"type,omitempty"`
 }
 
+// MarshalJSON override marshalling to include literal value
+func (s CustomNormalizer) MarshalJSON() ([]byte, error) {
+	type innerCustomNormalizer CustomNormalizer
+	tmp := innerCustomNormalizer{
+		CharFilter: s.CharFilter,
+		Filter:     s.Filter,
+		Type:       s.Type,
+	}
+
+	tmp.Type = "custom"
+
+	return json.Marshal(tmp)
+}
+
 // NewCustomNormalizer returns a CustomNormalizer.
 func NewCustomNormalizer() *CustomNormalizer {
 	r := &CustomNormalizer{}
-
-	r.Type = "custom"
 
 	return r
 }

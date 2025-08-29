@@ -15,40 +15,63 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package gettoken
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"strconv"
 
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/accesstokengranttype"
 )
 
 // Request holds the request body struct for the package gettoken
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/security/get_token/GetUserAccessTokenRequest.ts#L25-L39
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/security/get_token/GetUserAccessTokenRequest.ts#L25-L90
 type Request struct {
-	GrantType      *accesstokengranttype.AccessTokenGrantType `json:"grant_type,omitempty"`
-	KerberosTicket *string                                    `json:"kerberos_ticket,omitempty"`
-	Password       *string                                    `json:"password,omitempty"`
-	RefreshToken   *string                                    `json:"refresh_token,omitempty"`
-	Scope          *string                                    `json:"scope,omitempty"`
-	Username       *string                                    `json:"username,omitempty"`
+
+	// GrantType The type of grant.
+	// Supported grant types are: `password`, `_kerberos`, `client_credentials`, and
+	// `refresh_token`.
+	GrantType *accesstokengranttype.AccessTokenGrantType `json:"grant_type,omitempty"`
+	// KerberosTicket The base64 encoded kerberos ticket.
+	// If you specify the `_kerberos` grant type, this parameter is required.
+	// This parameter is not valid with any other supported grant type.
+	KerberosTicket *string `json:"kerberos_ticket,omitempty"`
+	// Password The user's password.
+	// If you specify the `password` grant type, this parameter is required.
+	// This parameter is not valid with any other supported grant type.
+	Password *string `json:"password,omitempty"`
+	// RefreshToken The string that was returned when you created the token, which enables you to
+	// extend its life.
+	// If you specify the `refresh_token` grant type, this parameter is required.
+	// This parameter is not valid with any other supported grant type.
+	RefreshToken *string `json:"refresh_token,omitempty"`
+	// Scope The scope of the token.
+	// Currently tokens are only issued for a scope of FULL regardless of the value
+	// sent with the request.
+	Scope *string `json:"scope,omitempty"`
+	// Username The username that identifies the user.
+	// If you specify the `password` grant type, this parameter is required.
+	// This parameter is not valid with any other supported grant type.
+	Username *string `json:"username,omitempty"`
 }
 
 // NewRequest returns a Request
 func NewRequest() *Request {
 	r := &Request{}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 
@@ -57,4 +80,74 @@ func (rb *Request) FromJSON(data string) (*Request, error) {
 	}
 
 	return &req, nil
+}
+
+func (s *Request) UnmarshalJSON(data []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "grant_type":
+			if err := dec.Decode(&s.GrantType); err != nil {
+				return fmt.Errorf("%s | %w", "GrantType", err)
+			}
+
+		case "kerberos_ticket":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "KerberosTicket", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.KerberosTicket = &o
+
+		case "password":
+			if err := dec.Decode(&s.Password); err != nil {
+				return fmt.Errorf("%s | %w", "Password", err)
+			}
+
+		case "refresh_token":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "RefreshToken", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.RefreshToken = &o
+
+		case "scope":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Scope", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Scope = &o
+
+		case "username":
+			if err := dec.Decode(&s.Username); err != nil {
+				return fmt.Errorf("%s | %w", "Username", err)
+			}
+
+		}
+	}
+	return nil
 }

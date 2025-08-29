@@ -74,6 +74,7 @@ type QuerySmsTemplateListRequest struct {
 	ResourceOwnerId      requests.Integer `position:"Query" name:"ResourceOwnerId"`
 	PageSize             requests.Integer `position:"Query" name:"PageSize"`
 	PageIndex            requests.Integer `position:"Query" name:"PageIndex"`
+	RouteName            string           `position:"Query" name:"RouteName"`
 	ResourceOwnerAccount string           `position:"Query" name:"ResourceOwnerAccount"`
 	OwnerId              requests.Integer `position:"Query" name:"OwnerId"`
 }
@@ -84,6 +85,9 @@ type QuerySmsTemplateListResponse struct {
 	RequestId       string              `json:"RequestId" xml:"RequestId"`
 	Code            string              `json:"Code" xml:"Code"`
 	Message         string              `json:"Message" xml:"Message"`
+	TotalCount      int64               `json:"TotalCount" xml:"TotalCount"`
+	CurrentPage     int                 `json:"CurrentPage" xml:"CurrentPage"`
+	PageSize        int                 `json:"PageSize" xml:"PageSize"`
 	SmsTemplateList []SmsStatsResultDTO `json:"SmsTemplateList" xml:"SmsTemplateList"`
 }
 
@@ -92,7 +96,7 @@ func CreateQuerySmsTemplateListRequest() (request *QuerySmsTemplateListRequest) 
 	request = &QuerySmsTemplateListRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySmsTemplateList", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySmsTemplateList", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

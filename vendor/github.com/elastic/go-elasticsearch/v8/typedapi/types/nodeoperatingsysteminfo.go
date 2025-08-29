@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // NodeOperatingSystemInfo type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/nodes/info/types.ts#L364-L381
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/nodes/info/types.ts#L383-L400
 type NodeOperatingSystemInfo struct {
 	// AllocatedProcessors The number of processors actually used to calculate thread pool size. This
 	// number can be set with the node.processors setting of a node and defaults to
@@ -44,6 +51,105 @@ type NodeOperatingSystemInfo struct {
 	Swap                    *NodeInfoMemory `json:"swap,omitempty"`
 	// Version Version of the operating system
 	Version string `json:"version"`
+}
+
+func (s *NodeOperatingSystemInfo) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "allocated_processors":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "AllocatedProcessors", err)
+				}
+				s.AllocatedProcessors = &value
+			case float64:
+				f := int(v)
+				s.AllocatedProcessors = &f
+			}
+
+		case "arch":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Arch", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Arch = o
+
+		case "available_processors":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "AvailableProcessors", err)
+				}
+				s.AvailableProcessors = value
+			case float64:
+				f := int(v)
+				s.AvailableProcessors = f
+			}
+
+		case "cpu":
+			if err := dec.Decode(&s.Cpu); err != nil {
+				return fmt.Errorf("%s | %w", "Cpu", err)
+			}
+
+		case "mem":
+			if err := dec.Decode(&s.Mem); err != nil {
+				return fmt.Errorf("%s | %w", "Mem", err)
+			}
+
+		case "name":
+			if err := dec.Decode(&s.Name); err != nil {
+				return fmt.Errorf("%s | %w", "Name", err)
+			}
+
+		case "pretty_name":
+			if err := dec.Decode(&s.PrettyName); err != nil {
+				return fmt.Errorf("%s | %w", "PrettyName", err)
+			}
+
+		case "refresh_interval_in_millis":
+			if err := dec.Decode(&s.RefreshIntervalInMillis); err != nil {
+				return fmt.Errorf("%s | %w", "RefreshIntervalInMillis", err)
+			}
+
+		case "swap":
+			if err := dec.Decode(&s.Swap); err != nil {
+				return fmt.Errorf("%s | %w", "Swap", err)
+			}
+
+		case "version":
+			if err := dec.Decode(&s.Version); err != nil {
+				return fmt.Errorf("%s | %w", "Version", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewNodeOperatingSystemInfo returns a NodeOperatingSystemInfo.

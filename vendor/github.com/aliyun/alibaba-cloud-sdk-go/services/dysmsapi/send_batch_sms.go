@@ -72,22 +72,23 @@ func (client *Client) SendBatchSmsWithCallback(request *SendBatchSmsRequest, cal
 type SendBatchSmsRequest struct {
 	*requests.RpcRequest
 	ResourceOwnerId      requests.Integer `position:"Query" name:"ResourceOwnerId"`
-	TemplateParamJson    string           `position:"Query" name:"TemplateParamJson"`
+	TemplateParamJson    string           `position:"Body" name:"TemplateParamJson"`
 	ResourceOwnerAccount string           `position:"Query" name:"ResourceOwnerAccount"`
 	OwnerId              requests.Integer `position:"Query" name:"OwnerId"`
-	SmsUpExtendCodeJson  string           `position:"Query" name:"SmsUpExtendCodeJson"`
-	SignNameJson         string           `position:"Query" name:"SignNameJson"`
+	SmsUpExtendCodeJson  string           `position:"Body" name:"SmsUpExtendCodeJson"`
+	OutId                string           `position:"Query" name:"OutId"`
+	SignNameJson         string           `position:"Body" name:"SignNameJson"`
 	TemplateCode         string           `position:"Query" name:"TemplateCode"`
-	PhoneNumberJson      string           `position:"Query" name:"PhoneNumberJson"`
+	PhoneNumberJson      string           `position:"Body" name:"PhoneNumberJson"`
 }
 
 // SendBatchSmsResponse is the response struct for api SendBatchSms
 type SendBatchSmsResponse struct {
 	*responses.BaseResponse
-	RequestId string `json:"RequestId" xml:"RequestId"`
-	BizId     string `json:"BizId" xml:"BizId"`
 	Code      string `json:"Code" xml:"Code"`
 	Message   string `json:"Message" xml:"Message"`
+	BizId     string `json:"BizId" xml:"BizId"`
+	RequestId string `json:"RequestId" xml:"RequestId"`
 }
 
 // CreateSendBatchSmsRequest creates a request to invoke SendBatchSms API
@@ -95,7 +96,7 @@ func CreateSendBatchSmsRequest() (request *SendBatchSmsRequest) {
 	request = &SendBatchSmsRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "SendBatchSms", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "SendBatchSms", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

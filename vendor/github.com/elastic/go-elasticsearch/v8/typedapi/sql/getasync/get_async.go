@@ -15,27 +15,30 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Returns the current status and available results for an async SQL search or
-// stored synchronous SQL search
+// Get async SQL search results.
+// Get the current status and available results for an async SQL search or
+// stored synchronous SQL search.
+//
+// If the Elasticsearch security features are enabled, only the user who first
+// submitted the SQL search can retrieve the search using this API.
 package getasync
 
 import (
-	gobytes "bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 const (
@@ -52,11 +55,15 @@ type GetAsync struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
 	paramSet int
 
 	id string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewGetAsync type alias for index.
@@ -68,22 +75,31 @@ func NewGetAsyncFunc(tp elastictransport.Interface) NewGetAsync {
 	return func(id string) *GetAsync {
 		n := New(tp)
 
-		n.Id(id)
+		n._id(id)
 
 		return n
 	}
 }
 
-// Returns the current status and available results for an async SQL search or
-// stored synchronous SQL search
+// Get async SQL search results.
+// Get the current status and available results for an async SQL search or
+// stored synchronous SQL search.
 //
-// https://www.elastic.co/guide/en/elasticsearch/reference/master/get-async-sql-search-api.html
+// If the Elasticsearch security features are enabled, only the user who first
+// submitted the SQL search can retrieve the search using this API.
+//
+// https://www.elastic.co/guide/en/elasticsearch/reference/current/get-async-sql-search-api.html
 func New(tp elastictransport.Interface) *GetAsync {
 	r := &GetAsync{
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -108,6 +124,9 @@ func (r *GetAsync) HttpRequest(ctx context.Context) (*http.Request, error) {
 		path.WriteString("async")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "id", r.id)
+		}
 		path.WriteString(r.id)
 
 		method = http.MethodGet
@@ -121,9 +140,9 @@ func (r *GetAsync) HttpRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
@@ -139,30 +158,121 @@ func (r *GetAsync) HttpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r GetAsync) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r GetAsync) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "sql.get_async")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "sql.get_async")
+		if reader := instrument.RecordRequestBody(ctx, "sql.get_async", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "sql.get_async")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the GetAsync query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the GetAsync query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
 }
 
+// Do runs the request through the transport, handle the response and returns a getasync.Response
+func (r GetAsync) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "sql.get_async")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
+}
+
 // IsSuccess allows to run a query with a context and retrieve the result as a boolean.
 // This only exists for endpoints without a request payload and allows for quick control flow.
-func (r GetAsync) IsSuccess(ctx context.Context) (bool, error) {
-	res, err := r.Do(ctx)
+func (r GetAsync) IsSuccess(providedCtx context.Context) (bool, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "sql.get_async")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	res, err := r.Perform(ctx)
 
 	if err != nil {
 		return false, err
 	}
-	io.Copy(ioutil.Discard, res.Body)
+	io.Copy(io.Discard, res.Body)
 	err = res.Body.Close()
 	if err != nil {
 		return false, err
@@ -170,6 +280,14 @@ func (r GetAsync) IsSuccess(ctx context.Context) (bool, error) {
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
+	}
+
+	if res.StatusCode != 404 {
+		err := fmt.Errorf("an error happened during the GetAsync query execution, status code: %d", res.StatusCode)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return false, err
 	}
 
 	return false, nil
@@ -182,48 +300,93 @@ func (r *GetAsync) Header(key, value string) *GetAsync {
 	return r
 }
 
-// Id The async search ID
+// Id The identifier for the search.
 // API Name: id
-func (r *GetAsync) Id(v string) *GetAsync {
+func (r *GetAsync) _id(id string) *GetAsync {
 	r.paramSet |= idMask
-	r.id = v
+	r.id = id
 
 	return r
 }
 
-// Delimiter Separator for CSV results. The API only supports this parameter for CSV
-// responses.
+// Delimiter The separator for CSV results.
+// The API supports this parameter only for CSV responses.
 // API name: delimiter
-func (r *GetAsync) Delimiter(value string) *GetAsync {
-	r.values.Set("delimiter", value)
+func (r *GetAsync) Delimiter(delimiter string) *GetAsync {
+	r.values.Set("delimiter", delimiter)
 
 	return r
 }
 
-// Format Format for the response. You must specify a format using this parameter or
-// the
-// Accept HTTP header. If you specify both, the API uses this parameter.
+// Format The format for the response.
+// You must specify a format using this parameter or the `Accept` HTTP header.
+// If you specify both, the API uses this parameter.
 // API name: format
-func (r *GetAsync) Format(value string) *GetAsync {
-	r.values.Set("format", value)
+func (r *GetAsync) Format(format string) *GetAsync {
+	r.values.Set("format", format)
 
 	return r
 }
 
-// KeepAlive Retention period for the search and its results. Defaults
-// to the `keep_alive` period for the original SQL search.
+// KeepAlive The retention period for the search and its results.
+// It defaults to the `keep_alive` period for the original SQL search.
 // API name: keep_alive
-func (r *GetAsync) KeepAlive(value string) *GetAsync {
-	r.values.Set("keep_alive", value)
+func (r *GetAsync) KeepAlive(duration string) *GetAsync {
+	r.values.Set("keep_alive", duration)
 
 	return r
 }
 
-// WaitForCompletionTimeout Period to wait for complete results. Defaults to no timeout,
-// meaning the request waits for complete search results.
+// WaitForCompletionTimeout The period to wait for complete results.
+// It defaults to no timeout, meaning the request waits for complete search
+// results.
 // API name: wait_for_completion_timeout
-func (r *GetAsync) WaitForCompletionTimeout(value string) *GetAsync {
-	r.values.Set("wait_for_completion_timeout", value)
+func (r *GetAsync) WaitForCompletionTimeout(duration string) *GetAsync {
+	r.values.Set("wait_for_completion_timeout", duration)
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *GetAsync) ErrorTrace(errortrace bool) *GetAsync {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *GetAsync) FilterPath(filterpaths ...string) *GetAsync {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *GetAsync) Human(human bool) *GetAsync {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *GetAsync) Pretty(pretty bool) *GetAsync {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
 
 	return r
 }

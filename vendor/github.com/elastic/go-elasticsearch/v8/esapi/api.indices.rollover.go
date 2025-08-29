@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -34,6 +34,11 @@ func newIndicesRolloverFunc(t Transport) IndicesRollover {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -54,6 +59,7 @@ type IndicesRolloverRequest struct {
 	NewIndex string
 
 	DryRun              *bool
+	Lazy                *bool
 	MasterTimeout       time.Duration
 	Timeout             time.Duration
 	WaitForActiveShards string
@@ -66,15 +72,26 @@ type IndicesRolloverRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r IndicesRolloverRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r IndicesRolloverRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.rollover")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -82,17 +99,27 @@ func (r IndicesRolloverRequest) Do(ctx context.Context, transport Transport) (*R
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(r.Alias)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "alias", r.Alias)
+	}
 	path.WriteString("/")
 	path.WriteString("_rollover")
 	if r.NewIndex != "" {
 		path.WriteString("/")
 		path.WriteString(r.NewIndex)
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "new_index", r.NewIndex)
+		}
 	}
 
 	params = make(map[string]string)
 
 	if r.DryRun != nil {
 		params["dry_run"] = strconv.FormatBool(*r.DryRun)
+	}
+
+	if r.Lazy != nil {
+		params["lazy"] = strconv.FormatBool(*r.Lazy)
 	}
 
 	if r.MasterTimeout != 0 {
@@ -125,6 +152,9 @@ func (r IndicesRolloverRequest) Do(ctx context.Context, transport Transport) (*R
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -156,8 +186,20 @@ func (r IndicesRolloverRequest) Do(ctx context.Context, transport Transport) (*R
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.rollover")
+		if reader := instrument.RecordRequestBody(ctx, "indices.rollover", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.rollover")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -195,6 +237,13 @@ func (f IndicesRollover) WithNewIndex(v string) func(*IndicesRolloverRequest) {
 func (f IndicesRollover) WithDryRun(v bool) func(*IndicesRolloverRequest) {
 	return func(r *IndicesRolloverRequest) {
 		r.DryRun = &v
+	}
+}
+
+// WithLazy - if set to true, the rollover action will only mark a data stream to signal that it needs to be rolled over at the next write. only allowed on data streams..
+func (f IndicesRollover) WithLazy(v bool) func(*IndicesRolloverRequest) {
+	return func(r *IndicesRolloverRequest) {
+		r.Lazy = &v
 	}
 }
 

@@ -15,22 +15,83 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // AnalyzeDetail type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/analyze/types.ts#L24-L30
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/analyze/types.ts#L24-L30
 type AnalyzeDetail struct {
 	Analyzer       *AnalyzerDetail    `json:"analyzer,omitempty"`
 	Charfilters    []CharFilterDetail `json:"charfilters,omitempty"`
 	CustomAnalyzer bool               `json:"custom_analyzer"`
 	Tokenfilters   []TokenDetail      `json:"tokenfilters,omitempty"`
 	Tokenizer      *TokenDetail       `json:"tokenizer,omitempty"`
+}
+
+func (s *AnalyzeDetail) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "analyzer":
+			if err := dec.Decode(&s.Analyzer); err != nil {
+				return fmt.Errorf("%s | %w", "Analyzer", err)
+			}
+
+		case "charfilters":
+			if err := dec.Decode(&s.Charfilters); err != nil {
+				return fmt.Errorf("%s | %w", "Charfilters", err)
+			}
+
+		case "custom_analyzer":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "CustomAnalyzer", err)
+				}
+				s.CustomAnalyzer = value
+			case bool:
+				s.CustomAnalyzer = v
+			}
+
+		case "tokenfilters":
+			if err := dec.Decode(&s.Tokenfilters); err != nil {
+				return fmt.Errorf("%s | %w", "Tokenfilters", err)
+			}
+
+		case "tokenizer":
+			if err := dec.Decode(&s.Tokenizer); err != nil {
+				return fmt.Errorf("%s | %w", "Tokenizer", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewAnalyzeDetail returns a AnalyzeDetail.

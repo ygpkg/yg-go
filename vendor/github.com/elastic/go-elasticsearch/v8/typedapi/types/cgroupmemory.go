@@ -15,20 +15,94 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // CgroupMemory type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/nodes/_types/Stats.ts#L206-L210
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/nodes/_types/Stats.ts#L559-L575
 type CgroupMemory struct {
+	// ControlGroup The `memory` control group to which the Elasticsearch process belongs.
 	ControlGroup *string `json:"control_group,omitempty"`
+	// LimitInBytes The maximum amount of user memory (including file cache) allowed for all
+	// tasks in the same cgroup as the Elasticsearch process.
+	// This value can be too big to store in a `long`, so is returned as a string so
+	// that the value returned can exactly match what the underlying operating
+	// system interface returns.
+	// Any value that is too large to parse into a `long` almost certainly means no
+	// limit has been set for the cgroup.
 	LimitInBytes *string `json:"limit_in_bytes,omitempty"`
+	// UsageInBytes The total current memory usage by processes in the cgroup, in bytes, by all
+	// tasks in the same cgroup as the Elasticsearch process.
+	// This value is stored as a string for consistency with `limit_in_bytes`.
 	UsageInBytes *string `json:"usage_in_bytes,omitempty"`
+}
+
+func (s *CgroupMemory) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "control_group":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "ControlGroup", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.ControlGroup = &o
+
+		case "limit_in_bytes":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "LimitInBytes", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.LimitInBytes = &o
+
+		case "usage_in_bytes":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "UsageInBytes", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.UsageInBytes = &o
+
+		}
+	}
+	return nil
 }
 
 // NewCgroupMemory returns a CgroupMemory.

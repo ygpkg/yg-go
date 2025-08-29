@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // InferenceResponseResult type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/_types/inference.ts#L412-L459
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/_types/inference.ts#L478-L526
 type InferenceResponseResult struct {
 	// Entities If the model is trained for named entity recognition (NER) tasks, the
 	// response contains the recognized entities.
@@ -48,22 +55,143 @@ type InferenceResponseResult struct {
 	// For regression models, its a numerical value
 	// For classification models, it may be an integer, double, boolean or string
 	// depending on prediction type
-	PredictedValue []PredictedValue `json:"predicted_value,omitempty"`
+	PredictedValue [][]ScalarValue `json:"predicted_value,omitempty"`
 	// PredictedValueSequence For fill mask tasks, the response contains the input text sequence with the
 	// mask token replaced by the predicted
 	// value.
 	// Additionally
 	PredictedValueSequence *string `json:"predicted_value_sequence,omitempty"`
 	// PredictionProbability Specifies a probability for the predicted value.
-	PredictionProbability *float64 `json:"prediction_probability,omitempty"`
+	PredictionProbability *Float64 `json:"prediction_probability,omitempty"`
 	// PredictionScore Specifies a confidence score for the predicted value.
-	PredictionScore *float64 `json:"prediction_score,omitempty"`
+	PredictionScore *Float64 `json:"prediction_score,omitempty"`
 	// TopClasses For fill mask, text classification, and zero shot classification tasks, the
 	// response contains a list of top
 	// class entries.
 	TopClasses []TopClassEntry `json:"top_classes,omitempty"`
 	// Warning If the request failed, the response contains the reason for the failure.
 	Warning *string `json:"warning,omitempty"`
+}
+
+func (s *InferenceResponseResult) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "entities":
+			if err := dec.Decode(&s.Entities); err != nil {
+				return fmt.Errorf("%s | %w", "Entities", err)
+			}
+
+		case "feature_importance":
+			if err := dec.Decode(&s.FeatureImportance); err != nil {
+				return fmt.Errorf("%s | %w", "FeatureImportance", err)
+			}
+
+		case "is_truncated":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "IsTruncated", err)
+				}
+				s.IsTruncated = &value
+			case bool:
+				s.IsTruncated = &v
+			}
+
+		case "predicted_value":
+			rawMsg := json.RawMessage{}
+			dec.Decode(&rawMsg)
+			if !bytes.HasPrefix(rawMsg, []byte("[")) {
+				o := new([]ScalarValue)
+				if err := json.NewDecoder(bytes.NewReader(rawMsg)).Decode(&o); err != nil {
+					return fmt.Errorf("%s | %w", "PredictedValue", err)
+				}
+
+				s.PredictedValue = append(s.PredictedValue, *o)
+			} else {
+				if err := json.NewDecoder(bytes.NewReader(rawMsg)).Decode(&s.PredictedValue); err != nil {
+					return fmt.Errorf("%s | %w", "PredictedValue", err)
+				}
+			}
+
+		case "predicted_value_sequence":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "PredictedValueSequence", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.PredictedValueSequence = &o
+
+		case "prediction_probability":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "PredictionProbability", err)
+				}
+				f := Float64(value)
+				s.PredictionProbability = &f
+			case float64:
+				f := Float64(v)
+				s.PredictionProbability = &f
+			}
+
+		case "prediction_score":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "PredictionScore", err)
+				}
+				f := Float64(value)
+				s.PredictionScore = &f
+			case float64:
+				f := Float64(v)
+				s.PredictionScore = &f
+			}
+
+		case "top_classes":
+			if err := dec.Decode(&s.TopClasses); err != nil {
+				return fmt.Errorf("%s | %w", "TopClasses", err)
+			}
+
+		case "warning":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Warning", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Warning = &o
+
+		}
+	}
+	return nil
 }
 
 // NewInferenceResponseResult returns a InferenceResponseResult.

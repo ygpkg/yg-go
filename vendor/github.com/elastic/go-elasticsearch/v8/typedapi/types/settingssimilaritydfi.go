@@ -15,30 +15,41 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"encoding/json"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/dfiindependencemeasure"
 )
 
 // SettingsSimilarityDfi type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/_types/IndexSettings.ts#L187-L190
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/_types/IndexSettings.ts#L203-L206
 type SettingsSimilarityDfi struct {
 	IndependenceMeasure dfiindependencemeasure.DFIIndependenceMeasure `json:"independence_measure"`
 	Type                string                                        `json:"type,omitempty"`
 }
 
+// MarshalJSON override marshalling to include literal value
+func (s SettingsSimilarityDfi) MarshalJSON() ([]byte, error) {
+	type innerSettingsSimilarityDfi SettingsSimilarityDfi
+	tmp := innerSettingsSimilarityDfi{
+		IndependenceMeasure: s.IndependenceMeasure,
+		Type:                s.Type,
+	}
+
+	tmp.Type = "DFI"
+
+	return json.Marshal(tmp)
+}
+
 // NewSettingsSimilarityDfi returns a SettingsSimilarityDfi.
 func NewSettingsSimilarityDfi() *SettingsSimilarityDfi {
 	r := &SettingsSimilarityDfi{}
-
-	r.Type = "DFI"
 
 	return r
 }

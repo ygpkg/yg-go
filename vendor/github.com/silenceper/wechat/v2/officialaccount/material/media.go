@@ -3,6 +3,7 @@ package material
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/silenceper/wechat/v2/util"
 )
@@ -48,6 +49,38 @@ func (material *Material) MediaUpload(mediaType MediaType, filename string) (med
 	uri := fmt.Sprintf("%s?access_token=%s&type=%s", mediaUploadURL, accessToken, mediaType)
 	var response []byte
 	response, err = util.PostFile("media", filename, uri)
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(response, &media)
+	if err != nil {
+		return
+	}
+	if media.ErrCode != 0 {
+		err = fmt.Errorf("MediaUpload error : errcode=%v , errmsg=%v", media.ErrCode, media.ErrMsg)
+		return
+	}
+	return
+}
+
+// MediaUploadFromReader 临时素材上传
+func (material *Material) MediaUploadFromReader(mediaType MediaType, filename string, reader io.Reader) (media Media, err error) {
+	var accessToken string
+	accessToken, err = material.GetAccessToken()
+	if err != nil {
+		return
+	}
+
+	uri := fmt.Sprintf("%s?access_token=%s&type=%s", mediaUploadURL, accessToken, mediaType)
+
+	var byteData []byte
+	byteData, err = io.ReadAll(reader)
+	if err != nil {
+		return
+	}
+
+	var response []byte
+	response, err = util.PostFileByStream("media", filename, uri, byteData)
 	if err != nil {
 		return
 	}

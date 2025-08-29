@@ -15,28 +15,96 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/calendarinterval"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/ratemode"
 )
 
 // RateAggregation type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/metric.ts#L127-L130
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/metric.ts#L262-L273
 type RateAggregation struct {
-	Field   *string                            `json:"field,omitempty"`
-	Format  *string                            `json:"format,omitempty"`
-	Missing *Missing                           `json:"missing,omitempty"`
-	Mode    *ratemode.RateMode                 `json:"mode,omitempty"`
-	Script  *Script                            `json:"script,omitempty"`
-	Unit    *calendarinterval.CalendarInterval `json:"unit,omitempty"`
+	// Field The field on which to run the aggregation.
+	Field  *string `json:"field,omitempty"`
+	Format *string `json:"format,omitempty"`
+	// Missing The value to apply to documents that do not have a value.
+	// By default, documents without a value are ignored.
+	Missing Missing `json:"missing,omitempty"`
+	// Mode How the rate is calculated.
+	Mode   *ratemode.RateMode `json:"mode,omitempty"`
+	Script *Script            `json:"script,omitempty"`
+	// Unit The interval used to calculate the rate.
+	// By default, the interval of the `date_histogram` is used.
+	Unit *calendarinterval.CalendarInterval `json:"unit,omitempty"`
+}
+
+func (s *RateAggregation) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "field":
+			if err := dec.Decode(&s.Field); err != nil {
+				return fmt.Errorf("%s | %w", "Field", err)
+			}
+
+		case "format":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Format", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Format = &o
+
+		case "missing":
+			if err := dec.Decode(&s.Missing); err != nil {
+				return fmt.Errorf("%s | %w", "Missing", err)
+			}
+
+		case "mode":
+			if err := dec.Decode(&s.Mode); err != nil {
+				return fmt.Errorf("%s | %w", "Mode", err)
+			}
+
+		case "script":
+			if err := dec.Decode(&s.Script); err != nil {
+				return fmt.Errorf("%s | %w", "Script", err)
+			}
+
+		case "unit":
+			if err := dec.Decode(&s.Unit); err != nil {
+				return fmt.Errorf("%s | %w", "Unit", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewRateAggregation returns a RateAggregation.

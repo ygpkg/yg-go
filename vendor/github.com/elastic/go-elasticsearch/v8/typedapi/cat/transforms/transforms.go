@@ -15,28 +15,32 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Gets configuration and usage information about transforms.
+// Get transform information.
+//
+// Get configuration and usage information about transforms.
+//
+// CAT APIs are only intended for human consumption using the Kibana
+// console or command line. They are not intended for use by applications. For
+// application consumption, use the get transform statistics API.
 package transforms
 
 import (
-	gobytes "bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
-
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/cattransformcolumn"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/timeunit"
 )
 
@@ -54,11 +58,15 @@ type Transforms struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
 	paramSet int
 
 	transformid string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewTransforms type alias for index.
@@ -74,15 +82,26 @@ func NewTransformsFunc(tp elastictransport.Interface) NewTransforms {
 	}
 }
 
-// Gets configuration and usage information about transforms.
+// Get transform information.
 //
-// https://www.elastic.co/guide/en/elasticsearch/reference/{branch}/cat-transforms.html
+// Get configuration and usage information about transforms.
+//
+// CAT APIs are only intended for human consumption using the Kibana
+// console or command line. They are not intended for use by applications. For
+// application consumption, use the get transform statistics API.
+//
+// https://www.elastic.co/guide/en/elasticsearch/reference/current/cat-transforms.html
 func New(tp elastictransport.Interface) *Transforms {
 	r := &Transforms{
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -114,6 +133,9 @@ func (r *Transforms) HttpRequest(ctx context.Context) (*http.Request, error) {
 		path.WriteString("transforms")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "transformid", r.transformid)
+		}
 		path.WriteString(r.transformid)
 
 		method = http.MethodGet
@@ -127,9 +149,9 @@ func (r *Transforms) HttpRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
@@ -145,30 +167,121 @@ func (r *Transforms) HttpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r Transforms) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r Transforms) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "cat.transforms")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "cat.transforms")
+		if reader := instrument.RecordRequestBody(ctx, "cat.transforms", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "cat.transforms")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the Transforms query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the Transforms query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
 }
 
+// Do runs the request through the transport, handle the response and returns a transforms.Response
+func (r Transforms) Do(providedCtx context.Context) (Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "cat.transforms")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(&response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
+}
+
 // IsSuccess allows to run a query with a context and retrieve the result as a boolean.
 // This only exists for endpoints without a request payload and allows for quick control flow.
-func (r Transforms) IsSuccess(ctx context.Context) (bool, error) {
-	res, err := r.Do(ctx)
+func (r Transforms) IsSuccess(providedCtx context.Context) (bool, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "cat.transforms")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	res, err := r.Perform(ctx)
 
 	if err != nil {
 		return false, err
 	}
-	io.Copy(ioutil.Discard, res.Body)
+	io.Copy(io.Discard, res.Body)
 	err = res.Body.Close()
 	if err != nil {
 		return false, err
@@ -176,6 +289,14 @@ func (r Transforms) IsSuccess(ctx context.Context) (bool, error) {
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
+	}
+
+	if res.StatusCode != 404 {
+		err := fmt.Errorf("an error happened during the Transforms query execution, status code: %d", res.StatusCode)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return false, err
 	}
 
 	return false, nil
@@ -188,37 +309,48 @@ func (r *Transforms) Header(key, value string) *Transforms {
 	return r
 }
 
-// TransformId The id of the transform for which to get stats. '_all' or '*' implies all
-// transforms
+// TransformId A transform identifier or a wildcard expression.
+// If you do not specify one of these options, the API returns information for
+// all transforms.
 // API Name: transformid
-func (r *Transforms) TransformId(v string) *Transforms {
+func (r *Transforms) TransformId(transformid string) *Transforms {
 	r.paramSet |= transformidMask
-	r.transformid = v
+	r.transformid = transformid
 
 	return r
 }
 
-// AllowNoMatch Whether to ignore if a wildcard expression matches no transforms. (This
-// includes `_all` string or when no transforms have been specified)
+// AllowNoMatch Specifies what to do when the request: contains wildcard expressions and
+// there are no transforms that match; contains the `_all` string or no
+// identifiers and there are no matches; contains wildcard expressions and there
+// are only partial matches.
+// If `true`, it returns an empty transforms array when there are no matches and
+// the subset of results when there are partial matches.
+// If `false`, the request returns a 404 status code when there are no matches
+// or only partial matches.
 // API name: allow_no_match
-func (r *Transforms) AllowNoMatch(b bool) *Transforms {
-	r.values.Set("allow_no_match", strconv.FormatBool(b))
+func (r *Transforms) AllowNoMatch(allownomatch bool) *Transforms {
+	r.values.Set("allow_no_match", strconv.FormatBool(allownomatch))
 
 	return r
 }
 
-// From skips a number of transform configs, defaults to 0
+// From Skips the specified number of transforms.
 // API name: from
-func (r *Transforms) From(i int) *Transforms {
-	r.values.Set("from", strconv.Itoa(i))
+func (r *Transforms) From(from int) *Transforms {
+	r.values.Set("from", strconv.Itoa(from))
 
 	return r
 }
 
 // H Comma-separated list of column names to display.
 // API name: h
-func (r *Transforms) H(value string) *Transforms {
-	r.values.Set("h", value)
+func (r *Transforms) H(cattransformcolumns ...cattransformcolumn.CatTransformColumn) *Transforms {
+	tmp := []string{}
+	for _, item := range cattransformcolumns {
+		tmp = append(tmp, item.String())
+	}
+	r.values.Set("expand_wildcards", strings.Join(tmp, ","))
 
 	return r
 }
@@ -226,24 +358,98 @@ func (r *Transforms) H(value string) *Transforms {
 // S Comma-separated list of column names or column aliases used to sort the
 // response.
 // API name: s
-func (r *Transforms) S(value string) *Transforms {
-	r.values.Set("s", value)
+func (r *Transforms) S(cattransformcolumns ...cattransformcolumn.CatTransformColumn) *Transforms {
+	tmp := []string{}
+	for _, item := range cattransformcolumns {
+		tmp = append(tmp, item.String())
+	}
+	r.values.Set("expand_wildcards", strings.Join(tmp, ","))
 
 	return r
 }
 
-// Time Unit used to display time values.
+// Time The unit used to display time values.
 // API name: time
-func (r *Transforms) Time(enum timeunit.TimeUnit) *Transforms {
-	r.values.Set("time", enum.String())
+func (r *Transforms) Time(time timeunit.TimeUnit) *Transforms {
+	r.values.Set("time", time.String())
 
 	return r
 }
 
-// Size specifies a max number of transforms to get, defaults to 100
+// Size The maximum number of transforms to obtain.
 // API name: size
-func (r *Transforms) Size(i int) *Transforms {
-	r.values.Set("size", strconv.Itoa(i))
+func (r *Transforms) Size(size int) *Transforms {
+	r.values.Set("size", strconv.Itoa(size))
+
+	return r
+}
+
+// Format Specifies the format to return the columnar data in, can be set to
+// `text`, `json`, `cbor`, `yaml`, or `smile`.
+// API name: format
+func (r *Transforms) Format(format string) *Transforms {
+	r.values.Set("format", format)
+
+	return r
+}
+
+// Help When set to `true` will output available columns. This option
+// can't be combined with any other query string option.
+// API name: help
+func (r *Transforms) Help(help bool) *Transforms {
+	r.values.Set("help", strconv.FormatBool(help))
+
+	return r
+}
+
+// V When set to `true` will enable verbose output.
+// API name: v
+func (r *Transforms) V(v bool) *Transforms {
+	r.values.Set("v", strconv.FormatBool(v))
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *Transforms) ErrorTrace(errortrace bool) *Transforms {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *Transforms) FilterPath(filterpaths ...string) *Transforms {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *Transforms) Human(human bool) *Transforms {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *Transforms) Pretty(pretty bool) *Transforms {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
 
 	return r
 }

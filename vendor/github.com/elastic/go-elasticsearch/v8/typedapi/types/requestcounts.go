@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // RequestCounts type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/nodes/_types/RepositoryMeteringInformation.ts#L76-L103
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/nodes/_types/RepositoryMeteringInformation.ts#L76-L103
 type RequestCounts struct {
 	// GetBlob Number of Get Blob requests (Azure)
 	GetBlob *int64 `json:"GetBlob,omitempty"`
@@ -53,6 +60,191 @@ type RequestCounts struct {
 	PutMultipartObject *int64 `json:"PutMultipartObject,omitempty"`
 	// PutObject Number of PutObject requests (S3)
 	PutObject *int64 `json:"PutObject,omitempty"`
+}
+
+func (s *RequestCounts) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "GetBlob":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "GetBlob", err)
+				}
+				s.GetBlob = &value
+			case float64:
+				f := int64(v)
+				s.GetBlob = &f
+			}
+
+		case "GetBlobProperties":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "GetBlobProperties", err)
+				}
+				s.GetBlobProperties = &value
+			case float64:
+				f := int64(v)
+				s.GetBlobProperties = &f
+			}
+
+		case "GetObject":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "GetObject", err)
+				}
+				s.GetObject = &value
+			case float64:
+				f := int64(v)
+				s.GetObject = &f
+			}
+
+		case "InsertObject":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "InsertObject", err)
+				}
+				s.InsertObject = &value
+			case float64:
+				f := int64(v)
+				s.InsertObject = &f
+			}
+
+		case "ListBlobs":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "ListBlobs", err)
+				}
+				s.ListBlobs = &value
+			case float64:
+				f := int64(v)
+				s.ListBlobs = &f
+			}
+
+		case "ListObjects":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "ListObjects", err)
+				}
+				s.ListObjects = &value
+			case float64:
+				f := int64(v)
+				s.ListObjects = &f
+			}
+
+		case "PutBlob":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "PutBlob", err)
+				}
+				s.PutBlob = &value
+			case float64:
+				f := int64(v)
+				s.PutBlob = &f
+			}
+
+		case "PutBlock":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "PutBlock", err)
+				}
+				s.PutBlock = &value
+			case float64:
+				f := int64(v)
+				s.PutBlock = &f
+			}
+
+		case "PutBlockList":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "PutBlockList", err)
+				}
+				s.PutBlockList = &value
+			case float64:
+				f := int64(v)
+				s.PutBlockList = &f
+			}
+
+		case "PutMultipartObject":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "PutMultipartObject", err)
+				}
+				s.PutMultipartObject = &value
+			case float64:
+				f := int64(v)
+				s.PutMultipartObject = &f
+			}
+
+		case "PutObject":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "PutObject", err)
+				}
+				s.PutObject = &value
+			case float64:
+				f := int64(v)
+				s.PutObject = &f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewRequestCounts returns a RequestCounts.

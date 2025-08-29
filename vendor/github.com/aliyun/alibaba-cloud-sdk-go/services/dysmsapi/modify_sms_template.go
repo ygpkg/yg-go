@@ -84,10 +84,10 @@ type ModifySmsTemplateRequest struct {
 // ModifySmsTemplateResponse is the response struct for api ModifySmsTemplate
 type ModifySmsTemplateResponse struct {
 	*responses.BaseResponse
-	RequestId    string `json:"RequestId" xml:"RequestId"`
-	TemplateCode string `json:"TemplateCode" xml:"TemplateCode"`
 	Code         string `json:"Code" xml:"Code"`
 	Message      string `json:"Message" xml:"Message"`
+	RequestId    string `json:"RequestId" xml:"RequestId"`
+	TemplateCode string `json:"TemplateCode" xml:"TemplateCode"`
 }
 
 // CreateModifySmsTemplateRequest creates a request to invoke ModifySmsTemplate API
@@ -95,7 +95,7 @@ func CreateModifySmsTemplateRequest() (request *ModifySmsTemplateRequest) {
 	request = &ModifySmsTemplateRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "ModifySmsTemplate", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "ModifySmsTemplate", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

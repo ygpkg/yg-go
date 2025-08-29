@@ -83,10 +83,10 @@ type AddSmsTemplateRequest struct {
 // AddSmsTemplateResponse is the response struct for api AddSmsTemplate
 type AddSmsTemplateResponse struct {
 	*responses.BaseResponse
-	RequestId    string `json:"RequestId" xml:"RequestId"`
-	TemplateCode string `json:"TemplateCode" xml:"TemplateCode"`
 	Code         string `json:"Code" xml:"Code"`
 	Message      string `json:"Message" xml:"Message"`
+	RequestId    string `json:"RequestId" xml:"RequestId"`
+	TemplateCode string `json:"TemplateCode" xml:"TemplateCode"`
 }
 
 // CreateAddSmsTemplateRequest creates a request to invoke AddSmsTemplate API
@@ -94,7 +94,7 @@ func CreateAddSmsTemplateRequest() (request *AddSmsTemplateRequest) {
 	request = &AddSmsTemplateRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "AddSmsTemplate", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "AddSmsTemplate", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

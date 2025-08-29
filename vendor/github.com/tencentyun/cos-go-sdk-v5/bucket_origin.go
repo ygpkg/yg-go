@@ -30,16 +30,16 @@ type BucketOriginCondition struct {
 
 type BucketOriginParameter struct {
 	Protocol          string                  `xml:"Protocol,omitempty"`
-	FollowQueryString bool                    `xml:"FollowQueryString,omitempty"`
+	FollowQueryString *bool                   `xml:"FollowQueryString,omitempty"`
 	HttpHeader        *BucketOriginHttpHeader `xml:"HttpHeader,omitempty"`
-	FollowRedirection bool                    `xml:"FollowRedirection,omitempty"`
+	FollowRedirection *bool                   `xml:"FollowRedirection,omitempty"`
 	HttpRedirectCode  string                  `xml:"HttpRedirectCode,omitempty"`
-	CopyOriginData    bool                    `xml:"CopyOriginData,omitempty"`
+	CopyOriginData    *bool                   `xml:"CopyOriginData,omitempty"`
 }
 
 type BucketOriginHttpHeader struct {
 	// 目前还不支持 FollowAllHeaders
-	FollowAllHeaders    bool               `xml:"FollowAllHeaders,omitempty"`
+	FollowAllHeaders    *bool              `xml:"FollowAllHeaders,omitempty"`
 	NewHttpHeaders      []OriginHttpHeader `xml:"NewHttpHeaders>Header,omitempty"`
 	FollowHttpHeaders   []OriginHttpHeader `xml:"FollowHttpHeaders>Header,omitempty"`
 	ForbidFollowHeaders []OriginHttpHeader `xml:"ForbidFollowHeaders>Header,omitempty"`
@@ -62,6 +62,11 @@ type BucketOriginHostInfo struct {
 }
 
 type BucketOriginFileInfo struct {
+	// 兼容旧版本
+	PrefixDirective bool   `xml:"PrefixDirective,omitempty"`
+	Prefix          string `xml:"Prefix,omitempty"`
+	Suffix          string `xml:"Suffix,omitempty"`
+	// 新版本
 	PrefixConfiguration    *OriginPrefixConfiguration    `xml:"PrefixConfiguration,omitempty"`
 	SuffixConfiguration    *OriginSuffixConfiguration    `xml:"SuffixConfiguration,omitempty"`
 	FixedFileConfiguration *OriginFixedFileConfiguration `xml:"FixedFileConfiguration,omitempty"`

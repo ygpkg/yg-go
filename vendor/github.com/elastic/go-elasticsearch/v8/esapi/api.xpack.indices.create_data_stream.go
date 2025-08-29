@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newIndicesCreateDataStreamFunc(t Transport) IndicesCreateDataStream {
@@ -31,6 +32,11 @@ func newIndicesCreateDataStreamFunc(t Transport) IndicesCreateDataStream {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -46,6 +52,9 @@ type IndicesCreateDataStream func(name string, o ...func(*IndicesCreateDataStrea
 type IndicesCreateDataStreamRequest struct {
 	Name string
 
+	MasterTimeout time.Duration
+	Timeout       time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -54,15 +63,26 @@ type IndicesCreateDataStreamRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r IndicesCreateDataStreamRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r IndicesCreateDataStreamRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.create_data_stream")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "PUT"
 
@@ -72,8 +92,19 @@ func (r IndicesCreateDataStreamRequest) Do(ctx context.Context, transport Transp
 	path.WriteString("_data_stream")
 	path.WriteString("/")
 	path.WriteString(r.Name)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "name", r.Name)
+	}
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -93,6 +124,9 @@ func (r IndicesCreateDataStreamRequest) Do(ctx context.Context, transport Transp
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -120,8 +154,17 @@ func (r IndicesCreateDataStreamRequest) Do(ctx context.Context, transport Transp
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.create_data_stream")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.create_data_stream")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -138,6 +181,20 @@ func (r IndicesCreateDataStreamRequest) Do(ctx context.Context, transport Transp
 func (f IndicesCreateDataStream) WithContext(v context.Context) func(*IndicesCreateDataStreamRequest) {
 	return func(r *IndicesCreateDataStreamRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - specify timeout for connection to master.
+func (f IndicesCreateDataStream) WithMasterTimeout(v time.Duration) func(*IndicesCreateDataStreamRequest) {
+	return func(r *IndicesCreateDataStreamRequest) {
+		r.MasterTimeout = v
+	}
+}
+
+// WithTimeout - specify timeout for acknowledging the cluster state update.
+func (f IndicesCreateDataStream) WithTimeout(v time.Duration) func(*IndicesCreateDataStreamRequest) {
+	return func(r *IndicesCreateDataStreamRequest) {
+		r.Timeout = v
 	}
 }
 

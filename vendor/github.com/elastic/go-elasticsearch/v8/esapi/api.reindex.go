@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -35,6 +35,11 @@ func newReindexFunc(t Transport) Reindex {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -55,6 +60,7 @@ type ReindexRequest struct {
 	MaxDocs             *int
 	Refresh             *bool
 	RequestsPerSecond   *int
+	RequireAlias        *bool
 	Scroll              time.Duration
 	Slices              interface{}
 	Timeout             time.Duration
@@ -69,15 +75,26 @@ type ReindexRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r ReindexRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r ReindexRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "reindex")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -97,6 +114,10 @@ func (r ReindexRequest) Do(ctx context.Context, transport Transport) (*Response,
 
 	if r.RequestsPerSecond != nil {
 		params["requests_per_second"] = strconv.FormatInt(int64(*r.RequestsPerSecond), 10)
+	}
+
+	if r.RequireAlias != nil {
+		params["require_alias"] = strconv.FormatBool(*r.RequireAlias)
 	}
 
 	if r.Scroll != 0 {
@@ -137,6 +158,9 @@ func (r ReindexRequest) Do(ctx context.Context, transport Transport) (*Response,
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -168,8 +192,20 @@ func (r ReindexRequest) Do(ctx context.Context, transport Transport) (*Response,
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "reindex")
+		if reader := instrument.RecordRequestBody(ctx, "reindex", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "reindex")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -207,6 +243,13 @@ func (f Reindex) WithRefresh(v bool) func(*ReindexRequest) {
 func (f Reindex) WithRequestsPerSecond(v int) func(*ReindexRequest) {
 	return func(r *ReindexRequest) {
 		r.RequestsPerSecond = &v
+	}
+}
+
+// WithRequireAlias - when true, requires destination to be an alias..
+func (f Reindex) WithRequireAlias(v bool) func(*ReindexRequest) {
+	return func(r *ReindexRequest) {
+		r.RequireAlias = &v
 	}
 }
 

@@ -15,22 +15,28 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 // DataframeClassificationSummary type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/evaluate_data_frame/types.ts#L31-L37
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/evaluate_data_frame/types.ts#L44-L66
 type DataframeClassificationSummary struct {
-	Accuracy                  *DataframeClassificationSummaryAccuracy                  `json:"accuracy,omitempty"`
-	AucRoc                    *DataframeEvaluationSummaryAucRoc                        `json:"auc_roc,omitempty"`
+	// Accuracy Accuracy of predictions (per-class and overall).
+	Accuracy *DataframeClassificationSummaryAccuracy `json:"accuracy,omitempty"`
+	// AucRoc The AUC ROC (area under the curve of the receiver operating characteristic)
+	// score and optionally the curve.
+	// It is calculated for a specific class (provided as "class_name") treated as
+	// positive.
+	AucRoc *DataframeEvaluationSummaryAucRoc `json:"auc_roc,omitempty"`
+	// MulticlassConfusionMatrix Multiclass confusion matrix.
 	MulticlassConfusionMatrix *DataframeClassificationSummaryMulticlassConfusionMatrix `json:"multiclass_confusion_matrix,omitempty"`
-	Precision                 *DataframeClassificationSummaryPrecision                 `json:"precision,omitempty"`
-	Recall                    *DataframeClassificationSummaryRecall                    `json:"recall,omitempty"`
+	// Precision Precision of predictions (per-class and average).
+	Precision *DataframeClassificationSummaryPrecision `json:"precision,omitempty"`
+	// Recall Recall of predictions (per-class and average).
+	Recall *DataframeClassificationSummaryRecall `json:"recall,omitempty"`
 }
 
 // NewDataframeClassificationSummary returns a DataframeClassificationSummary.

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newSlmExecuteRetentionFunc(t Transport) SlmExecuteRetention {
@@ -31,6 +32,11 @@ func newSlmExecuteRetentionFunc(t Transport) SlmExecuteRetention {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -44,6 +50,9 @@ type SlmExecuteRetention func(o ...func(*SlmExecuteRetentionRequest)) (*Response
 
 // SlmExecuteRetentionRequest configures the Slm Execute Retention API request.
 type SlmExecuteRetentionRequest struct {
+	MasterTimeout time.Duration
+	Timeout       time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -52,15 +61,26 @@ type SlmExecuteRetentionRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r SlmExecuteRetentionRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r SlmExecuteRetentionRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "slm.execute_retention")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -69,6 +89,14 @@ func (r SlmExecuteRetentionRequest) Do(ctx context.Context, transport Transport)
 	path.WriteString("/_slm/_execute_retention")
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -88,6 +116,9 @@ func (r SlmExecuteRetentionRequest) Do(ctx context.Context, transport Transport)
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -115,8 +146,17 @@ func (r SlmExecuteRetentionRequest) Do(ctx context.Context, transport Transport)
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "slm.execute_retention")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "slm.execute_retention")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -133,6 +173,20 @@ func (r SlmExecuteRetentionRequest) Do(ctx context.Context, transport Transport)
 func (f SlmExecuteRetention) WithContext(v context.Context) func(*SlmExecuteRetentionRequest) {
 	return func(r *SlmExecuteRetentionRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - explicit operation timeout for connection to master node.
+func (f SlmExecuteRetention) WithMasterTimeout(v time.Duration) func(*SlmExecuteRetentionRequest) {
+	return func(r *SlmExecuteRetentionRequest) {
+		r.MasterTimeout = v
+	}
+}
+
+// WithTimeout - explicit operation timeout.
+func (f SlmExecuteRetention) WithTimeout(v time.Duration) func(*SlmExecuteRetentionRequest) {
+	return func(r *SlmExecuteRetentionRequest) {
+		r.Timeout = v
 	}
 }
 

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -33,6 +33,11 @@ func newMsearchFunc(t Transport) Msearch {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -50,11 +55,17 @@ type MsearchRequest struct {
 
 	Body io.Reader
 
+	AllowNoIndices             *bool
 	CcsMinimizeRoundtrips      *bool
+	ExpandWildcards            string
+	IgnoreThrottled            *bool
+	IgnoreUnavailable          *bool
+	IncludeNamedQueriesScore   *bool
 	MaxConcurrentSearches      *int
 	MaxConcurrentShardRequests *int
 	PreFilterShardSize         *int
 	RestTotalHitsAsInt         *bool
+	Routing                    []string
 	SearchType                 string
 	TypedKeys                  *bool
 
@@ -66,15 +77,26 @@ type MsearchRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r MsearchRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r MsearchRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "msearch")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -83,14 +105,41 @@ func (r MsearchRequest) Do(ctx context.Context, transport Transport) (*Response,
 	if len(r.Index) > 0 {
 		path.WriteString("/")
 		path.WriteString(strings.Join(r.Index, ","))
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "index", strings.Join(r.Index, ","))
+		}
 	}
 	path.WriteString("/")
 	path.WriteString("_msearch")
 
 	params = make(map[string]string)
 
+	if r.AllowNoIndices != nil {
+		params["allow_no_indices"] = strconv.FormatBool(*r.AllowNoIndices)
+	}
+
 	if r.CcsMinimizeRoundtrips != nil {
 		params["ccs_minimize_roundtrips"] = strconv.FormatBool(*r.CcsMinimizeRoundtrips)
+	}
+
+	if r.ExpandWildcards != "" {
+		params["expand_wildcards"] = r.ExpandWildcards
+	}
+
+	if r.IgnoreThrottled != nil {
+		params["ignore_throttled"] = strconv.FormatBool(*r.IgnoreThrottled)
+	}
+
+	if r.IgnoreUnavailable != nil {
+		params["ignore_unavailable"] = strconv.FormatBool(*r.IgnoreUnavailable)
+	}
+
+	if r.IncludeNamedQueriesScore != nil {
+		params["include_named_queries_score"] = strconv.FormatBool(*r.IncludeNamedQueriesScore)
+	}
+
+	if len(r.Index) > 0 {
+		params["index"] = strings.Join(r.Index, ",")
 	}
 
 	if r.MaxConcurrentSearches != nil {
@@ -107,6 +156,10 @@ func (r MsearchRequest) Do(ctx context.Context, transport Transport) (*Response,
 
 	if r.RestTotalHitsAsInt != nil {
 		params["rest_total_hits_as_int"] = strconv.FormatBool(*r.RestTotalHitsAsInt)
+	}
+
+	if len(r.Routing) > 0 {
+		params["routing"] = strings.Join(r.Routing, ",")
 	}
 
 	if r.SearchType != "" {
@@ -135,6 +188,9 @@ func (r MsearchRequest) Do(ctx context.Context, transport Transport) (*Response,
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -166,8 +222,20 @@ func (r MsearchRequest) Do(ctx context.Context, transport Transport) (*Response,
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "msearch")
+		if reader := instrument.RecordRequestBody(ctx, "msearch", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "msearch")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -194,10 +262,45 @@ func (f Msearch) WithIndex(v ...string) func(*MsearchRequest) {
 	}
 }
 
+// WithAllowNoIndices - whether to ignore if a wildcard indices expression resolves into no concrete indices. (this includes `_all` string or when no indices have been specified).
+func (f Msearch) WithAllowNoIndices(v bool) func(*MsearchRequest) {
+	return func(r *MsearchRequest) {
+		r.AllowNoIndices = &v
+	}
+}
+
 // WithCcsMinimizeRoundtrips - indicates whether network round-trips should be minimized as part of cross-cluster search requests execution.
 func (f Msearch) WithCcsMinimizeRoundtrips(v bool) func(*MsearchRequest) {
 	return func(r *MsearchRequest) {
 		r.CcsMinimizeRoundtrips = &v
+	}
+}
+
+// WithExpandWildcards - whether to expand wildcard expression to concrete indices that are open, closed or both..
+func (f Msearch) WithExpandWildcards(v string) func(*MsearchRequest) {
+	return func(r *MsearchRequest) {
+		r.ExpandWildcards = v
+	}
+}
+
+// WithIgnoreThrottled - whether specified concrete, expanded or aliased indices should be ignored when throttled.
+func (f Msearch) WithIgnoreThrottled(v bool) func(*MsearchRequest) {
+	return func(r *MsearchRequest) {
+		r.IgnoreThrottled = &v
+	}
+}
+
+// WithIgnoreUnavailable - whether specified concrete indices should be ignored when unavailable (missing or closed).
+func (f Msearch) WithIgnoreUnavailable(v bool) func(*MsearchRequest) {
+	return func(r *MsearchRequest) {
+		r.IgnoreUnavailable = &v
+	}
+}
+
+// WithIncludeNamedQueriesScore - indicates whether hit.matched_queries should be rendered as a map that includes the name of the matched query associated with its score (true) or as an array containing the name of the matched queries (false).
+func (f Msearch) WithIncludeNamedQueriesScore(v bool) func(*MsearchRequest) {
+	return func(r *MsearchRequest) {
+		r.IncludeNamedQueriesScore = &v
 	}
 }
 
@@ -226,6 +329,13 @@ func (f Msearch) WithPreFilterShardSize(v int) func(*MsearchRequest) {
 func (f Msearch) WithRestTotalHitsAsInt(v bool) func(*MsearchRequest) {
 	return func(r *MsearchRequest) {
 		r.RestTotalHitsAsInt = &v
+	}
+}
+
+// WithRouting - a list of specific routing values.
+func (f Msearch) WithRouting(v ...string) func(*MsearchRequest) {
+	return func(r *MsearchRequest) {
+		r.Routing = v
 	}
 }
 

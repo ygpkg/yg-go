@@ -15,59 +15,31 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 // TokenizerDefinition holds the union for the following types:
 //
 //	CharGroupTokenizer
+//	ClassicTokenizer
 //	EdgeNGramTokenizer
 //	KeywordTokenizer
 //	LetterTokenizer
 //	LowercaseTokenizer
 //	NGramTokenizer
-//	NoriTokenizer
 //	PathHierarchyTokenizer
+//	PatternTokenizer
+//	SimplePatternTokenizer
+//	SimplePatternSplitTokenizer
 //	StandardTokenizer
+//	ThaiTokenizer
 //	UaxEmailUrlTokenizer
 //	WhitespaceTokenizer
-//	KuromojiTokenizer
-//	PatternTokenizer
 //	IcuTokenizer
+//	KuromojiTokenizer
+//	NoriTokenizer
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/analysis/tokenizers.ts#L123-L141
-type TokenizerDefinition interface {
-	isTokenizerDefinition()
-}
-
-func (i CharGroupTokenizer) isTokenizerDefinition() {}
-
-func (i EdgeNGramTokenizer) isTokenizerDefinition() {}
-
-func (i KeywordTokenizer) isTokenizerDefinition() {}
-
-func (i LetterTokenizer) isTokenizerDefinition() {}
-
-func (i LowercaseTokenizer) isTokenizerDefinition() {}
-
-func (i NGramTokenizer) isTokenizerDefinition() {}
-
-func (i NoriTokenizer) isTokenizerDefinition() {}
-
-func (i PathHierarchyTokenizer) isTokenizerDefinition() {}
-
-func (i StandardTokenizer) isTokenizerDefinition() {}
-
-func (i UaxEmailUrlTokenizer) isTokenizerDefinition() {}
-
-func (i WhitespaceTokenizer) isTokenizerDefinition() {}
-
-func (i KuromojiTokenizer) isTokenizerDefinition() {}
-
-func (i PatternTokenizer) isTokenizerDefinition() {}
-
-func (i IcuTokenizer) isTokenizerDefinition() {}
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/analysis/tokenizers.ts#L149-L172
+type TokenizerDefinition any

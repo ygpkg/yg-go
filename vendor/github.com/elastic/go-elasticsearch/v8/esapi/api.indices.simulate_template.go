@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -34,6 +34,11 @@ func newIndicesSimulateTemplateFunc(t Transport) IndicesSimulateTemplate {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -42,7 +47,7 @@ func newIndicesSimulateTemplateFunc(t Transport) IndicesSimulateTemplate {
 
 // IndicesSimulateTemplate simulate resolving the given template name or body
 //
-// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/master/indices-templates.html.
+// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/master/indices-simulate-template.html.
 type IndicesSimulateTemplate func(o ...func(*IndicesSimulateTemplateRequest)) (*Response, error)
 
 // IndicesSimulateTemplateRequest configures the Indices Simulate Template API request.
@@ -51,9 +56,10 @@ type IndicesSimulateTemplateRequest struct {
 
 	Name string
 
-	Cause         string
-	Create        *bool
-	MasterTimeout time.Duration
+	Cause           string
+	Create          *bool
+	IncludeDefaults *bool
+	MasterTimeout   time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -63,15 +69,26 @@ type IndicesSimulateTemplateRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r IndicesSimulateTemplateRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r IndicesSimulateTemplateRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.simulate_template")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -84,6 +101,9 @@ func (r IndicesSimulateTemplateRequest) Do(ctx context.Context, transport Transp
 	if r.Name != "" {
 		path.WriteString("/")
 		path.WriteString(r.Name)
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "name", r.Name)
+		}
 	}
 
 	params = make(map[string]string)
@@ -94,6 +114,10 @@ func (r IndicesSimulateTemplateRequest) Do(ctx context.Context, transport Transp
 
 	if r.Create != nil {
 		params["create"] = strconv.FormatBool(*r.Create)
+	}
+
+	if r.IncludeDefaults != nil {
+		params["include_defaults"] = strconv.FormatBool(*r.IncludeDefaults)
 	}
 
 	if r.MasterTimeout != 0 {
@@ -118,6 +142,9 @@ func (r IndicesSimulateTemplateRequest) Do(ctx context.Context, transport Transp
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -149,8 +176,20 @@ func (r IndicesSimulateTemplateRequest) Do(ctx context.Context, transport Transp
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.simulate_template")
+		if reader := instrument.RecordRequestBody(ctx, "indices.simulate_template", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.simulate_template")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -195,6 +234,13 @@ func (f IndicesSimulateTemplate) WithCause(v string) func(*IndicesSimulateTempla
 func (f IndicesSimulateTemplate) WithCreate(v bool) func(*IndicesSimulateTemplateRequest) {
 	return func(r *IndicesSimulateTemplateRequest) {
 		r.Create = &v
+	}
+}
+
+// WithIncludeDefaults - return all relevant default configurations for this template simulation (default: false).
+func (f IndicesSimulateTemplate) WithIncludeDefaults(v bool) func(*IndicesSimulateTemplateRequest) {
+	return func(r *IndicesSimulateTemplateRequest) {
+		r.IncludeDefaults = &v
 	}
 }
 

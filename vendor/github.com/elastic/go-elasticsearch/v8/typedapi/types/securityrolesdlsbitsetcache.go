@@ -15,20 +15,73 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // SecurityRolesDlsBitSetCache type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/xpack/usage/types.ts#L297-L301
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/xpack/usage/types.ts#L322-L326
 type SecurityRolesDlsBitSetCache struct {
-	Count         int       `json:"count"`
-	Memory        *ByteSize `json:"memory,omitempty"`
-	MemoryInBytes uint64    `json:"memory_in_bytes"`
+	Count         int      `json:"count"`
+	Memory        ByteSize `json:"memory,omitempty"`
+	MemoryInBytes uint64   `json:"memory_in_bytes"`
+}
+
+func (s *SecurityRolesDlsBitSetCache) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "count":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Count", err)
+				}
+				s.Count = value
+			case float64:
+				f := int(v)
+				s.Count = f
+			}
+
+		case "memory":
+			if err := dec.Decode(&s.Memory); err != nil {
+				return fmt.Errorf("%s | %w", "Memory", err)
+			}
+
+		case "memory_in_bytes":
+			if err := dec.Decode(&s.MemoryInBytes); err != nil {
+				return fmt.Errorf("%s | %w", "MemoryInBytes", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewSecurityRolesDlsBitSetCache returns a SecurityRolesDlsBitSetCache.

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newSlmStartFunc(t Transport) SlmStart {
@@ -31,6 +32,11 @@ func newSlmStartFunc(t Transport) SlmStart {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -44,6 +50,9 @@ type SlmStart func(o ...func(*SlmStartRequest)) (*Response, error)
 
 // SlmStartRequest configures the Slm Start API request.
 type SlmStartRequest struct {
+	MasterTimeout time.Duration
+	Timeout       time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -52,15 +61,26 @@ type SlmStartRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r SlmStartRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r SlmStartRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "slm.start")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -69,6 +89,14 @@ func (r SlmStartRequest) Do(ctx context.Context, transport Transport) (*Response
 	path.WriteString("/_slm/start")
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -88,6 +116,9 @@ func (r SlmStartRequest) Do(ctx context.Context, transport Transport) (*Response
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -115,8 +146,17 @@ func (r SlmStartRequest) Do(ctx context.Context, transport Transport) (*Response
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "slm.start")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "slm.start")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -133,6 +173,20 @@ func (r SlmStartRequest) Do(ctx context.Context, transport Transport) (*Response
 func (f SlmStart) WithContext(v context.Context) func(*SlmStartRequest) {
 	return func(r *SlmStartRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - timeout for processing on master node.
+func (f SlmStart) WithMasterTimeout(v time.Duration) func(*SlmStartRequest) {
+	return func(r *SlmStartRequest) {
+		r.MasterTimeout = v
+	}
+}
+
+// WithTimeout - timeout for acknowledgement of update from all nodes in cluster.
+func (f SlmStart) WithTimeout(v time.Duration) func(*SlmStartRequest) {
+	return func(r *SlmStartRequest) {
+		r.Timeout = v
 	}
 }
 

@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // ApplicationPrivileges type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/security/_types/Privileges.ts#L26-L39
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/security/_types/Privileges.ts#L27-L40
 type ApplicationPrivileges struct {
 	// Application The name of the application to which this entry applies.
 	Application string `json:"application"`
@@ -33,6 +40,48 @@ type ApplicationPrivileges struct {
 	Privileges []string `json:"privileges"`
 	// Resources A list resources to which the privileges are applied.
 	Resources []string `json:"resources"`
+}
+
+func (s *ApplicationPrivileges) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "application":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Application", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Application = o
+
+		case "privileges":
+			if err := dec.Decode(&s.Privileges); err != nil {
+				return fmt.Errorf("%s | %w", "Privileges", err)
+			}
+
+		case "resources":
+			if err := dec.Decode(&s.Resources); err != nil {
+				return fmt.Errorf("%s | %w", "Resources", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewApplicationPrivileges returns a ApplicationPrivileges.

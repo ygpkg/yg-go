@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newIndicesPromoteDataStreamFunc(t Transport) IndicesPromoteDataStream {
@@ -31,6 +32,11 @@ func newIndicesPromoteDataStreamFunc(t Transport) IndicesPromoteDataStream {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -46,6 +52,8 @@ type IndicesPromoteDataStream func(name string, o ...func(*IndicesPromoteDataStr
 type IndicesPromoteDataStreamRequest struct {
 	Name string
 
+	MasterTimeout time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -54,15 +62,26 @@ type IndicesPromoteDataStreamRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r IndicesPromoteDataStreamRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r IndicesPromoteDataStreamRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.promote_data_stream")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -74,8 +93,15 @@ func (r IndicesPromoteDataStreamRequest) Do(ctx context.Context, transport Trans
 	path.WriteString("_promote")
 	path.WriteString("/")
 	path.WriteString(r.Name)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "name", r.Name)
+	}
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -95,6 +121,9 @@ func (r IndicesPromoteDataStreamRequest) Do(ctx context.Context, transport Trans
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -122,8 +151,17 @@ func (r IndicesPromoteDataStreamRequest) Do(ctx context.Context, transport Trans
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.promote_data_stream")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.promote_data_stream")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -140,6 +178,13 @@ func (r IndicesPromoteDataStreamRequest) Do(ctx context.Context, transport Trans
 func (f IndicesPromoteDataStream) WithContext(v context.Context) func(*IndicesPromoteDataStreamRequest) {
 	return func(r *IndicesPromoteDataStreamRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - specify timeout for connection to master.
+func (f IndicesPromoteDataStream) WithMasterTimeout(v time.Duration) func(*IndicesPromoteDataStreamRequest) {
+	return func(r *IndicesPromoteDataStreamRequest) {
+		r.MasterTimeout = v
 	}
 }
 

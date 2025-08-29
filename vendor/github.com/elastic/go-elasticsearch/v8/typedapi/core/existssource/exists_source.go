@@ -15,28 +15,32 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Returns information about whether a document source exists in an index.
+// Check for a document source.
+//
+// Check whether a document source exists in an index.
+// For example:
+//
+// ```
+// HEAD my-index-000001/_source/1
+// ```
+//
+// A document's source is not available if it is disabled in the mapping.
 package existssource
 
 import (
-	gobytes "bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
-
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/versiontype"
 )
 
@@ -56,12 +60,16 @@ type ExistsSource struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
 	paramSet int
 
 	id    string
 	index string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewExistsSource type alias for index.
@@ -73,23 +81,37 @@ func NewExistsSourceFunc(tp elastictransport.Interface) NewExistsSource {
 	return func(index, id string) *ExistsSource {
 		n := New(tp)
 
-		n.Id(id)
+		n._id(id)
 
-		n.Index(index)
+		n._index(index)
 
 		return n
 	}
 }
 
-// Returns information about whether a document source exists in an index.
+// Check for a document source.
 //
-// https://www.elastic.co/guide/en/elasticsearch/reference/master/docs-get.html
+// Check whether a document source exists in an index.
+// For example:
+//
+// ```
+// HEAD my-index-000001/_source/1
+// ```
+//
+// A document's source is not available if it is disabled in the mapping.
+//
+// https://www.elastic.co/guide/en/elasticsearch/reference/current/docs-get.html
 func New(tp elastictransport.Interface) *ExistsSource {
 	r := &ExistsSource{
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -110,11 +132,17 @@ func (r *ExistsSource) HttpRequest(ctx context.Context) (*http.Request, error) {
 	case r.paramSet == indexMask|idMask:
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "index", r.index)
+		}
 		path.WriteString(r.index)
 		path.WriteString("/")
 		path.WriteString("_source")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "id", r.id)
+		}
 		path.WriteString(r.id)
 
 		method = http.MethodHead
@@ -128,9 +156,9 @@ func (r *ExistsSource) HttpRequest(ctx context.Context) (*http.Request, error) {
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
@@ -146,30 +174,72 @@ func (r *ExistsSource) HttpRequest(ctx context.Context) (*http.Request, error) {
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r ExistsSource) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r ExistsSource) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "exists_source")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "exists_source")
+		if reader := instrument.RecordRequestBody(ctx, "exists_source", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "exists_source")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the ExistsSource query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the ExistsSource query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
 }
 
+// Do runs the request through the transport, handle the response and returns a existssource.Response
+func (r ExistsSource) Do(ctx context.Context) (bool, error) {
+	return r.IsSuccess(ctx)
+}
+
 // IsSuccess allows to run a query with a context and retrieve the result as a boolean.
 // This only exists for endpoints without a request payload and allows for quick control flow.
-func (r ExistsSource) IsSuccess(ctx context.Context) (bool, error) {
-	res, err := r.Do(ctx)
+func (r ExistsSource) IsSuccess(providedCtx context.Context) (bool, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "exists_source")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	res, err := r.Perform(ctx)
 
 	if err != nil {
 		return false, err
 	}
-	io.Copy(ioutil.Discard, res.Body)
+	io.Copy(io.Discard, res.Body)
 	err = res.Body.Close()
 	if err != nil {
 		return false, err
@@ -177,6 +247,14 @@ func (r ExistsSource) IsSuccess(ctx context.Context) (bool, error) {
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
+	}
+
+	if res.StatusCode != 404 {
+		err := fmt.Errorf("an error happened during the ExistsSource query execution, status code: %d", res.StatusCode)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return false, err
 	}
 
 	return false, nil
@@ -189,94 +267,143 @@ func (r *ExistsSource) Header(key, value string) *ExistsSource {
 	return r
 }
 
-// Id The document ID
+// Id A unique identifier for the document.
 // API Name: id
-func (r *ExistsSource) Id(v string) *ExistsSource {
+func (r *ExistsSource) _id(id string) *ExistsSource {
 	r.paramSet |= idMask
-	r.id = v
+	r.id = id
 
 	return r
 }
 
-// Index The name of the index
+// Index A comma-separated list of data streams, indices, and aliases.
+// It supports wildcards (`*`).
 // API Name: index
-func (r *ExistsSource) Index(v string) *ExistsSource {
+func (r *ExistsSource) _index(index string) *ExistsSource {
 	r.paramSet |= indexMask
-	r.index = v
+	r.index = index
 
 	return r
 }
 
-// Preference Specify the node or shard the operation should be performed on (default:
-// random)
+// Preference The node or shard the operation should be performed on.
+// By default, the operation is randomized between the shard replicas.
 // API name: preference
-func (r *ExistsSource) Preference(value string) *ExistsSource {
-	r.values.Set("preference", value)
+func (r *ExistsSource) Preference(preference string) *ExistsSource {
+	r.values.Set("preference", preference)
 
 	return r
 }
 
-// Realtime Specify whether to perform the operation in realtime or search mode
+// Realtime If `true`, the request is real-time as opposed to near-real-time.
 // API name: realtime
-func (r *ExistsSource) Realtime(b bool) *ExistsSource {
-	r.values.Set("realtime", strconv.FormatBool(b))
+func (r *ExistsSource) Realtime(realtime bool) *ExistsSource {
+	r.values.Set("realtime", strconv.FormatBool(realtime))
 
 	return r
 }
 
-// Refresh Refresh the shard containing the document before performing the operation
+// Refresh If `true`, the request refreshes the relevant shards before retrieving the
+// document.
+// Setting it to `true` should be done after careful thought and verification
+// that this does not cause a heavy load on the system (and slow down indexing).
 // API name: refresh
-func (r *ExistsSource) Refresh(b bool) *ExistsSource {
-	r.values.Set("refresh", strconv.FormatBool(b))
+func (r *ExistsSource) Refresh(refresh bool) *ExistsSource {
+	r.values.Set("refresh", strconv.FormatBool(refresh))
 
 	return r
 }
 
-// Routing Specific routing value
+// Routing A custom value used to route operations to a specific shard.
 // API name: routing
-func (r *ExistsSource) Routing(value string) *ExistsSource {
-	r.values.Set("routing", value)
+func (r *ExistsSource) Routing(routing string) *ExistsSource {
+	r.values.Set("routing", routing)
 
 	return r
 }
 
-// Source_ True or false to return the _source field or not, or a list of fields to
-// return
+// Source_ Indicates whether to return the `_source` field (`true` or `false`) or lists
+// the fields to return.
 // API name: _source
-func (r *ExistsSource) Source_(value string) *ExistsSource {
-	r.values.Set("_source", value)
+func (r *ExistsSource) Source_(sourceconfigparam string) *ExistsSource {
+	r.values.Set("_source", sourceconfigparam)
 
 	return r
 }
 
-// SourceExcludes_ A list of fields to exclude from the returned _source field
+// SourceExcludes_ A comma-separated list of source fields to exclude in the response.
 // API name: _source_excludes
-func (r *ExistsSource) SourceExcludes_(value string) *ExistsSource {
-	r.values.Set("_source_excludes", value)
+func (r *ExistsSource) SourceExcludes_(fields ...string) *ExistsSource {
+	r.values.Set("_source_excludes", strings.Join(fields, ","))
 
 	return r
 }
 
-// SourceIncludes_ A list of fields to extract and return from the _source field
+// SourceIncludes_ A comma-separated list of source fields to include in the response.
 // API name: _source_includes
-func (r *ExistsSource) SourceIncludes_(value string) *ExistsSource {
-	r.values.Set("_source_includes", value)
+func (r *ExistsSource) SourceIncludes_(fields ...string) *ExistsSource {
+	r.values.Set("_source_includes", strings.Join(fields, ","))
 
 	return r
 }
 
-// Version Explicit version number for concurrency control
+// Version The version number for concurrency control.
+// It must match the current version of the document for the request to succeed.
 // API name: version
-func (r *ExistsSource) Version(value string) *ExistsSource {
-	r.values.Set("version", value)
+func (r *ExistsSource) Version(versionnumber string) *ExistsSource {
+	r.values.Set("version", versionnumber)
 
 	return r
 }
 
-// VersionType Specific version type
+// VersionType The version type.
 // API name: version_type
-func (r *ExistsSource) VersionType(enum versiontype.VersionType) *ExistsSource {
-	r.values.Set("version_type", enum.String())
+func (r *ExistsSource) VersionType(versiontype versiontype.VersionType) *ExistsSource {
+	r.values.Set("version_type", versiontype.String())
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *ExistsSource) ErrorTrace(errortrace bool) *ExistsSource {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *ExistsSource) FilterPath(filterpaths ...string) *ExistsSource {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *ExistsSource) Human(human bool) *ExistsSource {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *ExistsSource) Pretty(pretty bool) *ExistsSource {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
 
 	return r
 }

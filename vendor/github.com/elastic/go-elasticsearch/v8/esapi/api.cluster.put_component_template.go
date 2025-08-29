@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -34,6 +34,11 @@ func newClusterPutComponentTemplateFunc(t Transport) ClusterPutComponentTemplate
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -51,9 +56,9 @@ type ClusterPutComponentTemplateRequest struct {
 
 	Name string
 
+	Cause         string
 	Create        *bool
 	MasterTimeout time.Duration
-	Timeout       time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -63,15 +68,26 @@ type ClusterPutComponentTemplateRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r ClusterPutComponentTemplateRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r ClusterPutComponentTemplateRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "cluster.put_component_template")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "PUT"
 
@@ -81,8 +97,15 @@ func (r ClusterPutComponentTemplateRequest) Do(ctx context.Context, transport Tr
 	path.WriteString("_component_template")
 	path.WriteString("/")
 	path.WriteString(r.Name)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "name", r.Name)
+	}
 
 	params = make(map[string]string)
+
+	if r.Cause != "" {
+		params["cause"] = r.Cause
+	}
 
 	if r.Create != nil {
 		params["create"] = strconv.FormatBool(*r.Create)
@@ -90,10 +113,6 @@ func (r ClusterPutComponentTemplateRequest) Do(ctx context.Context, transport Tr
 
 	if r.MasterTimeout != 0 {
 		params["master_timeout"] = formatDuration(r.MasterTimeout)
-	}
-
-	if r.Timeout != 0 {
-		params["timeout"] = formatDuration(r.Timeout)
 	}
 
 	if r.Pretty {
@@ -114,6 +133,9 @@ func (r ClusterPutComponentTemplateRequest) Do(ctx context.Context, transport Tr
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -145,8 +167,20 @@ func (r ClusterPutComponentTemplateRequest) Do(ctx context.Context, transport Tr
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "cluster.put_component_template")
+		if reader := instrument.RecordRequestBody(ctx, "cluster.put_component_template", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "cluster.put_component_template")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -166,6 +200,13 @@ func (f ClusterPutComponentTemplate) WithContext(v context.Context) func(*Cluste
 	}
 }
 
+// WithCause - user defined reason for create the component template.
+func (f ClusterPutComponentTemplate) WithCause(v string) func(*ClusterPutComponentTemplateRequest) {
+	return func(r *ClusterPutComponentTemplateRequest) {
+		r.Cause = v
+	}
+}
+
 // WithCreate - whether the index template should only be added if new or can also replace an existing one.
 func (f ClusterPutComponentTemplate) WithCreate(v bool) func(*ClusterPutComponentTemplateRequest) {
 	return func(r *ClusterPutComponentTemplateRequest) {
@@ -177,13 +218,6 @@ func (f ClusterPutComponentTemplate) WithCreate(v bool) func(*ClusterPutComponen
 func (f ClusterPutComponentTemplate) WithMasterTimeout(v time.Duration) func(*ClusterPutComponentTemplateRequest) {
 	return func(r *ClusterPutComponentTemplateRequest) {
 		r.MasterTimeout = v
-	}
-}
-
-// WithTimeout - explicit operation timeout.
-func (f ClusterPutComponentTemplate) WithTimeout(v time.Duration) func(*ClusterPutComponentTemplateRequest) {
-	return func(r *ClusterPutComponentTemplateRequest) {
-		r.Timeout = v
 	}
 }
 

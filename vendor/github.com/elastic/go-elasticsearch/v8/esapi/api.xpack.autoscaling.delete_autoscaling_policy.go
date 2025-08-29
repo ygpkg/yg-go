@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newAutoscalingDeleteAutoscalingPolicyFunc(t Transport) AutoscalingDeleteAutoscalingPolicy {
@@ -31,6 +32,11 @@ func newAutoscalingDeleteAutoscalingPolicyFunc(t Transport) AutoscalingDeleteAut
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -46,6 +52,9 @@ type AutoscalingDeleteAutoscalingPolicy func(name string, o ...func(*Autoscaling
 type AutoscalingDeleteAutoscalingPolicyRequest struct {
 	Name string
 
+	MasterTimeout time.Duration
+	Timeout       time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -54,15 +63,26 @@ type AutoscalingDeleteAutoscalingPolicyRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r AutoscalingDeleteAutoscalingPolicyRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r AutoscalingDeleteAutoscalingPolicyRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "autoscaling.delete_autoscaling_policy")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "DELETE"
 
@@ -74,8 +94,19 @@ func (r AutoscalingDeleteAutoscalingPolicyRequest) Do(ctx context.Context, trans
 	path.WriteString("policy")
 	path.WriteString("/")
 	path.WriteString(r.Name)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "name", r.Name)
+	}
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -95,6 +126,9 @@ func (r AutoscalingDeleteAutoscalingPolicyRequest) Do(ctx context.Context, trans
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -122,8 +156,17 @@ func (r AutoscalingDeleteAutoscalingPolicyRequest) Do(ctx context.Context, trans
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "autoscaling.delete_autoscaling_policy")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "autoscaling.delete_autoscaling_policy")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -140,6 +183,20 @@ func (r AutoscalingDeleteAutoscalingPolicyRequest) Do(ctx context.Context, trans
 func (f AutoscalingDeleteAutoscalingPolicy) WithContext(v context.Context) func(*AutoscalingDeleteAutoscalingPolicyRequest) {
 	return func(r *AutoscalingDeleteAutoscalingPolicyRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - timeout for processing on master node.
+func (f AutoscalingDeleteAutoscalingPolicy) WithMasterTimeout(v time.Duration) func(*AutoscalingDeleteAutoscalingPolicyRequest) {
+	return func(r *AutoscalingDeleteAutoscalingPolicyRequest) {
+		r.MasterTimeout = v
+	}
+}
+
+// WithTimeout - timeout for acknowledgement of update from all nodes in cluster.
+func (f AutoscalingDeleteAutoscalingPolicy) WithTimeout(v time.Duration) func(*AutoscalingDeleteAutoscalingPolicyRequest) {
+	return func(r *AutoscalingDeleteAutoscalingPolicyRequest) {
+		r.Timeout = v
 	}
 }
 

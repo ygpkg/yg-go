@@ -15,26 +15,78 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // NodeInfoSettingsNode type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/nodes/info/types.ts#L148-L152
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/nodes/info/types.ts#L162-L166
 type NodeInfoSettingsNode struct {
-	Attr                 map[string]interface{} `json:"attr"`
-	MaxLocalStorageNodes *string                `json:"max_local_storage_nodes,omitempty"`
-	Name                 string                 `json:"name"`
+	Attr                 map[string]json.RawMessage `json:"attr"`
+	MaxLocalStorageNodes *string                    `json:"max_local_storage_nodes,omitempty"`
+	Name                 string                     `json:"name"`
+}
+
+func (s *NodeInfoSettingsNode) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "attr":
+			if s.Attr == nil {
+				s.Attr = make(map[string]json.RawMessage, 0)
+			}
+			if err := dec.Decode(&s.Attr); err != nil {
+				return fmt.Errorf("%s | %w", "Attr", err)
+			}
+
+		case "max_local_storage_nodes":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "MaxLocalStorageNodes", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.MaxLocalStorageNodes = &o
+
+		case "name":
+			if err := dec.Decode(&s.Name); err != nil {
+				return fmt.Errorf("%s | %w", "Name", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewNodeInfoSettingsNode returns a NodeInfoSettingsNode.
 func NewNodeInfoSettingsNode() *NodeInfoSettingsNode {
 	r := &NodeInfoSettingsNode{
-		Attr: make(map[string]interface{}, 0),
+		Attr: make(map[string]json.RawMessage),
 	}
 
 	return r

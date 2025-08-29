@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newSlmGetLifecycleFunc(t Transport) SlmGetLifecycle {
@@ -31,6 +32,11 @@ func newSlmGetLifecycleFunc(t Transport) SlmGetLifecycle {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -46,6 +52,9 @@ type SlmGetLifecycle func(o ...func(*SlmGetLifecycleRequest)) (*Response, error)
 type SlmGetLifecycleRequest struct {
 	PolicyID []string
 
+	MasterTimeout time.Duration
+	Timeout       time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -54,15 +63,26 @@ type SlmGetLifecycleRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r SlmGetLifecycleRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r SlmGetLifecycleRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "slm.get_lifecycle")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -75,9 +95,20 @@ func (r SlmGetLifecycleRequest) Do(ctx context.Context, transport Transport) (*R
 	if len(r.PolicyID) > 0 {
 		path.WriteString("/")
 		path.WriteString(strings.Join(r.PolicyID, ","))
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "policy_id", strings.Join(r.PolicyID, ","))
+		}
 	}
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -97,6 +128,9 @@ func (r SlmGetLifecycleRequest) Do(ctx context.Context, transport Transport) (*R
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -124,8 +158,17 @@ func (r SlmGetLifecycleRequest) Do(ctx context.Context, transport Transport) (*R
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "slm.get_lifecycle")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "slm.get_lifecycle")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -149,6 +192,20 @@ func (f SlmGetLifecycle) WithContext(v context.Context) func(*SlmGetLifecycleReq
 func (f SlmGetLifecycle) WithPolicyID(v ...string) func(*SlmGetLifecycleRequest) {
 	return func(r *SlmGetLifecycleRequest) {
 		r.PolicyID = v
+	}
+}
+
+// WithMasterTimeout - explicit operation timeout for connection to master node.
+func (f SlmGetLifecycle) WithMasterTimeout(v time.Duration) func(*SlmGetLifecycleRequest) {
+	return func(r *SlmGetLifecycleRequest) {
+		r.MasterTimeout = v
+	}
+}
+
+// WithTimeout - explicit operation timeout.
+func (f SlmGetLifecycle) WithTimeout(v time.Duration) func(*SlmGetLifecycleRequest) {
+	return func(r *SlmGetLifecycleRequest) {
+		r.Timeout = v
 	}
 }
 

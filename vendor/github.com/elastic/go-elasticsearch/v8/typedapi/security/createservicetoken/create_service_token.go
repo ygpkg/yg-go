@@ -15,28 +15,31 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Creates a service account token for access without requiring basic
+// Create a service account token.
+//
+// Create a service accounts token for access without requiring basic
 // authentication.
+//
+// NOTE: Service account tokens never expire.
+// You must actively delete them if they are no longer needed.
 package createservicetoken
 
 import (
-	gobytes "bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
-
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/refresh"
 )
 
@@ -58,13 +61,17 @@ type CreateServiceToken struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
 	paramSet int
 
 	namespace string
 	service   string
 	name      string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewCreateServiceToken type alias for index.
@@ -76,16 +83,21 @@ func NewCreateServiceTokenFunc(tp elastictransport.Interface) NewCreateServiceTo
 	return func(namespace, service string) *CreateServiceToken {
 		n := New(tp)
 
-		n.Namespace(namespace)
+		n._namespace(namespace)
 
-		n.Service(service)
+		n._service(service)
 
 		return n
 	}
 }
 
-// Creates a service account token for access without requiring basic
+// Create a service account token.
+//
+// Create a service accounts token for access without requiring basic
 // authentication.
+//
+// NOTE: Service account tokens never expire.
+// You must actively delete them if they are no longer needed.
 //
 // https://www.elastic.co/guide/en/elasticsearch/reference/current/security-api-create-service-token.html
 func New(tp elastictransport.Interface) *CreateServiceToken {
@@ -93,7 +105,12 @@ func New(tp elastictransport.Interface) *CreateServiceToken {
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -118,9 +135,15 @@ func (r *CreateServiceToken) HttpRequest(ctx context.Context) (*http.Request, er
 		path.WriteString("service")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "namespace", r.namespace)
+		}
 		path.WriteString(r.namespace)
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "service", r.service)
+		}
 		path.WriteString(r.service)
 		path.WriteString("/")
 		path.WriteString("credential")
@@ -128,6 +151,9 @@ func (r *CreateServiceToken) HttpRequest(ctx context.Context) (*http.Request, er
 		path.WriteString("token")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "name", r.name)
+		}
 		path.WriteString(r.name)
 
 		method = http.MethodPut
@@ -138,9 +164,15 @@ func (r *CreateServiceToken) HttpRequest(ctx context.Context) (*http.Request, er
 		path.WriteString("service")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "namespace", r.namespace)
+		}
 		path.WriteString(r.namespace)
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "service", r.service)
+		}
 		path.WriteString(r.service)
 		path.WriteString("/")
 		path.WriteString("credential")
@@ -158,9 +190,9 @@ func (r *CreateServiceToken) HttpRequest(ctx context.Context) (*http.Request, er
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
@@ -176,30 +208,121 @@ func (r *CreateServiceToken) HttpRequest(ctx context.Context) (*http.Request, er
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r CreateServiceToken) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r CreateServiceToken) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "security.create_service_token")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "security.create_service_token")
+		if reader := instrument.RecordRequestBody(ctx, "security.create_service_token", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "security.create_service_token")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the CreateServiceToken query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the CreateServiceToken query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
 }
 
+// Do runs the request through the transport, handle the response and returns a createservicetoken.Response
+func (r CreateServiceToken) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "security.create_service_token")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
+}
+
 // IsSuccess allows to run a query with a context and retrieve the result as a boolean.
 // This only exists for endpoints without a request payload and allows for quick control flow.
-func (r CreateServiceToken) IsSuccess(ctx context.Context) (bool, error) {
-	res, err := r.Do(ctx)
+func (r CreateServiceToken) IsSuccess(providedCtx context.Context) (bool, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "security.create_service_token")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	res, err := r.Perform(ctx)
 
 	if err != nil {
 		return false, err
 	}
-	io.Copy(ioutil.Discard, res.Body)
+	io.Copy(io.Discard, res.Body)
 	err = res.Body.Close()
 	if err != nil {
 		return false, err
@@ -207,6 +330,14 @@ func (r CreateServiceToken) IsSuccess(ctx context.Context) (bool, error) {
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
+	}
+
+	if res.StatusCode != 404 {
+		err := fmt.Errorf("an error happened during the CreateServiceToken query execution, status code: %d", res.StatusCode)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return false, err
 	}
 
 	return false, nil
@@ -219,29 +350,40 @@ func (r *CreateServiceToken) Header(key, value string) *CreateServiceToken {
 	return r
 }
 
-// Namespace An identifier for the namespace
+// Namespace The name of the namespace, which is a top-level grouping of service accounts.
 // API Name: namespace
-func (r *CreateServiceToken) Namespace(v string) *CreateServiceToken {
+func (r *CreateServiceToken) _namespace(namespace string) *CreateServiceToken {
 	r.paramSet |= namespaceMask
-	r.namespace = v
+	r.namespace = namespace
 
 	return r
 }
 
-// Service An identifier for the service name
+// Service The name of the service.
 // API Name: service
-func (r *CreateServiceToken) Service(v string) *CreateServiceToken {
+func (r *CreateServiceToken) _service(service string) *CreateServiceToken {
 	r.paramSet |= serviceMask
-	r.service = v
+	r.service = service
 
 	return r
 }
 
-// Name An identifier for the token name
+// Name The name for the service account token.
+// If omitted, a random name will be generated.
+//
+// Token names must be at least one and no more than 256 characters.
+// They can contain alphanumeric characters (a-z, A-Z, 0-9), dashes (`-`), and
+// underscores (`_`), but cannot begin with an underscore.
+//
+// NOTE: Token names must be unique in the context of the associated service
+// account.
+// They must also be globally unique with their fully qualified names, which are
+// comprised of the service account principal and token name, such as
+// `<namespace>/<service>/<token-name>`.
 // API Name: name
-func (r *CreateServiceToken) Name(v string) *CreateServiceToken {
+func (r *CreateServiceToken) Name(name string) *CreateServiceToken {
 	r.paramSet |= nameMask
-	r.name = v
+	r.name = name
 
 	return r
 }
@@ -250,8 +392,52 @@ func (r *CreateServiceToken) Name(v string) *CreateServiceToken {
 // search, if `wait_for` (the default) then wait for a refresh to make this
 // operation visible to search, if `false` then do nothing with refreshes.
 // API name: refresh
-func (r *CreateServiceToken) Refresh(enum refresh.Refresh) *CreateServiceToken {
-	r.values.Set("refresh", enum.String())
+func (r *CreateServiceToken) Refresh(refresh refresh.Refresh) *CreateServiceToken {
+	r.values.Set("refresh", refresh.String())
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *CreateServiceToken) ErrorTrace(errortrace bool) *CreateServiceToken {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *CreateServiceToken) FilterPath(filterpaths ...string) *CreateServiceToken {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *CreateServiceToken) Human(human bool) *CreateServiceToken {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *CreateServiceToken) Pretty(pretty bool) *CreateServiceToken {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
 
 	return r
 }

@@ -15,22 +15,78 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // CompositeAggregation type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/bucket.ts#L79-L84
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/bucket.ts#L130-L149
 type CompositeAggregation struct {
-	After   map[string]FieldValue                   `json:"after,omitempty"`
-	Meta    map[string]interface{}                  `json:"meta,omitempty"`
-	Name    *string                                 `json:"name,omitempty"`
-	Size    *int                                    `json:"size,omitempty"`
+	// After When paginating, use the `after_key` value returned in the previous response
+	// to retrieve the next page.
+	After CompositeAggregateKey `json:"after,omitempty"`
+	// Size The number of composite buckets that should be returned.
+	Size *int `json:"size,omitempty"`
+	// Sources The value sources used to build composite buckets.
+	// Keys are returned in the order of the `sources` definition.
 	Sources []map[string]CompositeAggregationSource `json:"sources,omitempty"`
+}
+
+func (s *CompositeAggregation) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "after":
+			if err := dec.Decode(&s.After); err != nil {
+				return fmt.Errorf("%s | %w", "After", err)
+			}
+
+		case "size":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Size", err)
+				}
+				s.Size = &value
+			case float64:
+				f := int(v)
+				s.Size = &f
+			}
+
+		case "sources":
+			if err := dec.Decode(&s.Sources); err != nil {
+				return fmt.Errorf("%s | %w", "Sources", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewCompositeAggregation returns a CompositeAggregation.

@@ -15,21 +15,26 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/appliesto"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/conditionoperator"
 )
 
 // RuleCondition type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/_types/Rule.ts#L52-L65
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/_types/Rule.ts#L52-L65
 type RuleCondition struct {
 	// AppliesTo Specifies the result property to which the condition applies. If your
 	// detector uses `lat_long`, `metric`, `rare`, or `freq_rare` functions, you can
@@ -39,7 +44,53 @@ type RuleCondition struct {
 	// greater than or equals, less than, and less than or equals.
 	Operator conditionoperator.ConditionOperator `json:"operator"`
 	// Value The value that is compared against the `applies_to` field using the operator.
-	Value float64 `json:"value"`
+	Value Float64 `json:"value"`
+}
+
+func (s *RuleCondition) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "applies_to":
+			if err := dec.Decode(&s.AppliesTo); err != nil {
+				return fmt.Errorf("%s | %w", "AppliesTo", err)
+			}
+
+		case "operator":
+			if err := dec.Decode(&s.Operator); err != nil {
+				return fmt.Errorf("%s | %w", "Operator", err)
+			}
+
+		case "value":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Value", err)
+				}
+				f := Float64(value)
+				s.Value = f
+			case float64:
+				f := Float64(v)
+				s.Value = f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewRuleCondition returns a RuleCondition.

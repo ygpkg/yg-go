@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func newCatTasksFunc(t Transport) CatTasks {
@@ -32,6 +33,11 @@ func newCatTasksFunc(t Transport) CatTasks {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -47,16 +53,18 @@ type CatTasks func(o ...func(*CatTasksRequest)) (*Response, error)
 
 // CatTasksRequest configures the Cat Tasks API request.
 type CatTasksRequest struct {
-	Actions      []string
-	Detailed     *bool
-	Format       string
-	H            []string
-	Help         *bool
-	Nodes        []string
-	ParentTaskID string
-	S            []string
-	Time         string
-	V            *bool
+	Actions           []string
+	Detailed          *bool
+	Format            string
+	H                 []string
+	Help              *bool
+	Nodes             []string
+	ParentTaskID      string
+	S                 []string
+	Time              string
+	Timeout           time.Duration
+	V                 *bool
+	WaitForCompletion *bool
 
 	Pretty     bool
 	Human      bool
@@ -66,15 +74,26 @@ type CatTasksRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r CatTasksRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r CatTasksRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "cat.tasks")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -120,8 +139,16 @@ func (r CatTasksRequest) Do(ctx context.Context, transport Transport) (*Response
 		params["time"] = r.Time
 	}
 
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
+
 	if r.V != nil {
 		params["v"] = strconv.FormatBool(*r.V)
+	}
+
+	if r.WaitForCompletion != nil {
+		params["wait_for_completion"] = strconv.FormatBool(*r.WaitForCompletion)
 	}
 
 	if r.Pretty {
@@ -142,6 +169,9 @@ func (r CatTasksRequest) Do(ctx context.Context, transport Transport) (*Response
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -169,8 +199,17 @@ func (r CatTasksRequest) Do(ctx context.Context, transport Transport) (*Response
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "cat.tasks")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "cat.tasks")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -253,10 +292,24 @@ func (f CatTasks) WithTime(v string) func(*CatTasksRequest) {
 	}
 }
 
+// WithTimeout - period to wait for a response. if no response is received before the timeout expires, the request fails and returns an error..
+func (f CatTasks) WithTimeout(v time.Duration) func(*CatTasksRequest) {
+	return func(r *CatTasksRequest) {
+		r.Timeout = v
+	}
+}
+
 // WithV - verbose mode. display column headers.
 func (f CatTasks) WithV(v bool) func(*CatTasksRequest) {
 	return func(r *CatTasksRequest) {
 		r.V = &v
+	}
+}
+
+// WithWaitForCompletion - if `true`, the request blocks until the task has completed..
+func (f CatTasks) WithWaitForCompletion(v bool) func(*CatTasksRequest) {
+	return func(r *CatTasksRequest) {
+		r.WaitForCompletion = &v
 	}
 }
 

@@ -15,27 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Retrieves information about the scheduled events in calendars.
+// Get info about events in calendars.
 package getcalendarevents
 
 import (
-	gobytes "bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 const (
@@ -52,11 +50,15 @@ type GetCalendarEvents struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
 	paramSet int
 
 	calendarid string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewGetCalendarEvents type alias for index.
@@ -68,13 +70,13 @@ func NewGetCalendarEventsFunc(tp elastictransport.Interface) NewGetCalendarEvent
 	return func(calendarid string) *GetCalendarEvents {
 		n := New(tp)
 
-		n.CalendarId(calendarid)
+		n._calendarid(calendarid)
 
 		return n
 	}
 }
 
-// Retrieves information about the scheduled events in calendars.
+// Get info about events in calendars.
 //
 // https://www.elastic.co/guide/en/elasticsearch/reference/current/ml-get-calendar-event.html
 func New(tp elastictransport.Interface) *GetCalendarEvents {
@@ -82,7 +84,12 @@ func New(tp elastictransport.Interface) *GetCalendarEvents {
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -107,6 +114,9 @@ func (r *GetCalendarEvents) HttpRequest(ctx context.Context) (*http.Request, err
 		path.WriteString("calendars")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "calendarid", r.calendarid)
+		}
 		path.WriteString(r.calendarid)
 		path.WriteString("/")
 		path.WriteString("events")
@@ -122,9 +132,9 @@ func (r *GetCalendarEvents) HttpRequest(ctx context.Context) (*http.Request, err
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
@@ -140,30 +150,121 @@ func (r *GetCalendarEvents) HttpRequest(ctx context.Context) (*http.Request, err
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r GetCalendarEvents) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r GetCalendarEvents) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "ml.get_calendar_events")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "ml.get_calendar_events")
+		if reader := instrument.RecordRequestBody(ctx, "ml.get_calendar_events", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ml.get_calendar_events")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the GetCalendarEvents query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the GetCalendarEvents query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
 }
 
+// Do runs the request through the transport, handle the response and returns a getcalendarevents.Response
+func (r GetCalendarEvents) Do(providedCtx context.Context) (*Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ml.get_calendar_events")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
+}
+
 // IsSuccess allows to run a query with a context and retrieve the result as a boolean.
 // This only exists for endpoints without a request payload and allows for quick control flow.
-func (r GetCalendarEvents) IsSuccess(ctx context.Context) (bool, error) {
-	res, err := r.Do(ctx)
+func (r GetCalendarEvents) IsSuccess(providedCtx context.Context) (bool, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ml.get_calendar_events")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	res, err := r.Perform(ctx)
 
 	if err != nil {
 		return false, err
 	}
-	io.Copy(ioutil.Discard, res.Body)
+	io.Copy(io.Discard, res.Body)
 	err = res.Body.Close()
 	if err != nil {
 		return false, err
@@ -171,6 +272,14 @@ func (r GetCalendarEvents) IsSuccess(ctx context.Context) (bool, error) {
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
+	}
+
+	if res.StatusCode != 404 {
+		err := fmt.Errorf("an error happened during the GetCalendarEvents query execution, status code: %d", res.StatusCode)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return false, err
 	}
 
 	return false, nil
@@ -188,25 +297,25 @@ func (r *GetCalendarEvents) Header(key, value string) *GetCalendarEvents {
 // expression. You can get information for all calendars by using `_all` or `*`
 // or by omitting the calendar identifier.
 // API Name: calendarid
-func (r *GetCalendarEvents) CalendarId(v string) *GetCalendarEvents {
+func (r *GetCalendarEvents) _calendarid(calendarid string) *GetCalendarEvents {
 	r.paramSet |= calendaridMask
-	r.calendarid = v
+	r.calendarid = calendarid
 
 	return r
 }
 
 // End Specifies to get events with timestamps earlier than this time.
 // API name: end
-func (r *GetCalendarEvents) End(value string) *GetCalendarEvents {
-	r.values.Set("end", value)
+func (r *GetCalendarEvents) End(datetime string) *GetCalendarEvents {
+	r.values.Set("end", datetime)
 
 	return r
 }
 
 // From Skips the specified number of events.
 // API name: from
-func (r *GetCalendarEvents) From(i int) *GetCalendarEvents {
-	r.values.Set("from", strconv.Itoa(i))
+func (r *GetCalendarEvents) From(from int) *GetCalendarEvents {
+	r.values.Set("from", strconv.Itoa(from))
 
 	return r
 }
@@ -214,24 +323,68 @@ func (r *GetCalendarEvents) From(i int) *GetCalendarEvents {
 // JobId Specifies to get events for a specific anomaly detection job identifier or
 // job group. It must be used with a calendar identifier of `_all` or `*`.
 // API name: job_id
-func (r *GetCalendarEvents) JobId(value string) *GetCalendarEvents {
-	r.values.Set("job_id", value)
+func (r *GetCalendarEvents) JobId(id string) *GetCalendarEvents {
+	r.values.Set("job_id", id)
 
 	return r
 }
 
 // Size Specifies the maximum number of events to obtain.
 // API name: size
-func (r *GetCalendarEvents) Size(i int) *GetCalendarEvents {
-	r.values.Set("size", strconv.Itoa(i))
+func (r *GetCalendarEvents) Size(size int) *GetCalendarEvents {
+	r.values.Set("size", strconv.Itoa(size))
 
 	return r
 }
 
 // Start Specifies to get events with timestamps after this time.
 // API name: start
-func (r *GetCalendarEvents) Start(value string) *GetCalendarEvents {
-	r.values.Set("start", value)
+func (r *GetCalendarEvents) Start(datetime string) *GetCalendarEvents {
+	r.values.Set("start", datetime)
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *GetCalendarEvents) ErrorTrace(errortrace bool) *GetCalendarEvents {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *GetCalendarEvents) FilterPath(filterpaths ...string) *GetCalendarEvents {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *GetCalendarEvents) Human(human bool) *GetCalendarEvents {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *GetCalendarEvents) Pretty(pretty bool) *GetCalendarEvents {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
 
 	return r
 }

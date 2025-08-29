@@ -15,10 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package samlprepareauthentication
 
@@ -29,20 +27,20 @@ import (
 
 // Request holds the request body struct for the package samlprepareauthentication
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/security/saml_prepare_authentication/Request.ts#L22-L46
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/security/saml_prepare_authentication/Request.ts#L22-L67
 type Request struct {
 
 	// Acs The Assertion Consumer Service URL that matches the one of the SAML realms in
 	// Elasticsearch.
 	// The realm is used to generate the authentication request. You must specify
-	// either this parameter or the realm parameter.
+	// either this parameter or the `realm` parameter.
 	Acs *string `json:"acs,omitempty"`
 	// Realm The name of the SAML realm in Elasticsearch for which the configuration is
 	// used to generate the authentication request.
-	// You must specify either this parameter or the acs parameter.
+	// You must specify either this parameter or the `acs` parameter.
 	Realm *string `json:"realm,omitempty"`
 	// RelayState A string that will be included in the redirect URL that this API returns as
-	// the RelayState query parameter.
+	// the `RelayState` query parameter.
 	// If the Authentication Request is signed, this value is used as part of the
 	// signature computation.
 	RelayState *string `json:"relay_state,omitempty"`
@@ -51,11 +49,12 @@ type Request struct {
 // NewRequest returns a Request
 func NewRequest() *Request {
 	r := &Request{}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 

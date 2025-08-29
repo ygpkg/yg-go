@@ -15,24 +15,31 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // IndexSettingsLifecycle type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/_types/IndexSettings.ts#L267-L300
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/_types/IndexSettings.ts#L284-L323
 type IndexSettingsLifecycle struct {
 	// IndexingComplete Indicates whether or not the index has been rolled over. Automatically set to
 	// true when ILM completes the rollover action.
 	// You can explicitly set it to skip rollover.
-	IndexingComplete *bool `json:"indexing_complete,omitempty"`
+	IndexingComplete Stringifiedboolean `json:"indexing_complete,omitempty"`
 	// Name The name of the policy to use to manage the index. For information about how
 	// Elasticsearch applies policy changes, see Policy updates.
-	Name string `json:"name"`
+	Name *string `json:"name,omitempty"`
 	// OriginationDate If specified, this is the timestamp used to calculate the index age for its
 	// phase transitions. Use this setting
 	// if you create a new index that contains old data and want to use the original
@@ -48,6 +55,10 @@ type IndexSettingsLifecycle struct {
 	// for example logs-2016.10.31-000002). If the index name doesn’t match the
 	// pattern, index creation fails.
 	ParseOriginationDate *bool `json:"parse_origination_date,omitempty"`
+	// PreferIlm Preference for the system that manages a data stream backing index
+	// (preferring ILM when both ILM and DLM are
+	// applicable for an index).
+	PreferIlm *string `json:"prefer_ilm,omitempty"`
 	// RolloverAlias The index alias to update when the index rolls over. Specify when using a
 	// policy that contains a rollover action.
 	// When the index rolls over, the alias is updated to reflect that the index is
@@ -55,6 +66,94 @@ type IndexSettingsLifecycle struct {
 	// information about rolling indices, see Rollover.
 	RolloverAlias *string                     `json:"rollover_alias,omitempty"`
 	Step          *IndexSettingsLifecycleStep `json:"step,omitempty"`
+}
+
+func (s *IndexSettingsLifecycle) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "indexing_complete":
+			if err := dec.Decode(&s.IndexingComplete); err != nil {
+				return fmt.Errorf("%s | %w", "IndexingComplete", err)
+			}
+
+		case "name":
+			if err := dec.Decode(&s.Name); err != nil {
+				return fmt.Errorf("%s | %w", "Name", err)
+			}
+
+		case "origination_date":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "OriginationDate", err)
+				}
+				s.OriginationDate = &value
+			case float64:
+				f := int64(v)
+				s.OriginationDate = &f
+			}
+
+		case "parse_origination_date":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "ParseOriginationDate", err)
+				}
+				s.ParseOriginationDate = &value
+			case bool:
+				s.ParseOriginationDate = &v
+			}
+
+		case "prefer_ilm":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "PreferIlm", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.PreferIlm = &o
+
+		case "rollover_alias":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "RolloverAlias", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.RolloverAlias = &o
+
+		case "step":
+			if err := dec.Decode(&s.Step); err != nil {
+				return fmt.Errorf("%s | %w", "Step", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewIndexSettingsLifecycle returns a IndexSettingsLifecycle.

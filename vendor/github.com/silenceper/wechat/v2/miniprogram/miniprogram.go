@@ -15,6 +15,7 @@ import (
 	"github.com/silenceper/wechat/v2/miniprogram/order"
 	"github.com/silenceper/wechat/v2/miniprogram/privacy"
 	"github.com/silenceper/wechat/v2/miniprogram/qrcode"
+	"github.com/silenceper/wechat/v2/miniprogram/redpacketcover"
 	"github.com/silenceper/wechat/v2/miniprogram/riskcontrol"
 	"github.com/silenceper/wechat/v2/miniprogram/security"
 	"github.com/silenceper/wechat/v2/miniprogram/shortlink"
@@ -33,17 +34,30 @@ type MiniProgram struct {
 
 // NewMiniProgram 实例化小程序 API
 func NewMiniProgram(cfg *config.Config) *MiniProgram {
-	defaultAkHandle := credential.NewDefaultAccessToken(cfg.AppID, cfg.AppSecret, credential.CacheKeyMiniProgramPrefix, cfg.Cache)
+	var defaultAkHandle credential.AccessTokenContextHandle
+	const cacheKeyPrefix = credential.CacheKeyMiniProgramPrefix
+	if cfg.UseStableAK {
+		defaultAkHandle = credential.NewStableAccessToken(cfg.AppID, cfg.AppSecret, cacheKeyPrefix, cfg.Cache)
+	} else {
+		defaultAkHandle = credential.NewDefaultAccessToken(cfg.AppID, cfg.AppSecret, cacheKeyPrefix, cfg.Cache)
+	}
 	ctx := &context.Context{
-		Config:            cfg,
-		AccessTokenHandle: defaultAkHandle,
+		Config:                   cfg,
+		AccessTokenContextHandle: defaultAkHandle,
 	}
 	return &MiniProgram{ctx}
 }
 
 // SetAccessTokenHandle 自定义 access_token 获取方式
 func (miniProgram *MiniProgram) SetAccessTokenHandle(accessTokenHandle credential.AccessTokenHandle) {
-	miniProgram.ctx.AccessTokenHandle = accessTokenHandle
+	miniProgram.ctx.AccessTokenContextHandle = credential.AccessTokenCompatibleHandle{
+		AccessTokenHandle: accessTokenHandle,
+	}
+}
+
+// SetAccessTokenContextHandle 自定义 access_token 获取方式
+func (miniProgram *MiniProgram) SetAccessTokenContextHandle(accessTokenContextHandle credential.AccessTokenContextHandle) {
+	miniProgram.ctx.AccessTokenContextHandle = accessTokenContextHandle
 }
 
 // GetContext get Context
@@ -154,4 +168,14 @@ func (miniProgram *MiniProgram) GetShipping() *order.Shipping {
 // GetMiniDrama 小程序娱乐微短剧
 func (miniProgram *MiniProgram) GetMiniDrama() *minidrama.MiniDrama {
 	return minidrama.NewMiniDrama(miniProgram.ctx)
+}
+
+// GetRedPacketCover 小程序微信红包封面 API
+func (miniProgram *MiniProgram) GetRedPacketCover() *redpacketcover.RedPacketCover {
+	return redpacketcover.NewRedPacketCover(miniProgram.ctx)
+}
+
+// GetUpdatableMessage 小程序动态消息
+func (miniProgram *MiniProgram) GetUpdatableMessage() *message.UpdatableMessage {
+	return message.NewUpdatableMessage(miniProgram.ctx)
 }

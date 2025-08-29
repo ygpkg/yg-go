@@ -15,38 +15,40 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"encoding/json"
+)
+
 // DataframeEvaluationClassificationMetrics type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/_types/DataframeEvaluation.ts#L73-L78
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/_types/DataframeEvaluation.ts#L73-L78
 type DataframeEvaluationClassificationMetrics struct {
 	// Accuracy Accuracy of predictions (per-class and overall).
-	Accuracy map[string]interface{} `json:"accuracy,omitempty"`
+	Accuracy map[string]json.RawMessage `json:"accuracy,omitempty"`
 	// AucRoc The AUC ROC (area under the curve of the receiver operating characteristic)
 	// score and optionally the curve. It is calculated for a specific class
 	// (provided as "class_name") treated as positive.
 	AucRoc *DataframeEvaluationClassificationMetricsAucRoc `json:"auc_roc,omitempty"`
 	// MulticlassConfusionMatrix Multiclass confusion matrix.
-	MulticlassConfusionMatrix map[string]interface{} `json:"multiclass_confusion_matrix,omitempty"`
+	MulticlassConfusionMatrix map[string]json.RawMessage `json:"multiclass_confusion_matrix,omitempty"`
 	// Precision Precision of predictions (per-class and average).
-	Precision map[string]interface{} `json:"precision,omitempty"`
+	Precision map[string]json.RawMessage `json:"precision,omitempty"`
 	// Recall Recall of predictions (per-class and average).
-	Recall map[string]interface{} `json:"recall,omitempty"`
+	Recall map[string]json.RawMessage `json:"recall,omitempty"`
 }
 
 // NewDataframeEvaluationClassificationMetrics returns a DataframeEvaluationClassificationMetrics.
 func NewDataframeEvaluationClassificationMetrics() *DataframeEvaluationClassificationMetrics {
 	r := &DataframeEvaluationClassificationMetrics{
-		Accuracy:                  make(map[string]interface{}, 0),
-		MulticlassConfusionMatrix: make(map[string]interface{}, 0),
-		Precision:                 make(map[string]interface{}, 0),
-		Recall:                    make(map[string]interface{}, 0),
+		Accuracy:                  make(map[string]json.RawMessage),
+		MulticlassConfusionMatrix: make(map[string]json.RawMessage),
+		Precision:                 make(map[string]json.RawMessage),
+		Recall:                    make(map[string]json.RawMessage),
 	}
 
 	return r

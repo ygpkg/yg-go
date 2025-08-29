@@ -15,39 +15,41 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package scroll
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 // Request holds the request body struct for the package scroll
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_global/scroll/ScrollRequest.ts#L24-L59
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_global/scroll/ScrollRequest.ts#L24-L88
 type Request struct {
 
-	// Scroll Period to retain the search context for scrolling.
-	Scroll *types.Duration `json:"scroll,omitempty"`
-	// ScrollId Scroll ID of the search.
+	// Scroll The period to retain the search context for scrolling.
+	Scroll types.Duration `json:"scroll,omitempty"`
+	// ScrollId The scroll ID of the search.
 	ScrollId string `json:"scroll_id"`
 }
 
 // NewRequest returns a Request
 func NewRequest() *Request {
 	r := &Request{}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 
@@ -56,4 +58,33 @@ func (rb *Request) FromJSON(data string) (*Request, error) {
 	}
 
 	return &req, nil
+}
+
+func (s *Request) UnmarshalJSON(data []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "scroll":
+			if err := dec.Decode(&s.Scroll); err != nil {
+				return fmt.Errorf("%s | %w", "Scroll", err)
+			}
+
+		case "scroll_id":
+			if err := dec.Decode(&s.ScrollId); err != nil {
+				return fmt.Errorf("%s | %w", "ScrollId", err)
+			}
+
+		}
+	}
+	return nil
 }

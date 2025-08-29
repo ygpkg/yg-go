@@ -15,26 +15,75 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // AdjacencyMatrixAggregation type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/bucket.ts#L48-L50
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/bucket.ts#L60-L70
 type AdjacencyMatrixAggregation struct {
-	Filters map[string]Query       `json:"filters,omitempty"`
-	Meta    map[string]interface{} `json:"meta,omitempty"`
-	Name    *string                `json:"name,omitempty"`
+	// Filters Filters used to create buckets.
+	// At least one filter is required.
+	Filters map[string]Query `json:"filters,omitempty"`
+	// Separator Separator used to concatenate filter names. Defaults to &.
+	Separator *string `json:"separator,omitempty"`
+}
+
+func (s *AdjacencyMatrixAggregation) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "filters":
+			if s.Filters == nil {
+				s.Filters = make(map[string]Query, 0)
+			}
+			if err := dec.Decode(&s.Filters); err != nil {
+				return fmt.Errorf("%s | %w", "Filters", err)
+			}
+
+		case "separator":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Separator", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Separator = &o
+
+		}
+	}
+	return nil
 }
 
 // NewAdjacencyMatrixAggregation returns a AdjacencyMatrixAggregation.
 func NewAdjacencyMatrixAggregation() *AdjacencyMatrixAggregation {
 	r := &AdjacencyMatrixAggregation{
-		Filters: make(map[string]Query, 0),
+		Filters: make(map[string]Query),
 	}
 
 	return r

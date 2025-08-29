@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -32,6 +32,11 @@ func newMLDeleteJobFunc(t Transport) MLDeleteJob {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -47,8 +52,9 @@ type MLDeleteJob func(job_id string, o ...func(*MLDeleteJobRequest)) (*Response,
 type MLDeleteJobRequest struct {
 	JobID string
 
-	Force             *bool
-	WaitForCompletion *bool
+	DeleteUserAnnotations *bool
+	Force                 *bool
+	WaitForCompletion     *bool
 
 	Pretty     bool
 	Human      bool
@@ -58,15 +64,26 @@ type MLDeleteJobRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r MLDeleteJobRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r MLDeleteJobRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ml.delete_job")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "DELETE"
 
@@ -78,8 +95,15 @@ func (r MLDeleteJobRequest) Do(ctx context.Context, transport Transport) (*Respo
 	path.WriteString("anomaly_detectors")
 	path.WriteString("/")
 	path.WriteString(r.JobID)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "job_id", r.JobID)
+	}
 
 	params = make(map[string]string)
+
+	if r.DeleteUserAnnotations != nil {
+		params["delete_user_annotations"] = strconv.FormatBool(*r.DeleteUserAnnotations)
+	}
 
 	if r.Force != nil {
 		params["force"] = strconv.FormatBool(*r.Force)
@@ -107,6 +131,9 @@ func (r MLDeleteJobRequest) Do(ctx context.Context, transport Transport) (*Respo
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -134,8 +161,17 @@ func (r MLDeleteJobRequest) Do(ctx context.Context, transport Transport) (*Respo
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "ml.delete_job")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ml.delete_job")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -152,6 +188,13 @@ func (r MLDeleteJobRequest) Do(ctx context.Context, transport Transport) (*Respo
 func (f MLDeleteJob) WithContext(v context.Context) func(*MLDeleteJobRequest) {
 	return func(r *MLDeleteJobRequest) {
 		r.ctx = v
+	}
+}
+
+// WithDeleteUserAnnotations - should annotations added by the user be deleted.
+func (f MLDeleteJob) WithDeleteUserAnnotations(v bool) func(*MLDeleteJobRequest) {
+	return func(r *MLDeleteJobRequest) {
+		r.DeleteUserAnnotations = &v
 	}
 }
 

@@ -15,10 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package reindex
 
@@ -32,24 +30,39 @@ import (
 
 // Request holds the request body struct for the package reindex
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_global/reindex/ReindexRequest.ts#L27-L51
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_global/reindex/ReindexRequest.ts#L27-L317
 type Request struct {
-	Conflicts *conflicts.Conflicts     `json:"conflicts,omitempty"`
-	Dest      types.ReindexDestination `json:"dest"`
-	MaxDocs   *int64                   `json:"max_docs,omitempty"`
-	Script    *types.Script            `json:"script,omitempty"`
-	Size      *int64                   `json:"size,omitempty"`
-	Source    types.ReindexSource      `json:"source"`
+
+	// Conflicts Indicates whether to continue reindexing even when there are conflicts.
+	Conflicts *conflicts.Conflicts `json:"conflicts,omitempty"`
+	// Dest The destination you are copying to.
+	Dest types.ReindexDestination `json:"dest"`
+	// MaxDocs The maximum number of documents to reindex.
+	// By default, all documents are reindexed.
+	// If it is a value less then or equal to `scroll_size`, a scroll will not be
+	// used to retrieve the results for the operation.
+	//
+	// If `conflicts` is set to `proceed`, the reindex operation could attempt to
+	// reindex more documents from the source than `max_docs` until it has
+	// successfully indexed `max_docs` documents into the target or it has gone
+	// through every document in the source query.
+	MaxDocs *int64 `json:"max_docs,omitempty"`
+	// Script The script to run to update the document source or metadata when reindexing.
+	Script *types.Script `json:"script,omitempty"`
+	Size   *int64        `json:"size,omitempty"`
+	// Source The source you are copying from.
+	Source types.ReindexSource `json:"source"`
 }
 
 // NewRequest returns a Request
 func NewRequest() *Request {
 	r := &Request{}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 

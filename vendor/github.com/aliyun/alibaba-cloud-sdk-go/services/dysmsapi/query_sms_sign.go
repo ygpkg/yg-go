@@ -81,12 +81,12 @@ type QuerySmsSignRequest struct {
 type QuerySmsSignResponse struct {
 	*responses.BaseResponse
 	RequestId  string `json:"RequestId" xml:"RequestId"`
+	SignStatus int    `json:"SignStatus" xml:"SignStatus"`
 	Code       string `json:"Code" xml:"Code"`
 	Message    string `json:"Message" xml:"Message"`
-	SignStatus int    `json:"SignStatus" xml:"SignStatus"`
+	CreateDate string `json:"CreateDate" xml:"CreateDate"`
 	Reason     string `json:"Reason" xml:"Reason"`
 	SignName   string `json:"SignName" xml:"SignName"`
-	CreateDate string `json:"CreateDate" xml:"CreateDate"`
 }
 
 // CreateQuerySmsSignRequest creates a request to invoke QuerySmsSign API
@@ -94,7 +94,7 @@ func CreateQuerySmsSignRequest() (request *QuerySmsSignRequest) {
 	request = &QuerySmsSignRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySmsSign", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "QuerySmsSign", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

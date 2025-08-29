@@ -26,7 +26,7 @@ import (
 
 const (
 	// Version current go sdk version
-	Version               = "0.7.58"
+	Version               = "0.7.69"
 	UserAgent             = "cos-go-sdk-v5/" + Version
 	contentTypeXML        = "application/xml"
 	defaultServiceBaseURL = "http://service.cos.myqcloud.com"
@@ -48,11 +48,9 @@ var (
 	regionChecker         = regexp.MustCompile(`^[a-z-1]+$`)
 
 	// 校验传入的url
-	domainSuffix         = regexp.MustCompile(`^.*\.(myqcloud\.com(:[0-9]+){0,1}|tencentcos\.cn(:[0-9]+){0,1})$`)
-	bucketDomainChecker  = regexp.MustCompile(`^(http://|https://){0,1}([a-z0-9-]+-[0-9]+\.){0,1}((cos|cos-internal|cos-website|ci)\.[a-z-1]+|file)\.(myqcloud\.com|tencentcos\.cn)(:[0-9]+){0,1}$`)
-	serviceDomainChecker = regexp.MustCompile(`^(http://|https://){0,1}((service.cos.myqcloud.com|service.cos-internal.tencentcos.cn|service.cos.tencentcos.cn)|(cos|cos-internal)\.[a-z-1]+\.(myqcloud\.com|tencentcos\.cn))(:[0-9]+){0,1}$`)
-	batchDomainChecker   = regexp.MustCompile(`^(http://|https://){0,1}([0-9]+\.){1}cos-control\.[a-z-1]+\.(myqcloud\.com|tencentcos\.cn)(:[0-9]+){0,1}$`)
-	invalidBucketErr     = fmt.Errorf("invalid bucket format, please check your cos.BaseURL")
+	domainSuffix        = regexp.MustCompile(`^.*\.(myqcloud\.com(:[0-9]+){0,1}|tencentcos\.cn(:[0-9]+){0,1})$`)
+	bucketDomainChecker = regexp.MustCompile(`^(http://|https://){0,1}([a-z0-9-]+\.)+(myqcloud\.com|tencentcos\.cn)(:[0-9]+){0,1}$`)
+	invalidBucketErr    = fmt.Errorf("invalid bucket format, please check your cos.BaseURL")
 
 	switchHost             = regexp.MustCompile(`([a-z0-9-]+-[0-9]+\.)(cos\.[a-z-1]+)\.(myqcloud\.com)(:[0-9]+){0,1}$`)
 	accelerateDomainSuffix = "accelerate.myqcloud.com"
@@ -89,13 +87,15 @@ func (*BaseURL) innerCheck(u *url.URL, reg *regexp.Regexp) bool {
 	if domainSuffix.MatchString(urlStr) && !reg.MatchString(urlStr) {
 		return false
 	}
+	host := u.Hostname()
+	if domainSuffix.MatchString(host) && !reg.MatchString(u.Scheme+"://"+host) {
+		return false
+	}
 	return true
 }
 
 func (u *BaseURL) Check() bool {
-	return u.innerCheck(u.BucketURL, bucketDomainChecker) &&
-		(u.innerCheck(u.ServiceURL, serviceDomainChecker) || u.innerCheck(u.ServiceURL, bucketDomainChecker)) &&
-		(u.innerCheck(u.BatchURL, batchDomainChecker) || u.innerCheck(u.BatchURL, bucketDomainChecker))
+	return u.innerCheck(u.BucketURL, bucketDomainChecker) && u.innerCheck(u.ServiceURL, bucketDomainChecker) && u.innerCheck(u.BatchURL, bucketDomainChecker)
 }
 
 // NewBucketURL 生成 BaseURL 所需的 BucketURL
@@ -240,16 +240,7 @@ type Credential struct {
 }
 
 func (c *Client) GetCredential() *Credential {
-	if auth, ok := c.client.Transport.(*AuthorizationTransport); ok {
-		auth.rwLocker.Lock()
-		defer auth.rwLocker.Unlock()
-		return &Credential{
-			SecretID:     auth.SecretID,
-			SecretKey:    auth.SecretKey,
-			SessionToken: auth.SessionToken,
-		}
-	}
-	if auth, ok := c.client.Transport.(*CVMCredentialTransport); ok {
+	if auth, ok := c.client.Transport.(TransportIface); ok {
 		ak, sk, token, err := auth.GetCredential()
 		if err != nil {
 			return nil
@@ -260,19 +251,40 @@ func (c *Client) GetCredential() *Credential {
 			SessionToken: token,
 		}
 	}
-	if auth, ok := c.client.Transport.(*CredentialTransport); ok {
-		ak, sk, token := auth.Credential.GetSecretId(), auth.Credential.GetSecretKey(), auth.Credential.GetToken()
-		return &Credential{
-			SecretID:     ak,
-			SecretKey:    sk,
-			SessionToken: token,
-		}
-	}
 	return nil
+}
+
+type commonHeader struct {
+	ContentLength int64 `header:"Content-Length,omitempty"`
+}
+
+func (c *Client) newPresignedRequest(ctx context.Context, sendOpt *sendOptions, enablePathMerge bool) (req *http.Request, err error) {
+	sendOpt.uri, err = addURLOptions(sendOpt.uri, sendOpt.optQuery)
+	if err != nil {
+		return
+	}
+	urlStr := fmt.Sprintf("%s://%s%s", sendOpt.baseURL.Scheme, sendOpt.baseURL.Host, sendOpt.uri)
+	if enablePathMerge {
+		u, _ := url.Parse(sendOpt.uri)
+		urlStr = sendOpt.baseURL.ResolveReference(u).String()
+	}
+	req, err = http.NewRequest(sendOpt.method, urlStr, nil)
+	if err != nil {
+		return
+	}
+
+	req.Header, err = addHeaderOptions(ctx, req.Header, sendOpt.optHeader)
+	if err != nil {
+		return
+	}
+	return req, err
 }
 
 func (c *Client) newRequest(ctx context.Context, baseURL *url.URL, uri, method string, body interface{}, optQuery interface{}, optHeader interface{}, isRetry bool) (req *http.Request, err error) {
 	if c.invalidURL {
+		return nil, invalidBucketErr
+	}
+	if baseURL == nil {
 		return nil, invalidBucketErr
 	}
 	if !checkURL(baseURL) {
@@ -291,6 +303,7 @@ func (c *Client) newRequest(ctx context.Context, baseURL *url.URL, uri, method s
 	var reader io.Reader
 	contentType := ""
 	contentMD5 := ""
+	contentLength := int64(-1)
 	if body != nil {
 		// 上传文件
 		if r, ok := body.(io.Reader); ok {
@@ -303,7 +316,10 @@ func (c *Client) newRequest(ctx context.Context, baseURL *url.URL, uri, method s
 			contentType = contentTypeXML
 			reader = bytes.NewReader(b)
 			contentMD5 = base64.StdEncoding.EncodeToString(calMD5Digest(b))
+			contentLength = int64(len(b))
 		}
+	} else if method == http.MethodPut || method == http.MethodPost {
+		contentLength = 0
 	}
 
 	req, err = http.NewRequest(method, urlStr, reader)
@@ -314,6 +330,9 @@ func (c *Client) newRequest(ctx context.Context, baseURL *url.URL, uri, method s
 	req.Header, err = addHeaderOptions(ctx, req.Header, optHeader)
 	if err != nil {
 		return
+	}
+	if v := req.Header.Get("Content-Length"); v == "" && contentLength >= 0 {
+		req.Header.Set("Content-Length", strconv.FormatInt(contentLength, 10))
 	}
 	if v := req.Header.Get("Content-Length"); req.ContentLength == 0 && v != "" && v != "0" {
 		req.ContentLength, _ = strconv.ParseInt(v, 10, 64)
@@ -459,6 +478,16 @@ func (c *Client) CheckRetrieable(u *url.URL, resp *Response, err error, secondLa
 	if err != nil && err != invalidBucketErr {
 		// 不重试
 		if resp != nil && resp.StatusCode < 500 {
+			if c.Conf.RetryOpt.AutoSwitchHost {
+				if resp.StatusCode == 301 || resp.StatusCode == 302 || resp.StatusCode == 307 {
+					if resp.Header.Get("X-Cos-Request-Id") == "" {
+						res = toSwitchHost(u)
+						if res != u {
+							return res, true
+						}
+					}
+				}
+			}
 			return res, false
 		}
 		if c.Conf.RetryOpt.AutoSwitchHost && secondLast {

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -35,6 +35,11 @@ func newSearchFunc(t Transport) Search {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -67,6 +72,7 @@ type SearchRequest struct {
 	From                       *int
 	IgnoreThrottled            *bool
 	IgnoreUnavailable          *bool
+	IncludeNamedQueriesScore   *bool
 	Lenient                    *bool
 	MaxConcurrentShardRequests *int
 	MinCompatibleShardNode     string
@@ -105,15 +111,26 @@ type SearchRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r SearchRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r SearchRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "search")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -122,6 +139,9 @@ func (r SearchRequest) Do(ctx context.Context, transport Transport) (*Response, 
 	if len(r.Index) > 0 {
 		path.WriteString("/")
 		path.WriteString(strings.Join(r.Index, ","))
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "index", strings.Join(r.Index, ","))
+		}
 	}
 	path.WriteString("/")
 	path.WriteString("_search")
@@ -186,6 +206,10 @@ func (r SearchRequest) Do(ctx context.Context, transport Transport) (*Response, 
 
 	if r.IgnoreUnavailable != nil {
 		params["ignore_unavailable"] = strconv.FormatBool(*r.IgnoreUnavailable)
+	}
+
+	if r.IncludeNamedQueriesScore != nil {
+		params["include_named_queries_score"] = strconv.FormatBool(*r.IncludeNamedQueriesScore)
 	}
 
 	if r.Lenient != nil {
@@ -322,6 +346,9 @@ func (r SearchRequest) Do(ctx context.Context, transport Transport) (*Response, 
 
 	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -353,8 +380,20 @@ func (r SearchRequest) Do(ctx context.Context, transport Transport) (*Response, 
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "search")
+		if reader := instrument.RecordRequestBody(ctx, "search", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "search")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -490,6 +529,13 @@ func (f Search) WithIgnoreThrottled(v bool) func(*SearchRequest) {
 func (f Search) WithIgnoreUnavailable(v bool) func(*SearchRequest) {
 	return func(r *SearchRequest) {
 		r.IgnoreUnavailable = &v
+	}
+}
+
+// WithIncludeNamedQueriesScore - indicates whether hit.matched_queries should be rendered as a map that includes the name of the matched query associated with its score (true) or as an array containing the name of the matched queries (false).
+func (f Search) WithIncludeNamedQueriesScore(v bool) func(*SearchRequest) {
+	return func(r *SearchRequest) {
+		r.IncludeNamedQueriesScore = &v
 	}
 }
 

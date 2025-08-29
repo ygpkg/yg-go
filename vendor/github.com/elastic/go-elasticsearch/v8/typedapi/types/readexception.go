@@ -15,20 +15,76 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // ReadException type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ccr/_types/FollowIndexStats.ts#L71-L75
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ccr/_types/FollowIndexStats.ts#L111-L118
 type ReadException struct {
+	// Exception The exception that caused the read to fail.
 	Exception ErrorCause `json:"exception"`
-	FromSeqNo int64      `json:"from_seq_no"`
-	Retries   int        `json:"retries"`
+	// FromSeqNo The starting sequence number of the batch requested from the leader.
+	FromSeqNo int64 `json:"from_seq_no"`
+	// Retries The number of times the batch has been retried.
+	Retries int `json:"retries"`
+}
+
+func (s *ReadException) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "exception":
+			if err := dec.Decode(&s.Exception); err != nil {
+				return fmt.Errorf("%s | %w", "Exception", err)
+			}
+
+		case "from_seq_no":
+			if err := dec.Decode(&s.FromSeqNo); err != nil {
+				return fmt.Errorf("%s | %w", "FromSeqNo", err)
+			}
+
+		case "retries":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Retries", err)
+				}
+				s.Retries = value
+			case float64:
+				f := int(v)
+				s.Retries = f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewReadException returns a ReadException.

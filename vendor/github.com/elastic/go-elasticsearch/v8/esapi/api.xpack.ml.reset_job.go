@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -32,6 +32,11 @@ func newMLResetJobFunc(t Transport) MLResetJob {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -47,7 +52,8 @@ type MLResetJob func(job_id string, o ...func(*MLResetJobRequest)) (*Response, e
 type MLResetJobRequest struct {
 	JobID string
 
-	WaitForCompletion *bool
+	DeleteUserAnnotations *bool
+	WaitForCompletion     *bool
 
 	Pretty     bool
 	Human      bool
@@ -57,15 +63,26 @@ type MLResetJobRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r MLResetJobRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r MLResetJobRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ml.reset_job")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -77,10 +94,17 @@ func (r MLResetJobRequest) Do(ctx context.Context, transport Transport) (*Respon
 	path.WriteString("anomaly_detectors")
 	path.WriteString("/")
 	path.WriteString(r.JobID)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "job_id", r.JobID)
+	}
 	path.WriteString("/")
 	path.WriteString("_reset")
 
 	params = make(map[string]string)
+
+	if r.DeleteUserAnnotations != nil {
+		params["delete_user_annotations"] = strconv.FormatBool(*r.DeleteUserAnnotations)
+	}
 
 	if r.WaitForCompletion != nil {
 		params["wait_for_completion"] = strconv.FormatBool(*r.WaitForCompletion)
@@ -104,6 +128,9 @@ func (r MLResetJobRequest) Do(ctx context.Context, transport Transport) (*Respon
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -131,8 +158,17 @@ func (r MLResetJobRequest) Do(ctx context.Context, transport Transport) (*Respon
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "ml.reset_job")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ml.reset_job")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -149,6 +185,13 @@ func (r MLResetJobRequest) Do(ctx context.Context, transport Transport) (*Respon
 func (f MLResetJob) WithContext(v context.Context) func(*MLResetJobRequest) {
 	return func(r *MLResetJobRequest) {
 		r.ctx = v
+	}
+}
+
+// WithDeleteUserAnnotations - should annotations added by the user be deleted.
+func (f MLResetJob) WithDeleteUserAnnotations(v bool) func(*MLResetJobRequest) {
+	return func(r *MLResetJobRequest) {
+		r.DeleteUserAnnotations = &v
 	}
 }
 

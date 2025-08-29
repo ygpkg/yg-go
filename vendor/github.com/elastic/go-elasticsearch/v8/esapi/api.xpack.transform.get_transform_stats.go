@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func newTransformGetTransformStatsFunc(t Transport) TransformGetTransformStats {
@@ -32,6 +33,11 @@ func newTransformGetTransformStatsFunc(t Transport) TransformGetTransformStats {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -50,6 +56,7 @@ type TransformGetTransformStatsRequest struct {
 	AllowNoMatch *bool
 	From         *int
 	Size         *int
+	Timeout      time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -59,15 +66,26 @@ type TransformGetTransformStatsRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r TransformGetTransformStatsRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r TransformGetTransformStatsRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "transform.get_transform_stats")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -77,6 +95,9 @@ func (r TransformGetTransformStatsRequest) Do(ctx context.Context, transport Tra
 	path.WriteString("_transform")
 	path.WriteString("/")
 	path.WriteString(r.TransformID)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "transform_id", r.TransformID)
+	}
 	path.WriteString("/")
 	path.WriteString("_stats")
 
@@ -92,6 +113,10 @@ func (r TransformGetTransformStatsRequest) Do(ctx context.Context, transport Tra
 
 	if r.Size != nil {
 		params["size"] = strconv.FormatInt(int64(*r.Size), 10)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
 	}
 
 	if r.Pretty {
@@ -112,6 +137,9 @@ func (r TransformGetTransformStatsRequest) Do(ctx context.Context, transport Tra
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -139,8 +167,17 @@ func (r TransformGetTransformStatsRequest) Do(ctx context.Context, transport Tra
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "transform.get_transform_stats")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "transform.get_transform_stats")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -178,6 +215,13 @@ func (f TransformGetTransformStats) WithFrom(v int) func(*TransformGetTransformS
 func (f TransformGetTransformStats) WithSize(v int) func(*TransformGetTransformStatsRequest) {
 	return func(r *TransformGetTransformStatsRequest) {
 		r.Size = &v
+	}
+}
+
+// WithTimeout - controls the time to wait for the stats.
+func (f TransformGetTransformStats) WithTimeout(v time.Duration) func(*TransformGetTransformStatsRequest) {
+	return func(r *TransformGetTransformStatsRequest) {
+		r.Timeout = v
 	}
 }
 

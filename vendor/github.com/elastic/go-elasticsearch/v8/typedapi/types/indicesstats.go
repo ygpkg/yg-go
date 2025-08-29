@@ -15,21 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/healthstatus"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/indexmetadatastate"
 )
 
 // IndicesStats type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/stats/types.ts#L89-L98
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/stats/types.ts#L95-L110
 type IndicesStats struct {
 	Health    *healthstatus.HealthStatus             `json:"health,omitempty"`
 	Primaries *IndexStats                            `json:"primaries,omitempty"`
@@ -39,10 +43,63 @@ type IndicesStats struct {
 	Uuid      *string                                `json:"uuid,omitempty"`
 }
 
+func (s *IndicesStats) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "health":
+			if err := dec.Decode(&s.Health); err != nil {
+				return fmt.Errorf("%s | %w", "Health", err)
+			}
+
+		case "primaries":
+			if err := dec.Decode(&s.Primaries); err != nil {
+				return fmt.Errorf("%s | %w", "Primaries", err)
+			}
+
+		case "shards":
+			if s.Shards == nil {
+				s.Shards = make(map[string][]IndicesShardStats, 0)
+			}
+			if err := dec.Decode(&s.Shards); err != nil {
+				return fmt.Errorf("%s | %w", "Shards", err)
+			}
+
+		case "status":
+			if err := dec.Decode(&s.Status); err != nil {
+				return fmt.Errorf("%s | %w", "Status", err)
+			}
+
+		case "total":
+			if err := dec.Decode(&s.Total); err != nil {
+				return fmt.Errorf("%s | %w", "Total", err)
+			}
+
+		case "uuid":
+			if err := dec.Decode(&s.Uuid); err != nil {
+				return fmt.Errorf("%s | %w", "Uuid", err)
+			}
+
+		}
+	}
+	return nil
+}
+
 // NewIndicesStats returns a IndicesStats.
 func NewIndicesStats() *IndicesStats {
 	r := &IndicesStats{
-		Shards: make(map[string][]IndicesShardStats, 0),
+		Shards: make(map[string][]IndicesShardStats),
 	}
 
 	return r

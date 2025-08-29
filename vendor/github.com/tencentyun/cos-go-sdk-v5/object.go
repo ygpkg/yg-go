@@ -32,6 +32,7 @@ type ObjectGetOptions struct {
 	ResponseCacheControl       string `url:"response-cache-control,omitempty" header:"-"`
 	ResponseContentDisposition string `url:"response-content-disposition,omitempty" header:"-"`
 	ResponseContentEncoding    string `url:"response-content-encoding,omitempty" header:"-"`
+	CiProcess                  string `url:"ci-process,omitempty" header:"-"`
 	Range                      string `url:"-" header:"Range,omitempty"`
 	IfModifiedSince            string `url:"-" header:"If-Modified-Since,omitempty"`
 	// SSE-C
@@ -123,6 +124,7 @@ type PresignedURLOptions struct {
 	SignMerged      bool         `xml:"-" url:"-" header:"-"`
 	AuthTime        *AuthTime    `xml:"-" url:"-" header:"-"`
 	EncodeDelimiter bool         `xml:"-" url:"-" header:"-"`
+	EnablePathMerge bool         `xml:"-" url:"-" header:"-"`
 }
 
 // GetPresignedURL get the object presigned to down or upload file by url
@@ -146,6 +148,7 @@ func (s *ObjectService) GetPresignedURL(ctx context.Context, httpMethod, name, a
 		optHeader: opt,
 	}
 	var authTime *AuthTime
+	var enablePathMerge bool
 	if opt != nil {
 		if popt, ok := opt.(*presignedURLTestingOptions); ok {
 			authTime = popt.authTime
@@ -160,9 +163,12 @@ func (s *ObjectService) GetPresignedURL(ctx context.Context, httpMethod, name, a
 			if popt.AuthTime != nil {
 				authTime = popt.AuthTime
 			}
+			if popt.EnablePathMerge {
+				enablePathMerge = true
+			}
 		}
 	}
-	req, err := s.client.newRequest(ctx, sendOpt.baseURL, sendOpt.uri, sendOpt.method, sendOpt.body, sendOpt.optQuery, sendOpt.optHeader, false)
+	req, err := s.client.newPresignedRequest(ctx, &sendOpt, enablePathMerge)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +226,7 @@ func (s *ObjectService) GetPresignedURL2(ctx context.Context, httpMethod, name s
 		optQuery:  opt,
 		optHeader: opt,
 	}
+	var enablePathMerge bool
 	var authTime *AuthTime
 	mark := "?"
 	if opt != nil {
@@ -237,13 +244,16 @@ func (s *ObjectService) GetPresignedURL2(ctx context.Context, httpMethod, name s
 			if popt.AuthTime != nil {
 				authTime = popt.AuthTime
 			}
+			if popt.EnablePathMerge {
+				enablePathMerge = true
+			}
 		}
 	}
 	if cred.SessionToken != "" {
 		sendOpt.uri = fmt.Sprintf("%s%s%s", sendOpt.uri, mark, url.Values{"x-cos-security-token": []string{cred.SessionToken}}.Encode())
 	}
 
-	req, err := s.client.newRequest(ctx, sendOpt.baseURL, sendOpt.uri, sendOpt.method, sendOpt.body, sendOpt.optQuery, sendOpt.optHeader, false)
+	req, err := s.client.newPresignedRequest(ctx, &sendOpt, enablePathMerge)
 	if err != nil {
 		return nil, err
 	}
@@ -306,6 +316,7 @@ func (s *ObjectService) GetPresignedURL3(ctx context.Context, httpMethod, name s
 		optQuery:  opt,
 		optHeader: opt,
 	}
+	var enablePathMerge bool
 	var authTime *AuthTime
 	mark := "?"
 	if opt != nil {
@@ -323,13 +334,16 @@ func (s *ObjectService) GetPresignedURL3(ctx context.Context, httpMethod, name s
 			if popt.AuthTime != nil {
 				authTime = popt.AuthTime
 			}
+			if popt.EnablePathMerge {
+				enablePathMerge = true
+			}
 		}
 	}
 	if cred.SessionToken != "" {
 		sendOpt.uri = fmt.Sprintf("%s%s%s", sendOpt.uri, mark, url.Values{"x-cos-security-token": []string{cred.SessionToken}}.Encode())
 	}
 
-	req, err := s.client.newRequest(ctx, sendOpt.baseURL, sendOpt.uri, sendOpt.method, sendOpt.body, sendOpt.optQuery, sendOpt.optHeader, false)
+	req, err := s.client.newPresignedRequest(ctx, &sendOpt, enablePathMerge)
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +396,7 @@ func (s *ObjectService) GetSignature(ctx context.Context, httpMethod, name, ak, 
 			sendOpt.uri = fmt.Sprintf("%s?%s", sendOpt.uri, qs)
 		}
 	}
-	req, err := s.client.newRequest(ctx, sendOpt.baseURL, sendOpt.uri, sendOpt.method, sendOpt.body, sendOpt.optQuery, sendOpt.optHeader, false)
+	req, err := s.client.newPresignedRequest(ctx, &sendOpt, false)
 	if err != nil {
 		return ""
 	}
@@ -491,6 +505,7 @@ func (s *ObjectService) Put(ctx context.Context, name string, r io.Reader, uopt 
 			method:    http.MethodPut,
 			body:      reader,
 			optHeader: opt,
+			isRetry:   nr > 0,
 		}
 
 		// 把上一次错误记录下来
@@ -672,6 +687,7 @@ type ObjectDeleteOptions struct {
 	XCosSSECustomerKeyMD5 string `header:"x-cos-server-side-encryption-customer-key-MD5,omitempty" url:"-" xml:"-"`
 	//兼容其他自定义头部
 	XOptionHeader *http.Header `header:"-,omitempty" url:"-" xml:"-"`
+	XOptionQuery  *url.Values  `header:"-" url:"-" xml:"-"`
 	VersionId     string       `header:"-" url:"VersionId,omitempty" xml:"-"`
 }
 
@@ -691,10 +707,14 @@ func (s *ObjectService) Delete(ctx context.Context, name string, opt ...*ObjectD
 	if len(opt) > 0 {
 		optHeader = opt[0]
 	}
+	uri := "/" + encodeURIComponent(name)
+	if optHeader != nil && optHeader.XOptionQuery != nil {
+		uri = uri + "?" + optHeader.XOptionQuery.Encode()
+	}
 
 	sendOpt := sendOptions{
 		baseURL:   s.client.BaseURL.BucketURL,
-		uri:       "/" + encodeURIComponent(name),
+		uri:       uri,
 		method:    http.MethodDelete,
 		optHeader: optHeader,
 		optQuery:  optHeader,
@@ -1452,6 +1472,194 @@ func (s *ObjectService) Upload(ctx context.Context, name string, filepath string
 	return v, resp, err
 }
 
+func (s *ObjectService) UploadWithPicOperations(ctx context.Context, name string, filepath string, opt *MultiUploadOptions) (*CompleteMultipartUploadResult, *Response, error) {
+	if opt == nil {
+		opt = &MultiUploadOptions{}
+	}
+	var localcrc uint64
+	// 1.Get the file chunk
+	totalBytes, chunks, partNum, err := SplitFileIntoChunks(filepath, opt.PartSize*1024*1024)
+	if err != nil {
+		return nil, nil, err
+	}
+	// 校验
+	if s.client.Conf.EnableCRC && !opt.DisableChecksum {
+		fd, err := os.Open(filepath)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer fd.Close()
+		localcrc, err = calCRC64(fd)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	// filesize=0 , use simple upload
+	if partNum == 0 || partNum == 1 {
+		var opt0 *ObjectPutOptions
+		if opt.OptIni != nil {
+			opt0 = &ObjectPutOptions{
+				opt.OptIni.ACLHeaderOptions,
+				opt.OptIni.ObjectPutHeaderOptions,
+				nil,
+			}
+		}
+		rsp, err := s.PutFromFile(ctx, name, filepath, opt0)
+		if err != nil {
+			return nil, rsp, err
+		}
+		result := &CompleteMultipartUploadResult{
+			Location: fmt.Sprintf("%s/%s", s.client.BaseURL.BucketURL, name),
+			Key:      name,
+			ETag:     rsp.Header.Get("ETag"),
+		}
+		if rsp != nil && s.client.Conf.EnableCRC && !opt.DisableChecksum {
+			scoscrc := rsp.Header.Get("x-cos-hash-crc64ecma")
+			icoscrc, _ := strconv.ParseUint(scoscrc, 10, 64)
+			if icoscrc != localcrc {
+				return result, rsp, fmt.Errorf("verification failed, want:%v, return:%v, header:%+v", localcrc, icoscrc, rsp.Header)
+			}
+		}
+		return result, rsp, nil
+	}
+
+	var uploadID string
+	resumableFlag := false
+	if opt.CheckPoint {
+		var err error
+		uploadID, err = s.getResumableUploadID(ctx, name)
+		if err == nil && uploadID != "" {
+			err = s.checkUploadedParts(ctx, name, uploadID, filepath, chunks, partNum)
+			resumableFlag = (err == nil)
+		}
+	}
+
+	// 2.Init
+	optini := opt.OptIni
+	if !resumableFlag {
+		res, _, err := s.InitiateMultipartUpload(ctx, name, optini)
+		if err != nil {
+			return nil, nil, err
+		}
+		uploadID = res.UploadID
+	}
+	var poolSize int
+	if opt.ThreadPoolSize > 0 {
+		poolSize = opt.ThreadPoolSize
+	} else {
+		// Default is one
+		poolSize = 1
+	}
+
+	chjobs := make(chan *Jobs, 100)
+	chresults := make(chan *Results, 10000)
+	optcom := &CompleteMultipartUploadOptions{}
+
+	// 3.Start worker
+	for w := 1; w <= poolSize; w++ {
+		go worker(ctx, s, chjobs, chresults)
+	}
+
+	// progress started event
+	var listener ProgressListener
+	var consumedBytes int64
+	if opt.OptIni != nil {
+		if opt.OptIni.ObjectPutHeaderOptions != nil {
+			listener = opt.OptIni.Listener
+		}
+		optcom.XOptionHeader, _ = deliverInitOptions(opt.OptIni)
+	}
+	event := newProgressEvent(ProgressStartedEvent, 0, 0, totalBytes)
+	progressCallback(listener, event)
+
+	// 4.Push jobs
+	go func() {
+		for _, chunk := range chunks {
+			if chunk.Done {
+				continue
+			}
+			partOpt := &ObjectUploadPartOptions{}
+			if optini != nil && optini.ObjectPutHeaderOptions != nil {
+				partOpt.XCosSSECustomerAglo = optini.XCosSSECustomerAglo
+				partOpt.XCosSSECustomerKey = optini.XCosSSECustomerKey
+				partOpt.XCosSSECustomerKeyMD5 = optini.XCosSSECustomerKeyMD5
+				partOpt.XCosTrafficLimit = optini.XCosTrafficLimit
+				partOpt.XOptionHeader = optini.XOptionHeader
+			}
+			job := &Jobs{
+				Name:       name,
+				RetryTimes: 3,
+				FilePath:   filepath,
+				UploadId:   uploadID,
+				Chunk:      chunk,
+				Opt:        partOpt,
+			}
+			chjobs <- job
+		}
+		close(chjobs)
+	}()
+
+	// 5.Recv the resp etag to complete
+	err = nil
+	for i := 0; i < partNum; i++ {
+		if chunks[i].Done {
+			optcom.Parts = append(optcom.Parts, Object{
+				PartNumber: chunks[i].Number, ETag: chunks[i].ETag},
+			)
+			if err == nil {
+				consumedBytes += chunks[i].Size
+				event = newProgressEvent(ProgressDataEvent, chunks[i].Size, consumedBytes, totalBytes)
+				progressCallback(listener, event)
+			}
+			continue
+		}
+		res := <-chresults
+		// Notice one part fail can not get the etag according.
+		if res.Resp == nil || res.err != nil {
+			// Some part already fail, can not to get the header inside.
+			err = fmt.Errorf("UploadID %s, part %d failed to get resp content. error: %s", uploadID, res.PartNumber, res.err.Error())
+			continue
+		}
+		// Notice one part fail can not get the etag according.
+		etag := res.Resp.Header.Get("ETag")
+		optcom.Parts = append(optcom.Parts, Object{
+			PartNumber: res.PartNumber, ETag: etag},
+		)
+		if err == nil {
+			consumedBytes += chunks[res.PartNumber-1].Size
+			event = newProgressEvent(ProgressDataEvent, chunks[res.PartNumber-1].Size, consumedBytes, totalBytes)
+			progressCallback(listener, event)
+		}
+	}
+	close(chresults)
+	if err != nil {
+		event = newProgressEvent(ProgressFailedEvent, 0, consumedBytes, totalBytes, err)
+		progressCallback(listener, event)
+		return nil, nil, err
+	}
+	sort.Sort(ObjectList(optcom.Parts))
+	if len(opt.OptIni.XOptionHeader.Get("Pic-Operations")) > 0 {
+		optcom.XOptionHeader.Add("Pic-Operations", opt.OptIni.XOptionHeader.Get("Pic-Operations"))
+	}
+
+	event = newProgressEvent(ProgressCompletedEvent, 0, consumedBytes, totalBytes)
+	progressCallback(listener, event)
+
+	v, resp, err := s.CompleteMultipartUpload(context.Background(), name, uploadID, optcom)
+	if err != nil {
+		return v, resp, err
+	}
+
+	if resp != nil && s.client.Conf.EnableCRC && !opt.DisableChecksum {
+		scoscrc := resp.Header.Get("x-cos-hash-crc64ecma")
+		icoscrc, err := strconv.ParseUint(scoscrc, 10, 64)
+		if icoscrc != localcrc {
+			return v, resp, fmt.Errorf("verification failed, want:%v, return:%v, x-cos-hash-crc64ecma: %v, err:%v, header:%+v", localcrc, icoscrc, scoscrc, err, resp.Header)
+		}
+	}
+	return v, resp, err
+}
+
 func SplitSizeIntoChunks(totalBytes int64, partSize int64) ([]Chunk, int, error) {
 	var partNum int64
 	if partSize > 0 {
@@ -1977,4 +2185,205 @@ func (s *ObjectService) GetSymlink(ctx context.Context, name string, opt *Object
 		return "", resp, err
 	}
 	return resp.Header.Get("x-cos-symlink-target"), resp, err
+}
+
+type ObjectPutFromURLOptions struct {
+	PartSize    int
+	QueueSize   int
+	InitOptions *InitiateMultipartUploadOptions
+}
+
+func (s *ObjectService) PutFromURL(ctx context.Context, name string, downloadURL string, opt *ObjectPutFromURLOptions) (*CompleteMultipartUploadResult, *Response, error) {
+	if opt == nil {
+		opt = &ObjectPutFromURLOptions{}
+	}
+	// init
+	v, resp, err := s.InitiateMultipartUpload(ctx, name, opt.InitOptions)
+	if err != nil {
+		return nil, resp, err
+	}
+	uploadId := v.UploadID
+	var isErr bool
+	defer func() {
+		if isErr {
+			s.AbortMultipartUpload(ctx, name, uploadId, nil)
+		}
+	}()
+	// request from url
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+	if err != nil {
+		isErr = true
+		return nil, nil, err
+	}
+	rsp, err := http.DefaultClient.Do(req)
+	if err != nil || rsp == nil {
+		isErr = true
+		return nil, nil, err
+	}
+	defer rsp.Body.Close()
+	if rsp.StatusCode > 299 {
+		isErr = true
+		return nil, &Response{rsp}, fmt.Errorf("the status code of downloadURL response is failed: %d", rsp.StatusCode)
+	}
+	factory := newPartFactory(opt.PartSize, opt.QueueSize)
+	partChannel, errChannel := factory.Produce(rsp.Body)
+	defer factory.Close()
+
+	comOpt := &CompleteMultipartUploadOptions{}
+	var partNumber int
+	for {
+		select {
+		case part, ok := <-partChannel:
+			if !ok {
+				partChannel = nil
+				break
+			}
+			partNumber++
+			resp, err := s.UploadPart(ctx, name, uploadId, partNumber, part, nil)
+			if err != nil {
+				isErr = true
+				return nil, resp, err
+			}
+			comOpt.Parts = append(comOpt.Parts, Object{
+				PartNumber: partNumber,
+				ETag:       resp.Header.Get("ETag"),
+			})
+		case err, ok := <-errChannel:
+			if !ok {
+				errChannel = nil
+				break
+			}
+			if err != nil {
+				isErr = true
+				return nil, nil, fmt.Errorf("url download failed: %v", err)
+			}
+		}
+		if partChannel == nil && errChannel == nil {
+			break
+		}
+	}
+	// 兼容0字节文件，如果没有上传分片，则上传一个空分片
+	if len(comOpt.Parts) == 0 {
+		resp, err := s.UploadPart(ctx, name, uploadId, 1, http.NoBody, nil)
+		if err != nil {
+			isErr = true
+			return nil, resp, err
+		}
+		comOpt.Parts = append(comOpt.Parts, Object{
+			PartNumber: 1,
+			ETag:       resp.Header.Get("ETag"),
+		})
+	}
+	res, resp, err := s.CompleteMultipartUpload(ctx, name, uploadId, comOpt)
+	if err != nil {
+		isErr = true
+	}
+	return res, resp, err
+}
+
+type partFactory struct {
+	partSize      int
+	queueSize     int
+	current       *bytes.Buffer
+	partChannel   chan *bytes.Buffer
+	errChannel    chan error
+	cancelChannel chan struct{}
+}
+
+const CHUNK_SIZE = 1024 * 1024
+
+func newPartFactory(partSize int, queueSize int) *partFactory {
+	if partSize <= 0 {
+		partSize = 8
+	}
+	if queueSize <= 0 {
+		queueSize = 10
+	}
+	return &partFactory{
+		partSize:  partSize * 1024 * 1024,
+		queueSize: queueSize,
+		current:   bytes.NewBuffer(nil),
+	}
+}
+
+func (pf *partFactory) Produce(reader io.ReadCloser) (<-chan *bytes.Buffer, <-chan error) {
+	pf.cancelChannel = make(chan struct{}, 1)
+	pf.partChannel = make(chan *bytes.Buffer, pf.queueSize)
+	pf.errChannel = make(chan error, 1)
+
+	go pf.Run(reader)
+	return pf.partChannel, pf.errChannel
+}
+
+func (pf *partFactory) Close() {
+	pf.cancelChannel <- struct{}{}
+}
+
+func (pf *partFactory) Run(reader io.ReadCloser) {
+	var total, parts int
+	defer func() {
+		close(pf.errChannel)
+		close(pf.partChannel)
+	}()
+	buf := make([]byte, CHUNK_SIZE)
+	for {
+		select {
+		case <-pf.cancelChannel:
+			return
+		default:
+			n, err := reader.Read(buf)
+			total += n
+			if n > 0 {
+				part, e := pf.Write(buf[:n])
+				if e != nil {
+					pf.errChannel <- e
+					return
+				}
+				if part != nil {
+					parts++
+					select {
+					case pf.partChannel <- part:
+					case <-pf.cancelChannel:
+						return
+					}
+				}
+			}
+			if err != nil && err != io.EOF {
+				pf.errChannel <- err
+				return
+			}
+			if err == io.EOF || n == 0 {
+				if pf.current.Len() > 0 {
+					parts++
+					select {
+					case pf.partChannel <- pf.current:
+					case <-pf.cancelChannel:
+						return
+					}
+				}
+				return
+			}
+		}
+	}
+}
+
+func (pf *partFactory) Write(p []byte) (*bytes.Buffer, error) {
+	var res *bytes.Buffer
+	for nwrite := 0; nwrite < len(p); {
+		if pf.current.Len() == pf.partSize {
+			res = pf.current
+			pf.current = bytes.NewBuffer(nil)
+		}
+		end := len(p)
+		// 大于缓存区大小
+		if pf.current.Len()+end-nwrite > pf.partSize {
+			end = nwrite + pf.partSize - pf.current.Len()
+		}
+		nr, err := pf.current.Write(p[nwrite:end])
+		if err != nil {
+			return res, err
+		}
+		nwrite += nr
+	}
+	return res, nil
 }

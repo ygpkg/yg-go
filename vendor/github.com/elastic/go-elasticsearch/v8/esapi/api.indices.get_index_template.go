@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -33,6 +33,11 @@ func newIndicesGetIndexTemplateFunc(t Transport) IndicesGetIndexTemplate {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -41,16 +46,17 @@ func newIndicesGetIndexTemplateFunc(t Transport) IndicesGetIndexTemplate {
 
 // IndicesGetIndexTemplate returns an index template.
 //
-// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/master/indices-templates.html.
+// See full documentation at https://www.elastic.co/guide/en/elasticsearch/reference/master/indices-get-template.html.
 type IndicesGetIndexTemplate func(o ...func(*IndicesGetIndexTemplateRequest)) (*Response, error)
 
 // IndicesGetIndexTemplateRequest configures the Indices Get Index Template API request.
 type IndicesGetIndexTemplateRequest struct {
 	Name string
 
-	FlatSettings  *bool
-	Local         *bool
-	MasterTimeout time.Duration
+	FlatSettings    *bool
+	IncludeDefaults *bool
+	Local           *bool
+	MasterTimeout   time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -60,15 +66,26 @@ type IndicesGetIndexTemplateRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r IndicesGetIndexTemplateRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r IndicesGetIndexTemplateRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "indices.get_index_template")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -79,12 +96,19 @@ func (r IndicesGetIndexTemplateRequest) Do(ctx context.Context, transport Transp
 	if r.Name != "" {
 		path.WriteString("/")
 		path.WriteString(r.Name)
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "name", r.Name)
+		}
 	}
 
 	params = make(map[string]string)
 
 	if r.FlatSettings != nil {
 		params["flat_settings"] = strconv.FormatBool(*r.FlatSettings)
+	}
+
+	if r.IncludeDefaults != nil {
+		params["include_defaults"] = strconv.FormatBool(*r.IncludeDefaults)
 	}
 
 	if r.Local != nil {
@@ -113,6 +137,9 @@ func (r IndicesGetIndexTemplateRequest) Do(ctx context.Context, transport Transp
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -140,8 +167,17 @@ func (r IndicesGetIndexTemplateRequest) Do(ctx context.Context, transport Transp
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "indices.get_index_template")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "indices.get_index_template")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -172,6 +208,13 @@ func (f IndicesGetIndexTemplate) WithName(v string) func(*IndicesGetIndexTemplat
 func (f IndicesGetIndexTemplate) WithFlatSettings(v bool) func(*IndicesGetIndexTemplateRequest) {
 	return func(r *IndicesGetIndexTemplateRequest) {
 		r.FlatSettings = &v
+	}
+}
+
+// WithIncludeDefaults - return all relevant default configurations for the index template (default: false).
+func (f IndicesGetIndexTemplate) WithIncludeDefaults(v bool) func(*IndicesGetIndexTemplateRequest) {
+	return func(r *IndicesGetIndexTemplateRequest) {
+		r.IncludeDefaults = &v
 	}
 }
 

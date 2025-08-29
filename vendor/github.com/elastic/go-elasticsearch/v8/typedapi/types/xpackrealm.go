@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // XpackRealm type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/xpack/usage/types.ts#L399-L408
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/xpack/usage/types.ts#L427-L436
 type XpackRealm struct {
 	Available                 bool         `json:"available"`
 	Cache                     []RealmCache `json:"cache,omitempty"`
@@ -36,6 +43,94 @@ type XpackRealm struct {
 	Name                      []string     `json:"name,omitempty"`
 	Order                     []int64      `json:"order,omitempty"`
 	Size                      []int64      `json:"size,omitempty"`
+}
+
+func (s *XpackRealm) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "available":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Available", err)
+				}
+				s.Available = value
+			case bool:
+				s.Available = v
+			}
+
+		case "cache":
+			if err := dec.Decode(&s.Cache); err != nil {
+				return fmt.Errorf("%s | %w", "Cache", err)
+			}
+
+		case "enabled":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Enabled", err)
+				}
+				s.Enabled = value
+			case bool:
+				s.Enabled = v
+			}
+
+		case "has_authorization_realms":
+			if err := dec.Decode(&s.HasAuthorizationRealms); err != nil {
+				return fmt.Errorf("%s | %w", "HasAuthorizationRealms", err)
+			}
+
+		case "has_default_username_pattern":
+			if err := dec.Decode(&s.HasDefaultUsernamePattern); err != nil {
+				return fmt.Errorf("%s | %w", "HasDefaultUsernamePattern", err)
+			}
+
+		case "has_truststore":
+			if err := dec.Decode(&s.HasTruststore); err != nil {
+				return fmt.Errorf("%s | %w", "HasTruststore", err)
+			}
+
+		case "is_authentication_delegated":
+			if err := dec.Decode(&s.IsAuthenticationDelegated); err != nil {
+				return fmt.Errorf("%s | %w", "IsAuthenticationDelegated", err)
+			}
+
+		case "name":
+			if err := dec.Decode(&s.Name); err != nil {
+				return fmt.Errorf("%s | %w", "Name", err)
+			}
+
+		case "order":
+			if err := dec.Decode(&s.Order); err != nil {
+				return fmt.Errorf("%s | %w", "Order", err)
+			}
+
+		case "size":
+			if err := dec.Decode(&s.Size); err != nil {
+				return fmt.Errorf("%s | %w", "Size", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewXpackRealm returns a XpackRealm.

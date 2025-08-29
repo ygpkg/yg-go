@@ -15,22 +15,73 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+)
+
 // IndexSettingBlocks type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/_types/IndexSettings.ts#L245-L251
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/_types/IndexSettings.ts#L262-L268
 type IndexSettingBlocks struct {
-	Metadata            *bool  `json:"metadata,omitempty"`
-	Read                *bool  `json:"read,omitempty"`
-	ReadOnly            *bool  `json:"read_only,omitempty"`
-	ReadOnlyAllowDelete *bool  `json:"read_only_allow_delete,omitempty"`
-	Write               string `json:"write,omitempty"`
+	Metadata            Stringifiedboolean `json:"metadata,omitempty"`
+	Read                Stringifiedboolean `json:"read,omitempty"`
+	ReadOnly            Stringifiedboolean `json:"read_only,omitempty"`
+	ReadOnlyAllowDelete Stringifiedboolean `json:"read_only_allow_delete,omitempty"`
+	Write               Stringifiedboolean `json:"write,omitempty"`
+}
+
+func (s *IndexSettingBlocks) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "metadata":
+			if err := dec.Decode(&s.Metadata); err != nil {
+				return fmt.Errorf("%s | %w", "Metadata", err)
+			}
+
+		case "read":
+			if err := dec.Decode(&s.Read); err != nil {
+				return fmt.Errorf("%s | %w", "Read", err)
+			}
+
+		case "read_only":
+			if err := dec.Decode(&s.ReadOnly); err != nil {
+				return fmt.Errorf("%s | %w", "ReadOnly", err)
+			}
+
+		case "read_only_allow_delete":
+			if err := dec.Decode(&s.ReadOnlyAllowDelete); err != nil {
+				return fmt.Errorf("%s | %w", "ReadOnlyAllowDelete", err)
+			}
+
+		case "write":
+			if err := dec.Decode(&s.Write); err != nil {
+				return fmt.Errorf("%s | %w", "Write", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewIndexSettingBlocks returns a IndexSettingBlocks.

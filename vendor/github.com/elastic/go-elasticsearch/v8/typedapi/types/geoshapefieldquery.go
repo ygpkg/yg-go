@@ -15,24 +15,66 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/geoshaperelation"
 )
 
 // GeoShapeFieldQuery type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/query_dsl/geo.ts#L78-L82
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/query_dsl/geo.ts#L128-L139
 type GeoShapeFieldQuery struct {
-	IndexedShape *FieldLookup                       `json:"indexed_shape,omitempty"`
-	Relation     *geoshaperelation.GeoShapeRelation `json:"relation,omitempty"`
-	Shape        interface{}                        `json:"shape,omitempty"`
+	// IndexedShape Query using an indexed shape retrieved from the the specified document and
+	// path.
+	IndexedShape *FieldLookup `json:"indexed_shape,omitempty"`
+	// Relation Spatial relation operator used to search a geo field.
+	Relation *geoshaperelation.GeoShapeRelation `json:"relation,omitempty"`
+	Shape    json.RawMessage                    `json:"shape,omitempty"`
+}
+
+func (s *GeoShapeFieldQuery) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "indexed_shape":
+			if err := dec.Decode(&s.IndexedShape); err != nil {
+				return fmt.Errorf("%s | %w", "IndexedShape", err)
+			}
+
+		case "relation":
+			if err := dec.Decode(&s.Relation); err != nil {
+				return fmt.Errorf("%s | %w", "Relation", err)
+			}
+
+		case "shape":
+			if err := dec.Decode(&s.Shape); err != nil {
+				return fmt.Errorf("%s | %w", "Shape", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewGeoShapeFieldQuery returns a GeoShapeFieldQuery.

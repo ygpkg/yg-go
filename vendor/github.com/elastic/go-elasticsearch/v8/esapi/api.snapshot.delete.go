@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -33,6 +34,11 @@ func newSnapshotDeleteFunc(t Transport) SnapshotDelete {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -49,7 +55,8 @@ type SnapshotDeleteRequest struct {
 	Repository string
 	Snapshot   []string
 
-	MasterTimeout time.Duration
+	MasterTimeout     time.Duration
+	WaitForCompletion *bool
 
 	Pretty     bool
 	Human      bool
@@ -59,15 +66,26 @@ type SnapshotDeleteRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r SnapshotDeleteRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r SnapshotDeleteRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "snapshot.delete")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "DELETE"
 
@@ -81,13 +99,23 @@ func (r SnapshotDeleteRequest) Do(ctx context.Context, transport Transport) (*Re
 	path.WriteString("_snapshot")
 	path.WriteString("/")
 	path.WriteString(r.Repository)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "repository", r.Repository)
+	}
 	path.WriteString("/")
 	path.WriteString(strings.Join(r.Snapshot, ","))
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "snapshot", strings.Join(r.Snapshot, ","))
+	}
 
 	params = make(map[string]string)
 
 	if r.MasterTimeout != 0 {
 		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.WaitForCompletion != nil {
+		params["wait_for_completion"] = strconv.FormatBool(*r.WaitForCompletion)
 	}
 
 	if r.Pretty {
@@ -108,6 +136,9 @@ func (r SnapshotDeleteRequest) Do(ctx context.Context, transport Transport) (*Re
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -135,8 +166,17 @@ func (r SnapshotDeleteRequest) Do(ctx context.Context, transport Transport) (*Re
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "snapshot.delete")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "snapshot.delete")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -160,6 +200,13 @@ func (f SnapshotDelete) WithContext(v context.Context) func(*SnapshotDeleteReque
 func (f SnapshotDelete) WithMasterTimeout(v time.Duration) func(*SnapshotDeleteRequest) {
 	return func(r *SnapshotDeleteRequest) {
 		r.MasterTimeout = v
+	}
+}
+
+// WithWaitForCompletion - should this request wait until the operation has completed before returning.
+func (f SnapshotDelete) WithWaitForCompletion(v bool) func(*SnapshotDeleteRequest) {
+	return func(r *SnapshotDeleteRequest) {
+		r.WaitForCompletion = &v
 	}
 }
 

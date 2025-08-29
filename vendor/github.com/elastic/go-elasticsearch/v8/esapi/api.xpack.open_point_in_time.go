@@ -15,13 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,6 +34,11 @@ func newOpenPointInTimeFunc(t Transport) OpenPointInTime {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -48,11 +54,15 @@ type OpenPointInTime func(index []string, keep_alive string, o ...func(*OpenPoin
 type OpenPointInTimeRequest struct {
 	Index []string
 
-	ExpandWildcards   string
-	IgnoreUnavailable *bool
-	KeepAlive         string
-	Preference        string
-	Routing           string
+	Body io.Reader
+
+	AllowPartialSearchResults  *bool
+	ExpandWildcards            string
+	IgnoreUnavailable          *bool
+	KeepAlive                  string
+	MaxConcurrentShardRequests *int
+	Preference                 string
+	Routing                    string
 
 	Pretty     bool
 	Human      bool
@@ -62,15 +72,26 @@ type OpenPointInTimeRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r OpenPointInTimeRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r OpenPointInTimeRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "open_point_in_time")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -82,10 +103,17 @@ func (r OpenPointInTimeRequest) Do(ctx context.Context, transport Transport) (*R
 	path.WriteString("http://")
 	path.WriteString("/")
 	path.WriteString(strings.Join(r.Index, ","))
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "index", strings.Join(r.Index, ","))
+	}
 	path.WriteString("/")
 	path.WriteString("_pit")
 
 	params = make(map[string]string)
+
+	if r.AllowPartialSearchResults != nil {
+		params["allow_partial_search_results"] = strconv.FormatBool(*r.AllowPartialSearchResults)
+	}
 
 	if r.ExpandWildcards != "" {
 		params["expand_wildcards"] = r.ExpandWildcards
@@ -97,6 +125,10 @@ func (r OpenPointInTimeRequest) Do(ctx context.Context, transport Transport) (*R
 
 	if r.KeepAlive != "" {
 		params["keep_alive"] = r.KeepAlive
+	}
+
+	if r.MaxConcurrentShardRequests != nil {
+		params["max_concurrent_shard_requests"] = strconv.FormatInt(int64(*r.MaxConcurrentShardRequests), 10)
 	}
 
 	if r.Preference != "" {
@@ -123,8 +155,11 @@ func (r OpenPointInTimeRequest) Do(ctx context.Context, transport Transport) (*R
 		params["filter_path"] = strings.Join(r.FilterPath, ",")
 	}
 
-	req, err := newRequest(method, path.String(), nil)
+	req, err := newRequest(method, path.String(), r.Body)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -148,12 +183,28 @@ func (r OpenPointInTimeRequest) Do(ctx context.Context, transport Transport) (*R
 		}
 	}
 
+	if r.Body != nil && req.Header.Get(headerContentType) == "" {
+		req.Header[headerContentType] = headerContentTypeJSON
+	}
+
 	if ctx != nil {
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "open_point_in_time")
+		if reader := instrument.RecordRequestBody(ctx, "open_point_in_time", r.Body); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "open_point_in_time")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -170,6 +221,20 @@ func (r OpenPointInTimeRequest) Do(ctx context.Context, transport Transport) (*R
 func (f OpenPointInTime) WithContext(v context.Context) func(*OpenPointInTimeRequest) {
 	return func(r *OpenPointInTimeRequest) {
 		r.ctx = v
+	}
+}
+
+// WithBody - An index_filter specified with the Query DSL.
+func (f OpenPointInTime) WithBody(v io.Reader) func(*OpenPointInTimeRequest) {
+	return func(r *OpenPointInTimeRequest) {
+		r.Body = v
+	}
+}
+
+// WithAllowPartialSearchResults - specify whether to tolerate shards missing when creating the point-in-time, or otherwise throw an exception. (default: false).
+func (f OpenPointInTime) WithAllowPartialSearchResults(v bool) func(*OpenPointInTimeRequest) {
+	return func(r *OpenPointInTimeRequest) {
+		r.AllowPartialSearchResults = &v
 	}
 }
 
@@ -191,6 +256,13 @@ func (f OpenPointInTime) WithIgnoreUnavailable(v bool) func(*OpenPointInTimeRequ
 func (f OpenPointInTime) WithKeepAlive(v string) func(*OpenPointInTimeRequest) {
 	return func(r *OpenPointInTimeRequest) {
 		r.KeepAlive = v
+	}
+}
+
+// WithMaxConcurrentShardRequests - the number of concurrent shard requests per node executed concurrently when opening this point-in-time. this value should be used to limit the impact of opening the point-in-time on the cluster.
+func (f OpenPointInTime) WithMaxConcurrentShardRequests(v int) func(*OpenPointInTimeRequest) {
+	return func(r *OpenPointInTimeRequest) {
+		r.MaxConcurrentShardRequests = &v
 	}
 }
 

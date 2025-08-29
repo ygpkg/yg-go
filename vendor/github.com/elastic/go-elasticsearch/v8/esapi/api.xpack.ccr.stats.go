@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newCCRStatsFunc(t Transport) CCRStats {
@@ -31,6 +32,11 @@ func newCCRStatsFunc(t Transport) CCRStats {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -44,6 +50,9 @@ type CCRStats func(o ...func(*CCRStatsRequest)) (*Response, error)
 
 // CCRStatsRequest configures the CCR Stats API request.
 type CCRStatsRequest struct {
+	MasterTimeout time.Duration
+	Timeout       time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -52,15 +61,26 @@ type CCRStatsRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r CCRStatsRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r CCRStatsRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "ccr.stats")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -69,6 +89,14 @@ func (r CCRStatsRequest) Do(ctx context.Context, transport Transport) (*Response
 	path.WriteString("/_ccr/stats")
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
+
+	if r.Timeout != 0 {
+		params["timeout"] = formatDuration(r.Timeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -88,6 +116,9 @@ func (r CCRStatsRequest) Do(ctx context.Context, transport Transport) (*Response
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -115,8 +146,17 @@ func (r CCRStatsRequest) Do(ctx context.Context, transport Transport) (*Response
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "ccr.stats")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "ccr.stats")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -133,6 +173,20 @@ func (r CCRStatsRequest) Do(ctx context.Context, transport Transport) (*Response
 func (f CCRStats) WithContext(v context.Context) func(*CCRStatsRequest) {
 	return func(r *CCRStatsRequest) {
 		r.ctx = v
+	}
+}
+
+// WithMasterTimeout - explicit operation timeout for connection to master node.
+func (f CCRStats) WithMasterTimeout(v time.Duration) func(*CCRStatsRequest) {
+	return func(r *CCRStatsRequest) {
+		r.MasterTimeout = v
+	}
+}
+
+// WithTimeout - explicit operation timeout.
+func (f CCRStats) WithTimeout(v time.Duration) func(*CCRStatsRequest) {
+	return func(r *CCRStatsRequest) {
+		r.Timeout = v
 	}
 }
 

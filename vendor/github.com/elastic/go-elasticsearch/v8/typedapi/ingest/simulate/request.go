@@ -15,10 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package simulate
 
@@ -31,20 +29,28 @@ import (
 
 // Request holds the request body struct for the package simulate
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ingest/simulate/SimulatePipelineRequest.ts#L25-L41
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ingest/simulate/SimulatePipelineRequest.ts#L25-L72
 type Request struct {
-	Docs     []types.Document      `json:"docs,omitempty"`
+
+	// Docs Sample documents to test in the pipeline.
+	Docs []types.Document `json:"docs"`
+	// Pipeline The pipeline to test.
+	// If you don't specify the `pipeline` request path parameter, this parameter is
+	// required.
+	// If you specify both this and the request path parameter, the API only uses
+	// the request path parameter.
 	Pipeline *types.IngestPipeline `json:"pipeline,omitempty"`
 }
 
 // NewRequest returns a Request
 func NewRequest() *Request {
 	r := &Request{}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 

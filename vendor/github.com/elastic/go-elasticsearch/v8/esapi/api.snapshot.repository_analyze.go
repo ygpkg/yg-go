@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -33,6 +33,11 @@ func newSnapshotRepositoryAnalyzeFunc(t Transport) SnapshotRepositoryAnalyze {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -48,17 +53,18 @@ type SnapshotRepositoryAnalyze func(repository string, o ...func(*SnapshotReposi
 type SnapshotRepositoryAnalyzeRequest struct {
 	Repository string
 
-	BlobCount             *int
-	Concurrency           *int
-	Detailed              *bool
-	EarlyReadNodeCount    *int
-	MaxBlobSize           string
-	MaxTotalDataSize      string
-	RareActionProbability *int
-	RarelyAbortWrites     *bool
-	ReadNodeCount         *int
-	Seed                  *int
-	Timeout               time.Duration
+	BlobCount              *int
+	Concurrency            *int
+	Detailed               *bool
+	EarlyReadNodeCount     *int
+	MaxBlobSize            string
+	MaxTotalDataSize       string
+	RareActionProbability  *int
+	RarelyAbortWrites      *bool
+	ReadNodeCount          *int
+	RegisterOperationCount *int
+	Seed                   *int
+	Timeout                time.Duration
 
 	Pretty     bool
 	Human      bool
@@ -68,15 +74,26 @@ type SnapshotRepositoryAnalyzeRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r SnapshotRepositoryAnalyzeRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r SnapshotRepositoryAnalyzeRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "snapshot.repository_analyze")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -86,6 +103,9 @@ func (r SnapshotRepositoryAnalyzeRequest) Do(ctx context.Context, transport Tran
 	path.WriteString("_snapshot")
 	path.WriteString("/")
 	path.WriteString(r.Repository)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "repository", r.Repository)
+	}
 	path.WriteString("/")
 	path.WriteString("_analyze")
 
@@ -127,6 +147,10 @@ func (r SnapshotRepositoryAnalyzeRequest) Do(ctx context.Context, transport Tran
 		params["read_node_count"] = strconv.FormatInt(int64(*r.ReadNodeCount), 10)
 	}
 
+	if r.RegisterOperationCount != nil {
+		params["register_operation_count"] = strconv.FormatInt(int64(*r.RegisterOperationCount), 10)
+	}
+
 	if r.Seed != nil {
 		params["seed"] = strconv.FormatInt(int64(*r.Seed), 10)
 	}
@@ -153,6 +177,9 @@ func (r SnapshotRepositoryAnalyzeRequest) Do(ctx context.Context, transport Tran
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -180,8 +207,17 @@ func (r SnapshotRepositoryAnalyzeRequest) Do(ctx context.Context, transport Tran
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "snapshot.repository_analyze")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "snapshot.repository_analyze")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -261,6 +297,13 @@ func (f SnapshotRepositoryAnalyze) WithRarelyAbortWrites(v bool) func(*SnapshotR
 func (f SnapshotRepositoryAnalyze) WithReadNodeCount(v int) func(*SnapshotRepositoryAnalyzeRequest) {
 	return func(r *SnapshotRepositoryAnalyzeRequest) {
 		r.ReadNodeCount = &v
+	}
+}
+
+// WithRegisterOperationCount - the minimum number of linearizable register operations to perform in total. defaults to 10..
+func (f SnapshotRepositoryAnalyze) WithRegisterOperationCount(v int) func(*SnapshotRepositoryAnalyzeRequest) {
+	return func(r *SnapshotRepositoryAnalyzeRequest) {
+		r.RegisterOperationCount = &v
 	}
 }
 

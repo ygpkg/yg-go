@@ -15,27 +15,37 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
-
-// Returns the capabilities of any rollup jobs that have been configured for a
+// Get the rollup job capabilities.
+// Get the capabilities of any rollup jobs that have been configured for a
 // specific index or index pattern.
+//
+// This API is useful because a rollup job is often configured to rollup only a
+// subset of fields from the source index.
+// Furthermore, only certain aggregations can be configured for various fields,
+// leading to a limited subset of functionality depending on that configuration.
+// This API enables you to inspect an index and determine:
+//
+// 1. Does this index have associated rollup data somewhere in the cluster?
+// 2. If yes to the first question, what fields were rolled up, what
+// aggregations can be performed, and where does the data live?
 package getrollupcaps
 
 import (
-	gobytes "bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 const (
@@ -52,11 +62,15 @@ type GetRollupCaps struct {
 	values  url.Values
 	path    url.URL
 
-	buf *gobytes.Buffer
+	raw io.Reader
 
 	paramSet int
 
 	id string
+
+	spanStarted bool
+
+	instrument elastictransport.Instrumentation
 }
 
 // NewGetRollupCaps type alias for index.
@@ -72,16 +86,32 @@ func NewGetRollupCapsFunc(tp elastictransport.Interface) NewGetRollupCaps {
 	}
 }
 
-// Returns the capabilities of any rollup jobs that have been configured for a
+// Get the rollup job capabilities.
+// Get the capabilities of any rollup jobs that have been configured for a
 // specific index or index pattern.
 //
-// https://www.elastic.co/guide/en/elasticsearch/reference/master/rollup-get-rollup-caps.html
+// This API is useful because a rollup job is often configured to rollup only a
+// subset of fields from the source index.
+// Furthermore, only certain aggregations can be configured for various fields,
+// leading to a limited subset of functionality depending on that configuration.
+// This API enables you to inspect an index and determine:
+//
+// 1. Does this index have associated rollup data somewhere in the cluster?
+// 2. If yes to the first question, what fields were rolled up, what
+// aggregations can be performed, and where does the data live?
+//
+// https://www.elastic.co/guide/en/elasticsearch/reference/current/rollup-get-rollup-caps.html
 func New(tp elastictransport.Interface) *GetRollupCaps {
 	r := &GetRollupCaps{
 		transport: tp,
 		values:    make(url.Values),
 		headers:   make(http.Header),
-		buf:       gobytes.NewBuffer(nil),
+	}
+
+	if instrumented, ok := r.transport.(elastictransport.Instrumented); ok {
+		if instrument := instrumented.InstrumentationEnabled(); instrument != nil {
+			r.instrument = instrument
+		}
 	}
 
 	return r
@@ -106,6 +136,9 @@ func (r *GetRollupCaps) HttpRequest(ctx context.Context) (*http.Request, error) 
 		path.WriteString("data")
 		path.WriteString("/")
 
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "id", r.id)
+		}
 		path.WriteString(r.id)
 
 		method = http.MethodGet
@@ -114,7 +147,7 @@ func (r *GetRollupCaps) HttpRequest(ctx context.Context) (*http.Request, error) 
 		path.WriteString("_rollup")
 		path.WriteString("/")
 		path.WriteString("data")
-		path.WriteString("/")
+
 		method = http.MethodGet
 	}
 
@@ -126,9 +159,9 @@ func (r *GetRollupCaps) HttpRequest(ctx context.Context) (*http.Request, error) 
 	}
 
 	if ctx != nil {
-		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.buf)
+		req, err = http.NewRequestWithContext(ctx, method, r.path.String(), r.raw)
 	} else {
-		req, err = http.NewRequest(method, r.path.String(), r.buf)
+		req, err = http.NewRequest(method, r.path.String(), r.raw)
 	}
 
 	req.Header = r.headers.Clone()
@@ -144,30 +177,121 @@ func (r *GetRollupCaps) HttpRequest(ctx context.Context) (*http.Request, error) 
 	return req, nil
 }
 
-// Do runs the http.Request through the provided transport.
-func (r GetRollupCaps) Do(ctx context.Context) (*http.Response, error) {
+// Perform runs the http.Request through the provided transport and returns an http.Response.
+func (r GetRollupCaps) Perform(providedCtx context.Context) (*http.Response, error) {
+	var ctx context.Context
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		if r.spanStarted == false {
+			ctx := instrument.Start(providedCtx, "rollup.get_rollup_caps")
+			defer instrument.Close(ctx)
+		}
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
 	req, err := r.HttpRequest(ctx)
 	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.BeforeRequest(req, "rollup.get_rollup_caps")
+		if reader := instrument.RecordRequestBody(ctx, "rollup.get_rollup_caps", r.raw); reader != nil {
+			req.Body = reader
+		}
+	}
 	res, err := r.transport.Perform(req)
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "rollup.get_rollup_caps")
+	}
 	if err != nil {
-		return nil, fmt.Errorf("an error happened during the GetRollupCaps query execution: %w", err)
+		localErr := fmt.Errorf("an error happened during the GetRollupCaps query execution: %w", err)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, localErr)
+		}
+		return nil, localErr
 	}
 
 	return res, nil
 }
 
+// Do runs the request through the transport, handle the response and returns a getrollupcaps.Response
+func (r GetRollupCaps) Do(providedCtx context.Context) (Response, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "rollup.get_rollup_caps")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	response := NewResponse()
+
+	res, err := r.Perform(ctx)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 299 {
+		err = json.NewDecoder(res.Body).Decode(&response)
+		if err != nil {
+			if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+				instrument.RecordError(ctx, err)
+			}
+			return nil, err
+		}
+
+		return response, nil
+	}
+
+	errorResponse := types.NewElasticsearchError()
+	err = json.NewDecoder(res.Body).Decode(errorResponse)
+	if err != nil {
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return nil, err
+	}
+
+	if errorResponse.Status == 0 {
+		errorResponse.Status = res.StatusCode
+	}
+
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		instrument.RecordError(ctx, errorResponse)
+	}
+	return nil, errorResponse
+}
+
 // IsSuccess allows to run a query with a context and retrieve the result as a boolean.
 // This only exists for endpoints without a request payload and allows for quick control flow.
-func (r GetRollupCaps) IsSuccess(ctx context.Context) (bool, error) {
-	res, err := r.Do(ctx)
+func (r GetRollupCaps) IsSuccess(providedCtx context.Context) (bool, error) {
+	var ctx context.Context
+	r.spanStarted = true
+	if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "rollup.get_rollup_caps")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
+
+	res, err := r.Perform(ctx)
 
 	if err != nil {
 		return false, err
 	}
-	io.Copy(ioutil.Discard, res.Body)
+	io.Copy(io.Discard, res.Body)
 	err = res.Body.Close()
 	if err != nil {
 		return false, err
@@ -175,6 +299,14 @@ func (r GetRollupCaps) IsSuccess(ctx context.Context) (bool, error) {
 
 	if res.StatusCode >= 200 && res.StatusCode < 300 {
 		return true, nil
+	}
+
+	if res.StatusCode != 404 {
+		err := fmt.Errorf("an error happened during the GetRollupCaps query execution, status code: %d", res.StatusCode)
+		if instrument, ok := r.instrument.(elastictransport.Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
+		return false, err
 	}
 
 	return false, nil
@@ -187,12 +319,56 @@ func (r *GetRollupCaps) Header(key, value string) *GetRollupCaps {
 	return r
 }
 
-// Id The ID of the index to check rollup capabilities on, or left blank for all
-// jobs
+// Id Index, indices or index-pattern to return rollup capabilities for.
+// `_all` may be used to fetch rollup capabilities from all jobs.
 // API Name: id
-func (r *GetRollupCaps) Id(v string) *GetRollupCaps {
+func (r *GetRollupCaps) Id(id string) *GetRollupCaps {
 	r.paramSet |= idMask
-	r.id = v
+	r.id = id
+
+	return r
+}
+
+// ErrorTrace When set to `true` Elasticsearch will include the full stack trace of errors
+// when they occur.
+// API name: error_trace
+func (r *GetRollupCaps) ErrorTrace(errortrace bool) *GetRollupCaps {
+	r.values.Set("error_trace", strconv.FormatBool(errortrace))
+
+	return r
+}
+
+// FilterPath Comma-separated list of filters in dot notation which reduce the response
+// returned by Elasticsearch.
+// API name: filter_path
+func (r *GetRollupCaps) FilterPath(filterpaths ...string) *GetRollupCaps {
+	tmp := []string{}
+	for _, item := range filterpaths {
+		tmp = append(tmp, fmt.Sprintf("%v", item))
+	}
+	r.values.Set("filter_path", strings.Join(tmp, ","))
+
+	return r
+}
+
+// Human When set to `true` will return statistics in a format suitable for humans.
+// For example `"exists_time": "1h"` for humans and
+// `"eixsts_time_in_millis": 3600000` for computers. When disabled the human
+// readable values will be omitted. This makes sense for responses being
+// consumed
+// only by machines.
+// API name: human
+func (r *GetRollupCaps) Human(human bool) *GetRollupCaps {
+	r.values.Set("human", strconv.FormatBool(human))
+
+	return r
+}
+
+// Pretty If set to `true` the returned JSON will be "pretty-formatted". Only use
+// this option for debugging only.
+// API name: pretty
+func (r *GetRollupCaps) Pretty(pretty bool) *GetRollupCaps {
+	r.values.Set("pretty", strconv.FormatBool(pretty))
 
 	return r
 }

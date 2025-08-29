@@ -15,10 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package updateuserprofiledata
 
@@ -29,28 +27,35 @@ import (
 
 // Request holds the request body struct for the package updateuserprofiledata
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/security/update_user_profile_data/Request.ts#L27-L70
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/security/update_user_profile_data/Request.ts#L27-L98
 type Request struct {
 
 	// Data Non-searchable data that you want to associate with the user profile.
 	// This field supports a nested data structure.
-	Data map[string]interface{} `json:"data,omitempty"`
-	// Labels Searchable data that you want to associate with the user profile. This
-	// field supports a nested data structure.
-	Labels map[string]interface{} `json:"labels,omitempty"`
+	// Within the `data` object, top-level keys cannot begin with an underscore
+	// (`_`) or contain a period (`.`).
+	// The data object is not searchable, but can be retrieved with the get user
+	// profile API.
+	Data map[string]json.RawMessage `json:"data,omitempty"`
+	// Labels Searchable data that you want to associate with the user profile.
+	// This field supports a nested data structure.
+	// Within the labels object, top-level keys cannot begin with an underscore
+	// (`_`) or contain a period (`.`).
+	Labels map[string]json.RawMessage `json:"labels,omitempty"`
 }
 
 // NewRequest returns a Request
 func NewRequest() *Request {
 	r := &Request{
-		Data:   make(map[string]interface{}, 0),
-		Labels: make(map[string]interface{}, 0),
+		Data:   make(map[string]json.RawMessage, 0),
+		Labels: make(map[string]json.RawMessage, 0),
 	}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 

@@ -15,41 +15,52 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package createapikey
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 )
 
 // Request holds the request body struct for the package createapikey
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/security/create_api_key/SecurityCreateApiKeyRequest.ts#L26-L51
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/security/create_api_key/SecurityCreateApiKeyRequest.ts#L26-L86
 type Request struct {
 
-	// Expiration Expiration time for the API key. By default, API keys never expire.
-	Expiration *types.Duration `json:"expiration,omitempty"`
+	// Expiration The expiration time for the API key.
+	// By default, API keys never expire.
+	Expiration types.Duration `json:"expiration,omitempty"`
 	// Metadata Arbitrary metadata that you want to associate with the API key. It supports
-	// nested data structure. Within the metadata object, keys beginning with _ are
-	// reserved for system usage.
-	Metadata map[string]interface{} `json:"metadata,omitempty"`
-	// Name Specifies the name for this API key.
+	// nested data structure. Within the metadata object, keys beginning with `_`
+	// are reserved for system usage.
+	Metadata types.Metadata `json:"metadata,omitempty"`
+	// Name A name for the API key.
 	Name *string `json:"name,omitempty"`
-	// RoleDescriptors An array of role descriptors for this API key. This parameter is optional.
-	// When it is not specified or is an empty array, then the API key will have a
-	// point in time snapshot of permissions of the authenticated user. If you
-	// supply role descriptors then the resultant permissions would be an
-	// intersection of API keys permissions and authenticated user’s permissions
-	// thereby limiting the access scope for API keys. The structure of role
-	// descriptor is the same as the request for create role API. For more details,
-	// see create or update roles API.
+	// RoleDescriptors An array of role descriptors for this API key.
+	// When it is not specified or it is an empty array, the API key will have a
+	// point in time snapshot of permissions of the authenticated user.
+	// If you supply role descriptors, the resultant permissions are an intersection
+	// of API keys permissions and the authenticated user's permissions thereby
+	// limiting the access scope for API keys.
+	// The structure of role descriptor is the same as the request for the create
+	// role API.
+	// For more details, refer to the create or update roles API.
+	//
+	// NOTE: Due to the way in which this permission intersection is calculated, it
+	// is not possible to create an API key that is a child of another API key,
+	// unless the derived key is created without any privileges.
+	// In this case, you must explicitly specify a role descriptor with no
+	// privileges.
+	// The derived API key can be used for authentication; it will not have
+	// authority to call Elasticsearch APIs.
 	RoleDescriptors map[string]types.RoleDescriptor `json:"role_descriptors,omitempty"`
 }
 
@@ -58,11 +69,12 @@ func NewRequest() *Request {
 	r := &Request{
 		RoleDescriptors: make(map[string]types.RoleDescriptor, 0),
 	}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 
@@ -71,4 +83,46 @@ func (rb *Request) FromJSON(data string) (*Request, error) {
 	}
 
 	return &req, nil
+}
+
+func (s *Request) UnmarshalJSON(data []byte) error {
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "expiration":
+			if err := dec.Decode(&s.Expiration); err != nil {
+				return fmt.Errorf("%s | %w", "Expiration", err)
+			}
+
+		case "metadata":
+			if err := dec.Decode(&s.Metadata); err != nil {
+				return fmt.Errorf("%s | %w", "Metadata", err)
+			}
+
+		case "name":
+			if err := dec.Decode(&s.Name); err != nil {
+				return fmt.Errorf("%s | %w", "Name", err)
+			}
+
+		case "role_descriptors":
+			if s.RoleDescriptors == nil {
+				s.RoleDescriptors = make(map[string]types.RoleDescriptor, 0)
+			}
+			if err := dec.Decode(&s.RoleDescriptors); err != nil {
+				return fmt.Errorf("%s | %w", "RoleDescriptors", err)
+			}
+
+		}
+	}
+	return nil
 }

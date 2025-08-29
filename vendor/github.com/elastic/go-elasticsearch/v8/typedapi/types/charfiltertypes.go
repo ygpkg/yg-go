@@ -15,30 +15,40 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 // CharFilterTypes type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/cluster/stats/types.ts#L126-L135
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/cluster/stats/types.ts#L315-L352
 type CharFilterTypes struct {
-	AnalyzerTypes      []FieldTypes `json:"analyzer_types"`
-	BuiltInAnalyzers   []FieldTypes `json:"built_in_analyzers"`
+	// AnalyzerTypes Contains statistics about analyzer types used in selected nodes.
+	AnalyzerTypes []FieldTypes `json:"analyzer_types"`
+	// BuiltInAnalyzers Contains statistics about built-in analyzers used in selected nodes.
+	BuiltInAnalyzers []FieldTypes `json:"built_in_analyzers"`
+	// BuiltInCharFilters Contains statistics about built-in character filters used in selected nodes.
 	BuiltInCharFilters []FieldTypes `json:"built_in_char_filters"`
-	BuiltInFilters     []FieldTypes `json:"built_in_filters"`
-	BuiltInTokenizers  []FieldTypes `json:"built_in_tokenizers"`
-	CharFilterTypes    []FieldTypes `json:"char_filter_types"`
-	FilterTypes        []FieldTypes `json:"filter_types"`
-	TokenizerTypes     []FieldTypes `json:"tokenizer_types"`
+	// BuiltInFilters Contains statistics about built-in token filters used in selected nodes.
+	BuiltInFilters []FieldTypes `json:"built_in_filters"`
+	// BuiltInTokenizers Contains statistics about built-in tokenizers used in selected nodes.
+	BuiltInTokenizers []FieldTypes `json:"built_in_tokenizers"`
+	// CharFilterTypes Contains statistics about character filter types used in selected nodes.
+	CharFilterTypes []FieldTypes `json:"char_filter_types"`
+	// FilterTypes Contains statistics about token filter types used in selected nodes.
+	FilterTypes []FieldTypes `json:"filter_types"`
+	// Synonyms Contains statistics about synonyms types used in selected nodes.
+	Synonyms map[string]SynonymsStats `json:"synonyms"`
+	// TokenizerTypes Contains statistics about tokenizer types used in selected nodes.
+	TokenizerTypes []FieldTypes `json:"tokenizer_types"`
 }
 
 // NewCharFilterTypes returns a CharFilterTypes.
 func NewCharFilterTypes() *CharFilterTypes {
-	r := &CharFilterTypes{}
+	r := &CharFilterTypes{
+		Synonyms: make(map[string]SynonymsStats),
+	}
 
 	return r
 }

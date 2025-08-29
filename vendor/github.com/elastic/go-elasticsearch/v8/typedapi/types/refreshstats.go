@@ -15,23 +15,110 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // RefreshStats type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/Stats.ts#L168-L175
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/Stats.ts#L260-L267
 type RefreshStats struct {
-	ExternalTotal             int64     `json:"external_total"`
-	ExternalTotalTimeInMillis int64     `json:"external_total_time_in_millis"`
-	Listeners                 int64     `json:"listeners"`
-	Total                     int64     `json:"total"`
-	TotalTime                 *Duration `json:"total_time,omitempty"`
-	TotalTimeInMillis         int64     `json:"total_time_in_millis"`
+	ExternalTotal             int64    `json:"external_total"`
+	ExternalTotalTimeInMillis int64    `json:"external_total_time_in_millis"`
+	Listeners                 int64    `json:"listeners"`
+	Total                     int64    `json:"total"`
+	TotalTime                 Duration `json:"total_time,omitempty"`
+	TotalTimeInMillis         int64    `json:"total_time_in_millis"`
+}
+
+func (s *RefreshStats) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "external_total":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "ExternalTotal", err)
+				}
+				s.ExternalTotal = value
+			case float64:
+				f := int64(v)
+				s.ExternalTotal = f
+			}
+
+		case "external_total_time_in_millis":
+			if err := dec.Decode(&s.ExternalTotalTimeInMillis); err != nil {
+				return fmt.Errorf("%s | %w", "ExternalTotalTimeInMillis", err)
+			}
+
+		case "listeners":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Listeners", err)
+				}
+				s.Listeners = value
+			case float64:
+				f := int64(v)
+				s.Listeners = f
+			}
+
+		case "total":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Total", err)
+				}
+				s.Total = value
+			case float64:
+				f := int64(v)
+				s.Total = f
+			}
+
+		case "total_time":
+			if err := dec.Decode(&s.TotalTime); err != nil {
+				return fmt.Errorf("%s | %w", "TotalTime", err)
+			}
+
+		case "total_time_in_millis":
+			if err := dec.Decode(&s.TotalTimeInMillis); err != nil {
+				return fmt.Errorf("%s | %w", "TotalTimeInMillis", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewRefreshStats returns a RefreshStats.

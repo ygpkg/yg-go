@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // BucketKsAggregation type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/pipeline.ts#L79-L112
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/pipeline.ts#L103-L137
 type BucketKsAggregation struct {
 	// Alternative A list of string values indicating which K-S test alternative to calculate.
 	// The valid values
@@ -34,7 +41,7 @@ type BucketKsAggregation struct {
 	// hypotheses.
 	Alternative []string `json:"alternative,omitempty"`
 	// BucketsPath Path to the buckets that contain one set of values to correlate.
-	BucketsPath *BucketsPath `json:"buckets_path,omitempty"`
+	BucketsPath BucketsPath `json:"buckets_path,omitempty"`
 	// Fractions A list of doubles indicating the distribution of the samples with which to
 	// compare to the `buckets_path` results.
 	// In typical usage this is the overall proportion of documents in each bucket,
@@ -44,9 +51,7 @@ type BucketKsAggregation struct {
 	// documents are uniformly distributed on these buckets, which they would be if
 	// one used equal percentiles of a
 	// metric to define the bucket end points.
-	Fractions []float64              `json:"fractions,omitempty"`
-	Meta      map[string]interface{} `json:"meta,omitempty"`
-	Name      *string                `json:"name,omitempty"`
+	Fractions []Float64 `json:"fractions,omitempty"`
 	// SamplingMethod Indicates the sampling methodology when calculating the K-S test. Note, this
 	// is sampling of the returned values.
 	// This determines the cumulative distribution function (CDF) points used
@@ -55,6 +60,53 @@ type BucketKsAggregation struct {
 	// are: `upper_tail`, `uniform`,
 	// and `lower_tail`.
 	SamplingMethod *string `json:"sampling_method,omitempty"`
+}
+
+func (s *BucketKsAggregation) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "alternative":
+			if err := dec.Decode(&s.Alternative); err != nil {
+				return fmt.Errorf("%s | %w", "Alternative", err)
+			}
+
+		case "buckets_path":
+			if err := dec.Decode(&s.BucketsPath); err != nil {
+				return fmt.Errorf("%s | %w", "BucketsPath", err)
+			}
+
+		case "fractions":
+			if err := dec.Decode(&s.Fractions); err != nil {
+				return fmt.Errorf("%s | %w", "Fractions", err)
+			}
+
+		case "sampling_method":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "SamplingMethod", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.SamplingMethod = &o
+
+		}
+	}
+	return nil
 }
 
 // NewBucketKsAggregation returns a BucketKsAggregation.

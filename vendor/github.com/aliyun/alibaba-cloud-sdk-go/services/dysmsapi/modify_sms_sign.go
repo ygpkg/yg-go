@@ -76,6 +76,7 @@ type ModifySmsSignRequest struct {
 	SignName             string                       `position:"Query" name:"SignName"`
 	SignFileList         *[]ModifySmsSignSignFileList `position:"Body" name:"SignFileList"  type:"Repeated"`
 	ResourceOwnerAccount string                       `position:"Query" name:"ResourceOwnerAccount"`
+	SignType             requests.Integer             `position:"Query" name:"SignType"`
 	OwnerId              requests.Integer             `position:"Query" name:"OwnerId"`
 	SignSource           requests.Integer             `position:"Query" name:"SignSource"`
 }
@@ -89,10 +90,10 @@ type ModifySmsSignSignFileList struct {
 // ModifySmsSignResponse is the response struct for api ModifySmsSign
 type ModifySmsSignResponse struct {
 	*responses.BaseResponse
-	RequestId string `json:"RequestId" xml:"RequestId"`
-	SignName  string `json:"SignName" xml:"SignName"`
 	Code      string `json:"Code" xml:"Code"`
 	Message   string `json:"Message" xml:"Message"`
+	RequestId string `json:"RequestId" xml:"RequestId"`
+	SignName  string `json:"SignName" xml:"SignName"`
 }
 
 // CreateModifySmsSignRequest creates a request to invoke ModifySmsSign API
@@ -100,7 +101,7 @@ func CreateModifySmsSignRequest() (request *ModifySmsSignRequest) {
 	request = &ModifySmsSignRequest{
 		RpcRequest: &requests.RpcRequest{},
 	}
-	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "ModifySmsSign", "", "")
+	request.InitWithApiInfo("Dysmsapi", "2017-05-25", "ModifySmsSign", "dysms", "openAPI")
 	request.Method = requests.POST
 	return
 }

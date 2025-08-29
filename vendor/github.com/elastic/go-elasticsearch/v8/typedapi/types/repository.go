@@ -15,25 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
-// Repository type.
+// Repository holds the union for the following types:
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/snapshot/_types/SnapshotRepository.ts#L23-L27
-type Repository struct {
-	Settings RepositorySettings `json:"settings"`
-	Type     string             `json:"type"`
-	Uuid     *string            `json:"uuid,omitempty"`
-}
-
-// NewRepository returns a Repository.
-func NewRepository() *Repository {
-	r := &Repository{}
-
-	return r
-}
+//	AzureRepository
+//	GcsRepository
+//	S3Repository
+//	SharedFileSystemRepository
+//	ReadOnlyUrlRepository
+//	SourceOnlyRepository
+//
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/snapshot/_types/SnapshotRepository.ts#L24-L34
+type Repository any

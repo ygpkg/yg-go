@@ -15,25 +15,61 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+)
+
 // TimeSync type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/transform/_types/Transform.ts#L175-L187
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/transform/_types/Transform.ts#L177-L189
 type TimeSync struct {
 	// Delay The time delay between the current time and the latest input data time.
-	Delay *Duration `json:"delay,omitempty"`
+	Delay Duration `json:"delay,omitempty"`
 	// Field The date field that is used to identify new documents in the source. In
 	// general, it’s a good idea to use a field
 	// that contains the ingest timestamp. If you use a different field, you might
 	// need to set the delay such that it
 	// accounts for data transmission delays.
 	Field string `json:"field"`
+}
+
+func (s *TimeSync) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "delay":
+			if err := dec.Decode(&s.Delay); err != nil {
+				return fmt.Errorf("%s | %w", "Delay", err)
+			}
+
+		case "field":
+			if err := dec.Decode(&s.Field); err != nil {
+				return fmt.Errorf("%s | %w", "Field", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewTimeSync returns a TimeSync.

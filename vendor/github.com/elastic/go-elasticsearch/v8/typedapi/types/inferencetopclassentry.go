@@ -15,20 +15,84 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // InferenceTopClassEntry type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/Aggregate.ts#L663-L667
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/Aggregate.ts#L774-L778
 type InferenceTopClassEntry struct {
 	ClassName        FieldValue `json:"class_name"`
-	ClassProbability float64    `json:"class_probability"`
-	ClassScore       float64    `json:"class_score"`
+	ClassProbability Float64    `json:"class_probability"`
+	ClassScore       Float64    `json:"class_score"`
+}
+
+func (s *InferenceTopClassEntry) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "class_name":
+			if err := dec.Decode(&s.ClassName); err != nil {
+				return fmt.Errorf("%s | %w", "ClassName", err)
+			}
+
+		case "class_probability":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "ClassProbability", err)
+				}
+				f := Float64(value)
+				s.ClassProbability = f
+			case float64:
+				f := Float64(v)
+				s.ClassProbability = f
+			}
+
+		case "class_score":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseFloat(v, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "ClassScore", err)
+				}
+				f := Float64(value)
+				s.ClassScore = f
+			case float64:
+				f := Float64(v)
+				s.ClassScore = f
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewInferenceTopClassEntry returns a InferenceTopClassEntry.

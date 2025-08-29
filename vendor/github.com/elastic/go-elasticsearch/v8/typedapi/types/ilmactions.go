@@ -15,14 +15,46 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
-// IlmActions type alias.
+// IlmActions type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ilm/_types/Phase.ts#L45-L45
-type IlmActions interface{}
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ilm/_types/Phase.ts#L39-L93
+type IlmActions struct {
+	// Allocate Phases allowed: warm, cold.
+	Allocate *AllocateAction `json:"allocate,omitempty"`
+	// Delete Phases allowed: delete.
+	Delete *DeleteAction `json:"delete,omitempty"`
+	// Downsample Phases allowed: hot, warm, cold.
+	Downsample *DownsampleAction `json:"downsample,omitempty"`
+	// Forcemerge Phases allowed: hot, warm.
+	Forcemerge *ForceMergeAction `json:"forcemerge,omitempty"`
+	// Freeze The freeze action is a noop in 8.x
+	Freeze *EmptyObject `json:"freeze,omitempty"`
+	// Migrate Phases allowed: warm, cold.
+	Migrate *MigrateAction `json:"migrate,omitempty"`
+	// Readonly Phases allowed: hot, warm, cold.
+	Readonly *EmptyObject `json:"readonly,omitempty"`
+	// Rollover Phases allowed: hot.
+	Rollover *RolloverAction `json:"rollover,omitempty"`
+	// SearchableSnapshot Phases allowed: hot, cold, frozen.
+	SearchableSnapshot *SearchableSnapshotAction `json:"searchable_snapshot,omitempty"`
+	// SetPriority Phases allowed: hot, warm, cold.
+	SetPriority *SetPriorityAction `json:"set_priority,omitempty"`
+	// Shrink Phases allowed: hot, warm.
+	Shrink *ShrinkAction `json:"shrink,omitempty"`
+	// Unfollow Phases allowed: hot, warm, cold, frozen.
+	Unfollow *EmptyObject `json:"unfollow,omitempty"`
+	// WaitForSnapshot Phases allowed: delete.
+	WaitForSnapshot *WaitForSnapshotAction `json:"wait_for_snapshot,omitempty"`
+}
+
+// NewIlmActions returns a IlmActions.
+func NewIlmActions() *IlmActions {
+	r := &IlmActions{}
+
+	return r
+}

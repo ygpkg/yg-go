@@ -15,23 +15,31 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/deploymentassignmentstate"
 )
 
 // TrainedModelAssignment type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/_types/TrainedModel.ts#L379-L393
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/_types/TrainedModel.ts#L472-L489
 type TrainedModelAssignment struct {
+	AdaptiveAllocations *AdaptiveAllocationsSettings `json:"adaptive_allocations,omitempty"`
 	// AssignmentState The overall assignment state.
-	AssignmentState deploymentassignmentstate.DeploymentAssignmentState `json:"assignment_state"`
+	AssignmentState        deploymentassignmentstate.DeploymentAssignmentState `json:"assignment_state"`
+	MaxAssignedAllocations *int                                                `json:"max_assigned_allocations,omitempty"`
+	Reason                 *string                                             `json:"reason,omitempty"`
 	// RoutingTable The allocation state for each node.
 	RoutingTable map[string]TrainedModelAssignmentRoutingTable `json:"routing_table"`
 	// StartTime The timestamp when the deployment started.
@@ -39,10 +47,86 @@ type TrainedModelAssignment struct {
 	TaskParameters TrainedModelAssignmentTaskParameters `json:"task_parameters"`
 }
 
+func (s *TrainedModelAssignment) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "adaptive_allocations":
+			if err := dec.Decode(&s.AdaptiveAllocations); err != nil {
+				return fmt.Errorf("%s | %w", "AdaptiveAllocations", err)
+			}
+
+		case "assignment_state":
+			if err := dec.Decode(&s.AssignmentState); err != nil {
+				return fmt.Errorf("%s | %w", "AssignmentState", err)
+			}
+
+		case "max_assigned_allocations":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MaxAssignedAllocations", err)
+				}
+				s.MaxAssignedAllocations = &value
+			case float64:
+				f := int(v)
+				s.MaxAssignedAllocations = &f
+			}
+
+		case "reason":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Reason", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Reason = &o
+
+		case "routing_table":
+			if s.RoutingTable == nil {
+				s.RoutingTable = make(map[string]TrainedModelAssignmentRoutingTable, 0)
+			}
+			if err := dec.Decode(&s.RoutingTable); err != nil {
+				return fmt.Errorf("%s | %w", "RoutingTable", err)
+			}
+
+		case "start_time":
+			if err := dec.Decode(&s.StartTime); err != nil {
+				return fmt.Errorf("%s | %w", "StartTime", err)
+			}
+
+		case "task_parameters":
+			if err := dec.Decode(&s.TaskParameters); err != nil {
+				return fmt.Errorf("%s | %w", "TaskParameters", err)
+			}
+
+		}
+	}
+	return nil
+}
+
 // NewTrainedModelAssignment returns a TrainedModelAssignment.
 func NewTrainedModelAssignment() *TrainedModelAssignment {
 	r := &TrainedModelAssignment{
-		RoutingTable: make(map[string]TrainedModelAssignmentRoutingTable, 0),
+		RoutingTable: make(map[string]TrainedModelAssignmentRoutingTable),
 	}
 
 	return r

@@ -15,16 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // RecoveryOrigin type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/indices/recovery/types.ts#L76-L89
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/indices/recovery/types.ts#L76-L89
 type RecoveryOrigin struct {
 	BootstrapNewHistoryUuid *bool   `json:"bootstrap_new_history_uuid,omitempty"`
 	Host                    *string `json:"host,omitempty"`
@@ -38,6 +45,102 @@ type RecoveryOrigin struct {
 	Snapshot                *string `json:"snapshot,omitempty"`
 	TransportAddress        *string `json:"transport_address,omitempty"`
 	Version                 *string `json:"version,omitempty"`
+}
+
+func (s *RecoveryOrigin) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "bootstrap_new_history_uuid":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "BootstrapNewHistoryUuid", err)
+				}
+				s.BootstrapNewHistoryUuid = &value
+			case bool:
+				s.BootstrapNewHistoryUuid = &v
+			}
+
+		case "host":
+			if err := dec.Decode(&s.Host); err != nil {
+				return fmt.Errorf("%s | %w", "Host", err)
+			}
+
+		case "hostname":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "Hostname", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.Hostname = &o
+
+		case "id":
+			if err := dec.Decode(&s.Id); err != nil {
+				return fmt.Errorf("%s | %w", "Id", err)
+			}
+
+		case "index":
+			if err := dec.Decode(&s.Index); err != nil {
+				return fmt.Errorf("%s | %w", "Index", err)
+			}
+
+		case "ip":
+			if err := dec.Decode(&s.Ip); err != nil {
+				return fmt.Errorf("%s | %w", "Ip", err)
+			}
+
+		case "name":
+			if err := dec.Decode(&s.Name); err != nil {
+				return fmt.Errorf("%s | %w", "Name", err)
+			}
+
+		case "repository":
+			if err := dec.Decode(&s.Repository); err != nil {
+				return fmt.Errorf("%s | %w", "Repository", err)
+			}
+
+		case "restoreUUID":
+			if err := dec.Decode(&s.RestoreUUID); err != nil {
+				return fmt.Errorf("%s | %w", "RestoreUUID", err)
+			}
+
+		case "snapshot":
+			if err := dec.Decode(&s.Snapshot); err != nil {
+				return fmt.Errorf("%s | %w", "Snapshot", err)
+			}
+
+		case "transport_address":
+			if err := dec.Decode(&s.TransportAddress); err != nil {
+				return fmt.Errorf("%s | %w", "TransportAddress", err)
+			}
+
+		case "version":
+			if err := dec.Decode(&s.Version); err != nil {
+				return fmt.Errorf("%s | %w", "Version", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewRecoveryOrigin returns a RecoveryOrigin.

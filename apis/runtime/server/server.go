@@ -139,7 +139,7 @@ func (svr *Router) router() {
 	svr.eng.Use(middleware.CustomerHeader())
 	svr.eng.Use(middleware.Logger(".Ping", "metrics"))
 	if svr.deployMode != "" {
-		svr.eng.Use(middleware.LicenseCheck())
+		svr.eng.Use(middleware.LicenseCheckV2)
 	}
 	svr.eng.Use(middleware.Recovery())
 	svr.eng.Use(middleware.LoginStatus())

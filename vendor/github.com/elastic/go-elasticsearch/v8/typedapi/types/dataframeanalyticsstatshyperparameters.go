@@ -15,23 +15,91 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // DataframeAnalyticsStatsHyperparameters type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/ml/_types/DataframeAnalytics.ts#L380-L387
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/ml/_types/DataframeAnalytics.ts#L384-L403
 type DataframeAnalyticsStatsHyperparameters struct {
+	// Hyperparameters An object containing the parameters of the classification analysis job.
 	Hyperparameters Hyperparameters `json:"hyperparameters"`
 	// Iteration The number of iterations on the analysis.
-	Iteration      int            `json:"iteration"`
-	Timestamp      int64          `json:"timestamp"`
-	TimingStats    TimingStats    `json:"timing_stats"`
+	Iteration int `json:"iteration"`
+	// Timestamp The timestamp when the statistics were reported in milliseconds since the
+	// epoch.
+	Timestamp int64 `json:"timestamp"`
+	// TimingStats An object containing time statistics about the data frame analytics job.
+	TimingStats TimingStats `json:"timing_stats"`
+	// ValidationLoss An object containing information about validation loss.
 	ValidationLoss ValidationLoss `json:"validation_loss"`
+}
+
+func (s *DataframeAnalyticsStatsHyperparameters) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "hyperparameters":
+			if err := dec.Decode(&s.Hyperparameters); err != nil {
+				return fmt.Errorf("%s | %w", "Hyperparameters", err)
+			}
+
+		case "iteration":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Iteration", err)
+				}
+				s.Iteration = value
+			case float64:
+				f := int(v)
+				s.Iteration = f
+			}
+
+		case "timestamp":
+			if err := dec.Decode(&s.Timestamp); err != nil {
+				return fmt.Errorf("%s | %w", "Timestamp", err)
+			}
+
+		case "timing_stats":
+			if err := dec.Decode(&s.TimingStats); err != nil {
+				return fmt.Errorf("%s | %w", "TimingStats", err)
+			}
+
+		case "validation_loss":
+			if err := dec.Decode(&s.ValidationLoss); err != nil {
+				return fmt.Errorf("%s | %w", "ValidationLoss", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewDataframeAnalyticsStatsHyperparameters returns a DataframeAnalyticsStatsHyperparameters.

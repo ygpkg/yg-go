@@ -15,17 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 // Package normalizemethod
 package normalizemethod
 
 import "strings"
 
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/aggregations/pipeline.ts#L266-L274
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/aggregations/pipeline.ts#L361-L387
 type NormalizeMethod struct {
 	Name string
 }
@@ -39,7 +37,7 @@ var (
 
 	Mean = NormalizeMethod{"mean"}
 
-	ZScore = NormalizeMethod{"z-score"}
+	Zscore = NormalizeMethod{"z-score"}
 
 	Softmax = NormalizeMethod{"softmax"}
 )
@@ -49,7 +47,7 @@ func (n NormalizeMethod) MarshalText() (text []byte, err error) {
 }
 
 func (n *NormalizeMethod) UnmarshalText(text []byte) error {
-	switch strings.ToLower(string(text)) {
+	switch strings.ReplaceAll(strings.ToLower(string(text)), "\"", "") {
 
 	case "rescale_0_1":
 		*n = Rescale01
@@ -60,7 +58,7 @@ func (n *NormalizeMethod) UnmarshalText(text []byte) error {
 	case "mean":
 		*n = Mean
 	case "z-score":
-		*n = ZScore
+		*n = Zscore
 	case "softmax":
 		*n = Softmax
 	default:

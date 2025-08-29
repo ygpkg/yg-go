@@ -15,10 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package explore
 
@@ -31,22 +29,31 @@ import (
 
 // Request holds the request body struct for the package explore
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/graph/explore/GraphExploreRequest.ts#L28-L47
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/graph/explore/GraphExploreRequest.ts#L28-L84
 type Request struct {
-	Connections *types.Hop               `json:"connections,omitempty"`
-	Controls    *types.ExploreControls   `json:"controls,omitempty"`
-	Query       *types.Query             `json:"query,omitempty"`
-	Vertices    []types.VertexDefinition `json:"vertices,omitempty"`
+
+	// Connections Specifies or more fields from which you want to extract terms that are
+	// associated with the specified vertices.
+	Connections *types.Hop `json:"connections,omitempty"`
+	// Controls Direct the Graph API how to build the graph.
+	Controls *types.ExploreControls `json:"controls,omitempty"`
+	// Query A seed query that identifies the documents of interest. Can be any valid
+	// Elasticsearch query.
+	Query *types.Query `json:"query,omitempty"`
+	// Vertices Specifies one or more fields that contain the terms you want to include in
+	// the graph as vertices.
+	Vertices []types.VertexDefinition `json:"vertices,omitempty"`
 }
 
 // NewRequest returns a Request
 func NewRequest() *Request {
 	r := &Request{}
+
 	return r
 }
 
 // FromJSON allows to load an arbitrary json into the request structure
-func (rb *Request) FromJSON(data string) (*Request, error) {
+func (r *Request) FromJSON(data string) (*Request, error) {
 	var req Request
 	err := json.Unmarshal([]byte(data), &req)
 

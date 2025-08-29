@@ -15,34 +15,133 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
 import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types/enums/tokenchar"
 )
 
 // NGramTokenizer type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/analysis/tokenizers.ts#L38-L44
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/analysis/tokenizers.ts#L85-L95
 type NGramTokenizer struct {
 	CustomTokenChars *string               `json:"custom_token_chars,omitempty"`
-	MaxGram          int                   `json:"max_gram"`
-	MinGram          int                   `json:"min_gram"`
-	TokenChars       []tokenchar.TokenChar `json:"token_chars"`
+	MaxGram          *int                  `json:"max_gram,omitempty"`
+	MinGram          *int                  `json:"min_gram,omitempty"`
+	TokenChars       []tokenchar.TokenChar `json:"token_chars,omitempty"`
 	Type             string                `json:"type,omitempty"`
 	Version          *string               `json:"version,omitempty"`
+}
+
+func (s *NGramTokenizer) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "custom_token_chars":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "CustomTokenChars", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.CustomTokenChars = &o
+
+		case "max_gram":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MaxGram", err)
+				}
+				s.MaxGram = &value
+			case float64:
+				f := int(v)
+				s.MaxGram = &f
+			}
+
+		case "min_gram":
+
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "MinGram", err)
+				}
+				s.MinGram = &value
+			case float64:
+				f := int(v)
+				s.MinGram = &f
+			}
+
+		case "token_chars":
+			if err := dec.Decode(&s.TokenChars); err != nil {
+				return fmt.Errorf("%s | %w", "TokenChars", err)
+			}
+
+		case "type":
+			if err := dec.Decode(&s.Type); err != nil {
+				return fmt.Errorf("%s | %w", "Type", err)
+			}
+
+		case "version":
+			if err := dec.Decode(&s.Version); err != nil {
+				return fmt.Errorf("%s | %w", "Version", err)
+			}
+
+		}
+	}
+	return nil
+}
+
+// MarshalJSON override marshalling to include literal value
+func (s NGramTokenizer) MarshalJSON() ([]byte, error) {
+	type innerNGramTokenizer NGramTokenizer
+	tmp := innerNGramTokenizer{
+		CustomTokenChars: s.CustomTokenChars,
+		MaxGram:          s.MaxGram,
+		MinGram:          s.MinGram,
+		TokenChars:       s.TokenChars,
+		Type:             s.Type,
+		Version:          s.Version,
+	}
+
+	tmp.Type = "ngram"
+
+	return json.Marshal(tmp)
 }
 
 // NewNGramTokenizer returns a NGramTokenizer.
 func NewNGramTokenizer() *NGramTokenizer {
 	r := &NGramTokenizer{}
-
-	r.Type = "ngram"
 
 	return r
 }

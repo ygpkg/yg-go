@@ -15,30 +15,97 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // HitsEvent type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/eql/_types/EqlHits.ts#L41-L49
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/eql/_types/EqlHits.ts#L41-L54
 type HitsEvent struct {
-	Fields map[string][]interface{} `json:"fields,omitempty"`
+	Fields map[string][]json.RawMessage `json:"fields,omitempty"`
 	// Id_ Unique identifier for the event. This ID is only unique within the index.
 	Id_ string `json:"_id"`
 	// Index_ Name of the index containing the event.
 	Index_ string `json:"_index"`
+	// Missing Set to `true` for events in a timespan-constrained sequence that do not meet
+	// a given condition.
+	Missing *bool `json:"missing,omitempty"`
 	// Source_ Original JSON body passed for the event at index time.
-	Source_ interface{} `json:"_source,omitempty"`
+	Source_ json.RawMessage `json:"_source,omitempty"`
+}
+
+func (s *HitsEvent) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "fields":
+			if s.Fields == nil {
+				s.Fields = make(map[string][]json.RawMessage, 0)
+			}
+			if err := dec.Decode(&s.Fields); err != nil {
+				return fmt.Errorf("%s | %w", "Fields", err)
+			}
+
+		case "_id":
+			if err := dec.Decode(&s.Id_); err != nil {
+				return fmt.Errorf("%s | %w", "Id_", err)
+			}
+
+		case "_index":
+			if err := dec.Decode(&s.Index_); err != nil {
+				return fmt.Errorf("%s | %w", "Index_", err)
+			}
+
+		case "missing":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseBool(v)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "Missing", err)
+				}
+				s.Missing = &value
+			case bool:
+				s.Missing = &v
+			}
+
+		case "_source":
+			if err := dec.Decode(&s.Source_); err != nil {
+				return fmt.Errorf("%s | %w", "Source_", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewHitsEvent returns a HitsEvent.
 func NewHitsEvent() *HitsEvent {
 	r := &HitsEvent{
-		Fields: make(map[string][]interface{}, 0),
+		Fields: make(map[string][]json.RawMessage),
 	}
 
 	return r

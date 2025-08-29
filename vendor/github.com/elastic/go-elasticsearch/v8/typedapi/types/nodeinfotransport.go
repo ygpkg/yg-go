@@ -15,26 +15,78 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // NodeInfoTransport type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/nodes/info/types.ts#L342-L346
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/nodes/info/types.ts#L362-L366
 type NodeInfoTransport struct {
 	BoundAddress   []string          `json:"bound_address"`
 	Profiles       map[string]string `json:"profiles"`
 	PublishAddress string            `json:"publish_address"`
 }
 
+func (s *NodeInfoTransport) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "bound_address":
+			if err := dec.Decode(&s.BoundAddress); err != nil {
+				return fmt.Errorf("%s | %w", "BoundAddress", err)
+			}
+
+		case "profiles":
+			if s.Profiles == nil {
+				s.Profiles = make(map[string]string, 0)
+			}
+			if err := dec.Decode(&s.Profiles); err != nil {
+				return fmt.Errorf("%s | %w", "Profiles", err)
+			}
+
+		case "publish_address":
+			var tmp json.RawMessage
+			if err := dec.Decode(&tmp); err != nil {
+				return fmt.Errorf("%s | %w", "PublishAddress", err)
+			}
+			o := string(tmp[:])
+			o, err = strconv.Unquote(o)
+			if err != nil {
+				o = string(tmp[:])
+			}
+			s.PublishAddress = o
+
+		}
+	}
+	return nil
+}
+
 // NewNodeInfoTransport returns a NodeInfoTransport.
 func NewNodeInfoTransport() *NodeInfoTransport {
 	r := &NodeInfoTransport{
-		Profiles: make(map[string]string, 0),
+		Profiles: make(map[string]string),
 	}
 
 	return r

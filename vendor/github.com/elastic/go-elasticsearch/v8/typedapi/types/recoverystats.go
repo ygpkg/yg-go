@@ -15,21 +15,88 @@
 // specific language governing permissions and limitations
 // under the License.
 
-
 // Code generated from the elasticsearch-specification DO NOT EDIT.
-// https://github.com/elastic/elasticsearch-specification/tree/7f49eec1f23a5ae155001c058b3196d85981d5c2
-
+// https://github.com/elastic/elasticsearch-specification/tree/470b4b9aaaa25cae633ec690e54b725c6fc939c7
 
 package types
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"strconv"
+)
+
 // RecoveryStats type.
 //
-// https://github.com/elastic/elasticsearch-specification/blob/7f49eec1f23a5ae155001c058b3196d85981d5c2/specification/_types/Stats.ts#L161-L166
+// https://github.com/elastic/elasticsearch-specification/blob/470b4b9aaaa25cae633ec690e54b725c6fc939c7/specification/_types/Stats.ts#L253-L258
 type RecoveryStats struct {
-	CurrentAsSource      int64     `json:"current_as_source"`
-	CurrentAsTarget      int64     `json:"current_as_target"`
-	ThrottleTime         *Duration `json:"throttle_time,omitempty"`
-	ThrottleTimeInMillis int64     `json:"throttle_time_in_millis"`
+	CurrentAsSource      int64    `json:"current_as_source"`
+	CurrentAsTarget      int64    `json:"current_as_target"`
+	ThrottleTime         Duration `json:"throttle_time,omitempty"`
+	ThrottleTimeInMillis int64    `json:"throttle_time_in_millis"`
+}
+
+func (s *RecoveryStats) UnmarshalJSON(data []byte) error {
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	for {
+		t, err := dec.Token()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+
+		switch t {
+
+		case "current_as_source":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "CurrentAsSource", err)
+				}
+				s.CurrentAsSource = value
+			case float64:
+				f := int64(v)
+				s.CurrentAsSource = f
+			}
+
+		case "current_as_target":
+			var tmp any
+			dec.Decode(&tmp)
+			switch v := tmp.(type) {
+			case string:
+				value, err := strconv.ParseInt(v, 10, 64)
+				if err != nil {
+					return fmt.Errorf("%s | %w", "CurrentAsTarget", err)
+				}
+				s.CurrentAsTarget = value
+			case float64:
+				f := int64(v)
+				s.CurrentAsTarget = f
+			}
+
+		case "throttle_time":
+			if err := dec.Decode(&s.ThrottleTime); err != nil {
+				return fmt.Errorf("%s | %w", "ThrottleTime", err)
+			}
+
+		case "throttle_time_in_millis":
+			if err := dec.Decode(&s.ThrottleTimeInMillis); err != nil {
+				return fmt.Errorf("%s | %w", "ThrottleTimeInMillis", err)
+			}
+
+		}
+	}
+	return nil
 }
 
 // NewRecoveryStats returns a RecoveryStats.

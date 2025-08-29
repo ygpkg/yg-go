@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -23,6 +23,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func newShutdownGetNodeFunc(t Transport) ShutdownGetNode {
@@ -31,6 +32,11 @@ func newShutdownGetNodeFunc(t Transport) ShutdownGetNode {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -46,6 +52,8 @@ type ShutdownGetNode func(o ...func(*ShutdownGetNodeRequest)) (*Response, error)
 type ShutdownGetNodeRequest struct {
 	NodeID string
 
+	MasterTimeout time.Duration
+
 	Pretty     bool
 	Human      bool
 	ErrorTrace bool
@@ -54,15 +62,26 @@ type ShutdownGetNodeRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r ShutdownGetNodeRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r ShutdownGetNodeRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "shutdown.get_node")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "GET"
 
@@ -73,11 +92,18 @@ func (r ShutdownGetNodeRequest) Do(ctx context.Context, transport Transport) (*R
 	if r.NodeID != "" {
 		path.WriteString("/")
 		path.WriteString(r.NodeID)
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordPathPart(ctx, "node_id", r.NodeID)
+		}
 	}
 	path.WriteString("/")
 	path.WriteString("shutdown")
 
 	params = make(map[string]string)
+
+	if r.MasterTimeout != 0 {
+		params["master_timeout"] = formatDuration(r.MasterTimeout)
+	}
 
 	if r.Pretty {
 		params["pretty"] = "true"
@@ -97,6 +123,9 @@ func (r ShutdownGetNodeRequest) Do(ctx context.Context, transport Transport) (*R
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -124,8 +153,17 @@ func (r ShutdownGetNodeRequest) Do(ctx context.Context, transport Transport) (*R
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "shutdown.get_node")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "shutdown.get_node")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -149,6 +187,13 @@ func (f ShutdownGetNode) WithContext(v context.Context) func(*ShutdownGetNodeReq
 func (f ShutdownGetNode) WithNodeID(v string) func(*ShutdownGetNodeRequest) {
 	return func(r *ShutdownGetNodeRequest) {
 		r.NodeID = v
+	}
+}
+
+// WithMasterTimeout - timeout for processing on master node.
+func (f ShutdownGetNode) WithMasterTimeout(v time.Duration) func(*ShutdownGetNodeRequest) {
+	return func(r *ShutdownGetNodeRequest) {
+		r.MasterTimeout = v
 	}
 }
 

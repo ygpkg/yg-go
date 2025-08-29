@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 //
-// Code generated from specification version 8.6.0: DO NOT EDIT
+// Code generated from specification version 8.19.0: DO NOT EDIT
 
 package esapi
 
@@ -32,6 +32,11 @@ func newTransformStartTransformFunc(t Transport) TransformStartTransform {
 		for _, f := range o {
 			f(&r)
 		}
+
+		if transport, ok := t.(Instrumented); ok {
+			r.Instrument = transport.InstrumentationEnabled()
+		}
+
 		return r.Do(r.ctx, t)
 	}
 }
@@ -47,6 +52,7 @@ type TransformStartTransform func(transform_id string, o ...func(*TransformStart
 type TransformStartTransformRequest struct {
 	TransformID string
 
+	From    string
 	Timeout time.Duration
 
 	Pretty     bool
@@ -57,15 +63,26 @@ type TransformStartTransformRequest struct {
 	Header http.Header
 
 	ctx context.Context
+
+	Instrument Instrumentation
 }
 
 // Do executes the request and returns response or error.
-func (r TransformStartTransformRequest) Do(ctx context.Context, transport Transport) (*Response, error) {
+func (r TransformStartTransformRequest) Do(providedCtx context.Context, transport Transport) (*Response, error) {
 	var (
 		method string
 		path   strings.Builder
 		params map[string]string
+		ctx    context.Context
 	)
+
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		ctx = instrument.Start(providedCtx, "transform.start_transform")
+		defer instrument.Close(ctx)
+	}
+	if ctx == nil {
+		ctx = providedCtx
+	}
 
 	method = "POST"
 
@@ -75,10 +92,17 @@ func (r TransformStartTransformRequest) Do(ctx context.Context, transport Transp
 	path.WriteString("_transform")
 	path.WriteString("/")
 	path.WriteString(r.TransformID)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.RecordPathPart(ctx, "transform_id", r.TransformID)
+	}
 	path.WriteString("/")
 	path.WriteString("_start")
 
 	params = make(map[string]string)
+
+	if r.From != "" {
+		params["from"] = r.From
+	}
 
 	if r.Timeout != 0 {
 		params["timeout"] = formatDuration(r.Timeout)
@@ -102,6 +126,9 @@ func (r TransformStartTransformRequest) Do(ctx context.Context, transport Transp
 
 	req, err := newRequest(method, path.String(), nil)
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -129,8 +156,17 @@ func (r TransformStartTransformRequest) Do(ctx context.Context, transport Transp
 		req = req.WithContext(ctx)
 	}
 
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.BeforeRequest(req, "transform.start_transform")
+	}
 	res, err := transport.Perform(req)
+	if instrument, ok := r.Instrument.(Instrumentation); ok {
+		instrument.AfterRequest(req, "elasticsearch", "transform.start_transform")
+	}
 	if err != nil {
+		if instrument, ok := r.Instrument.(Instrumentation); ok {
+			instrument.RecordError(ctx, err)
+		}
 		return nil, err
 	}
 
@@ -147,6 +183,13 @@ func (r TransformStartTransformRequest) Do(ctx context.Context, transport Transp
 func (f TransformStartTransform) WithContext(v context.Context) func(*TransformStartTransformRequest) {
 	return func(r *TransformStartTransformRequest) {
 		r.ctx = v
+	}
+}
+
+// WithFrom - restricts the set of transformed entities to those changed after this time.
+func (f TransformStartTransform) WithFrom(v string) func(*TransformStartTransformRequest) {
+	return func(r *TransformStartTransformRequest) {
+		r.From = v
 	}
 }
 
