@@ -37,13 +37,13 @@ const (
 type SettingItem struct {
 	gorm.Model
 
-	Group     string    `json:"group" gorm:"column:group;type:varchar(16);uniqueIndex:idx_setting,priority:2,unique"`
-	Key       string    `json:"key" gorm:"column:key;type:varchar(64);uniqueIndex:idx_setting,priority:3,unique"`
-	Name      string    `json:"name" gorm:"column:name;type:varchar(64)"`
-	Describe  string    `json:"describe" gorm:"column:describe;type:varchar(128)"`
-	ValueType ValueType `json:"value_type" gorm:"column:value_type;default:text;type:varchar(16)"`
-	Value     string    `json:"value" gorm:"column:value;type:text"`
-	Default   string    `json:"default" gorm:"column:default;type:text"`
+	Group     string    `json:"group" yaml:"group" gorm:"column:group;type:varchar(16);uniqueIndex:idx_setting,priority:2,unique"`
+	Key       string    `json:"key" yaml:"key" gorm:"column:key;type:varchar(64);uniqueIndex:idx_setting,priority:3,unique"`
+	Name      string    `json:"name" yaml:"name" gorm:"column:name;type:varchar(64)"`
+	Describe  string    `json:"describe" yaml:"describe" gorm:"column:describe;type:varchar(128)"`
+	ValueType ValueType `json:"value_type" yaml:"value_type" gorm:"column:value_type;default:text;type:varchar(16)"`
+	Value     string    `json:"value" yaml:"value" gorm:"column:value;type:text"`
+	Default   string    `json:"default" yaml:"default" gorm:"column:default;type:text"`
 }
 
 // TableName .
