@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func LicenseMDs(ctx *gin.Context) {
+func LicenseCheckV2(ctx *gin.Context) {
 	if err := LogEntryCheck(ctx); err != nil {
 		logs.ErrorContextf(ctx, "license check failed: %v", err)
 		ctx.AbortWithStatusJSON(http.StatusForbidden, apiobj.BaseResponse{Code: 403, Message: "License认证失败"})
