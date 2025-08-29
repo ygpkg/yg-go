@@ -50,7 +50,7 @@ import (
 	"k8s.io/utils/clock"
 )
 
-const (
+var (
 	// longThrottleLatency defines threshold for logging requests. All requests being
 	// throttled (via the provided rateLimiter) for more than longThrottleLatency will
 	// be logged.
@@ -96,13 +96,10 @@ func defaultRequestRetryFn(maxRetries int) WithRetry {
 type Request struct {
 	c *RESTClient
 
-	contentConfig     ClientContentConfig
-	contentTypeNotSet bool
-
-	warningHandler WarningHandlerWithContext
+	warningHandler WarningHandler
 
 	rateLimiter flowcontrol.RateLimiter
-	backoff     BackoffManagerWithContext
+	backoff     BackoffManager
 	timeout     time.Duration
 	maxRetries  int
 
@@ -123,7 +120,7 @@ type Request struct {
 	// output
 	err error
 
-	// only one of body / bodyBytes may be set. requests using body are not retryable.
+	// only one of body / bodyBytes may be set. requests using body are not retriable.
 	body      io.Reader
 	bodyBytes []byte
 
@@ -132,7 +129,7 @@ type Request struct {
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
 func NewRequest(c *RESTClient) *Request {
-	var backoff BackoffManagerWithContext
+	var backoff BackoffManager
 	if c.createBackoffMgr != nil {
 		backoff = c.createBackoffMgr()
 	}
@@ -152,11 +149,6 @@ func NewRequest(c *RESTClient) *Request {
 		timeout = c.Client.Timeout
 	}
 
-	// A request needs to know whether the content type was explicitly configured or selected by
-	// default in order to support the per-request Protobuf override used by clients generated
-	// with --prefers-protobuf.
-	contentConfig, contentTypeDefaulted := c.content.GetClientContentConfig()
-
 	r := &Request{
 		c:              c,
 		rateLimiter:    c.rateLimiter,
@@ -166,12 +158,14 @@ func NewRequest(c *RESTClient) *Request {
 		maxRetries:     10,
 		retryFn:        defaultRequestRetryFn,
 		warningHandler: c.warningHandler,
-
-		contentConfig:     contentConfig,
-		contentTypeNotSet: contentTypeDefaulted,
 	}
 
-	r.setAcceptHeader()
+	switch {
+	case len(c.content.AcceptContentTypes) > 0:
+		r.SetHeader("Accept", c.content.AcceptContentTypes)
+	case len(c.content.ContentType) > 0:
+		r.SetHeader("Accept", c.content.ContentType+", */*")
+	}
 	return r
 }
 
@@ -180,34 +174,9 @@ func NewRequestWithClient(base *url.URL, versionedAPIPath string, content Client
 	return NewRequest(&RESTClient{
 		base:             base,
 		versionedAPIPath: versionedAPIPath,
-		content:          requestClientContentConfigProvider{base: content},
+		content:          content,
 		Client:           client,
 	})
-}
-
-func (r *Request) UseProtobufAsDefaultIfPreferred(prefersProtobuf bool) *Request {
-	if prefersProtobuf {
-		return r.UseProtobufAsDefault()
-	}
-	return r
-}
-
-func (r *Request) UseProtobufAsDefault() *Request {
-	if r.contentTypeNotSet && len(r.contentConfig.AcceptContentTypes) == 0 {
-		r.contentConfig.AcceptContentTypes = "application/vnd.kubernetes.protobuf,application/json"
-		r.contentConfig.ContentType = "application/vnd.kubernetes.protobuf"
-		r.setAcceptHeader()
-	}
-	return r
-}
-
-func (r *Request) setAcceptHeader() {
-	switch {
-	case len(r.contentConfig.AcceptContentTypes) > 0:
-		r.SetHeader("Accept", r.contentConfig.AcceptContentTypes)
-	case len(r.contentConfig.ContentType) > 0:
-		r.SetHeader("Accept", r.contentConfig.ContentType+", */*")
-	}
 }
 
 // Verb sets the verb this request will use.
@@ -255,22 +224,8 @@ func (r *Request) Resource(resource string) *Request {
 }
 
 // BackOff sets the request's backoff manager to the one specified,
-// or defaults to the stub implementation if nil is provided.
-//
-// Deprecated: BackoffManager.Sleep ignores the caller's context. Use BackOffWithContext and BackoffManagerWithContext instead.
+// or defaults to the stub implementation if nil is provided
 func (r *Request) BackOff(manager BackoffManager) *Request {
-	if manager == nil {
-		r.backoff = &NoBackoff{}
-		return r
-	}
-
-	r.backoff = &backoffManagerNopContext{BackoffManager: manager}
-	return r
-}
-
-// BackOffWithContext sets the request's backoff manager to the one specified,
-// or defaults to the stub implementation if nil is provided.
-func (r *Request) BackOffWithContext(manager BackoffManagerWithContext) *Request {
 	if manager == nil {
 		r.backoff = &NoBackoff{}
 		return r
@@ -281,21 +236,8 @@ func (r *Request) BackOffWithContext(manager BackoffManagerWithContext) *Request
 }
 
 // WarningHandler sets the handler this client uses when warning headers are encountered.
-// If set to nil, this client will use the default warning handler (see [SetDefaultWarningHandler]).
-//
-//logcheck:context // WarningHandlerWithContext should be used instead of WarningHandler in code which supports contextual logging.
+// If set to nil, this client will use the default warning handler (see SetDefaultWarningHandler).
 func (r *Request) WarningHandler(handler WarningHandler) *Request {
-	if handler == nil {
-		r.warningHandler = nil
-		return r
-	}
-	r.warningHandler = warningLoggerNopContext{l: handler}
-	return r
-}
-
-// WarningHandlerWithContext sets the handler this client uses when warning headers are encountered.
-// If set to nil, this client will use the default warning handler (see [SetDefaultWarningHandlerWithContext]).
-func (r *Request) WarningHandlerWithContext(handler WarningHandlerWithContext) *Request {
 	r.warningHandler = handler
 	return r
 }
@@ -374,9 +316,8 @@ func (r *Request) NamespaceIfScoped(namespace string, scoped bool) *Request {
 	return r
 }
 
-// AbsPath overwrites an existing path with the segments provided.
-// Trailing slashes are preserved when a single segment is passed.
-// Any path in the request's REST client's base URL is preserved as a prefix.
+// AbsPath overwrites an existing path with the segments provided. Trailing slashes are preserved
+// when a single segment is passed.
 func (r *Request) AbsPath(segments ...string) *Request {
 	if r.err != nil {
 		return r
@@ -389,8 +330,8 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	return r
 }
 
-// RequestURI overwrites existing path and parameters with the value of the provided server relative URI.
-// This is equivalent to clearing params, then calling AbsPath() + Param() for each query parameter.
+// RequestURI overwrites existing path and parameters with the value of the provided server relative
+// URI.
 func (r *Request) RequestURI(uri string) *Request {
 	if r.err != nil {
 		return r
@@ -400,17 +341,14 @@ func (r *Request) RequestURI(uri string) *Request {
 		r.err = err
 		return r
 	}
-	// AbsPath handles prepending r.c.base.Path, if set
-	r.AbsPath(locator.Path)
+	r.pathPrefix = locator.Path
 	if len(locator.Query()) > 0 {
-		// clear any existing params
-		r.params = make(url.Values)
+		if r.params == nil {
+			r.params = make(url.Values)
+		}
 		for k, v := range locator.Query() {
 			r.params[k] = v
 		}
-	} else {
-		// clear any existing params
-		r.params = nil
 	}
 	return r
 }
@@ -429,7 +367,7 @@ func (r *Request) Param(paramName, s string) *Request {
 // VersionedParams will not write query parameters that have omitempty set and are empty. If a
 // parameter has already been set it is appended to (Params and VersionedParams are additive).
 func (r *Request) VersionedParams(obj runtime.Object, codec runtime.ParameterCodec) *Request {
-	return r.SpecificallyVersionedParams(obj, codec, r.contentConfig.GroupVersion)
+	return r.SpecificallyVersionedParams(obj, codec, r.c.content.GroupVersion)
 }
 
 func (r *Request) SpecificallyVersionedParams(obj runtime.Object, codec runtime.ParameterCodec, version schema.GroupVersion) *Request {
@@ -509,9 +447,11 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
+		glogBody("Request Body", data)
 		r.body = nil
 		r.bodyBytes = data
 	case []byte:
+		glogBody("Request Body", t)
 		r.body = nil
 		r.bodyBytes = t
 	case io.Reader:
@@ -522,7 +462,7 @@ func (r *Request) Body(obj interface{}) *Request {
 		if reflect.ValueOf(t).IsNil() {
 			return r
 		}
-		encoder, err := r.contentConfig.Negotiator.Encoder(r.contentConfig.ContentType, nil)
+		encoder, err := r.c.content.Negotiator.Encoder(r.c.content.ContentType, nil)
 		if err != nil {
 			r.err = err
 			return r
@@ -532,9 +472,10 @@ func (r *Request) Body(obj interface{}) *Request {
 			r.err = err
 			return r
 		}
+		glogBody("Request Body", data)
 		r.body = nil
 		r.bodyBytes = data
-		r.SetHeader("Content-Type", r.contentConfig.ContentType)
+		r.SetHeader("Content-Type", r.c.content.ContentType)
 	default:
 		r.err = fmt.Errorf("unknown type used for body: %+v", obj)
 	}
@@ -676,17 +617,21 @@ func (r *Request) tryThrottleWithInfo(ctx context.Context, retryInfo string) err
 	}
 	latency := time.Since(now)
 
-	if latency > longThrottleLatency {
-		if retryInfo == "" {
-			retryInfo = "client-side throttling, not priority and fairness"
-		}
-		klog.FromContext(ctx).V(3).Info("Waited before sending request", "delay", latency, "reason", retryInfo, "verb", r.verb, "URL", r.URL())
+	var message string
+	switch {
+	case len(retryInfo) > 0:
+		message = fmt.Sprintf("Waited for %v, %s - request: %s:%s", latency, retryInfo, r.verb, r.URL().String())
+	default:
+		message = fmt.Sprintf("Waited for %v due to client-side throttling, not priority and fairness, request: %s:%s", latency, r.verb, r.URL().String())
+	}
 
-		if latency > extraLongThrottleLatency {
-			// If the rate limiter latency is very high, the log message should be printed at a higher log level,
-			// but we use a throttled logger to prevent spamming.
-			globalThrottledLogger.info(klog.FromContext(ctx), "Waited before sending request", "delay", latency, "reason", retryInfo, "verb", r.verb, "URL", r.URL())
-		}
+	if latency > longThrottleLatency {
+		klog.V(3).Info(message)
+	}
+	if latency > extraLongThrottleLatency {
+		// If the rate limiter latency is very high, the log message should be printed at a higher log level,
+		// but we use a throttled logger to prevent spamming.
+		globalThrottledLogger.Infof("%s", message)
 	}
 	metrics.RateLimiterLatency.Observe(ctx, r.verb, r.finalURLTemplate(), latency)
 
@@ -698,7 +643,7 @@ func (r *Request) tryThrottle(ctx context.Context) error {
 }
 
 type throttleSettings struct {
-	logLevel       int
+	logLevel       klog.Level
 	minLogInterval time.Duration
 
 	lastLogTime time.Time
@@ -723,9 +668,9 @@ var globalThrottledLogger = &throttledLogger{
 	},
 }
 
-func (b *throttledLogger) attemptToLog(logger klog.Logger) (int, bool) {
+func (b *throttledLogger) attemptToLog() (klog.Level, bool) {
 	for _, setting := range b.settings {
-		if bool(logger.V(setting.logLevel).Enabled()) {
+		if bool(klog.V(setting.logLevel).Enabled()) {
 			// Return early without write locking if possible.
 			if func() bool {
 				setting.lock.RLock()
@@ -747,19 +692,15 @@ func (b *throttledLogger) attemptToLog(logger klog.Logger) (int, bool) {
 
 // Infof will write a log message at each logLevel specified by the receiver's throttleSettings
 // as long as it hasn't written a log message more recently than minLogInterval.
-func (b *throttledLogger) info(logger klog.Logger, message string, kv ...any) {
-	if logLevel, ok := b.attemptToLog(logger); ok {
-		logger.V(logLevel).Info(message, kv...)
+func (b *throttledLogger) Infof(message string, args ...interface{}) {
+	if logLevel, ok := b.attemptToLog(); ok {
+		klog.V(logLevel).Infof(message, args...)
 	}
 }
 
 // Watch attempts to begin watching the requested location.
 // Returns a watch.Interface, or an error.
 func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
-	if r.body == nil {
-		logBody(klog.FromContext(ctx), 2, "Request Body", r.bodyBytes)
-	}
-
 	// We specifically don't want to rate limit watches, so we
 	// don't use r.rateLimiter here.
 	if r.err != nil {
@@ -794,7 +735,7 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 		resp, err := client.Do(req)
 		retry.After(ctx, r, resp, err)
 		if err == nil && resp.StatusCode == http.StatusOK {
-			return r.newStreamWatcher(ctx, resp)
+			return r.newStreamWatcher(resp)
 		}
 
 		done, transformErr := func() (bool, error) {
@@ -808,9 +749,8 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 				// the server must have sent us an error in 'err'
 				return true, nil
 			}
-			result := r.transformResponse(ctx, resp, req)
-			if err := result.Error(); err != nil {
-				return true, err
+			if result := r.transformResponse(resp, req); result.err != nil {
+				return true, result.err
 			}
 			return true, fmt.Errorf("for request %s, got status: %v", url, resp.StatusCode)
 		}()
@@ -828,24 +768,23 @@ func (r *Request) Watch(ctx context.Context) (watch.Interface, error) {
 	}
 }
 
-func (r *Request) newStreamWatcher(ctx context.Context, resp *http.Response) (watch.Interface, error) {
+func (r *Request) newStreamWatcher(resp *http.Response) (watch.Interface, error) {
 	contentType := resp.Header.Get("Content-Type")
 	mediaType, params, err := mime.ParseMediaType(contentType)
 	if err != nil {
-		klog.FromContext(ctx).V(4).Info("Unexpected content type from the server", "contentType", contentType, "err", err)
+		klog.V(4).Infof("Unexpected content type from the server: %q: %v", contentType, err)
 	}
-	objectDecoder, streamingSerializer, framer, err := r.contentConfig.Negotiator.StreamDecoder(mediaType, params)
+	objectDecoder, streamingSerializer, framer, err := r.c.content.Negotiator.StreamDecoder(mediaType, params)
 	if err != nil {
 		return nil, err
 	}
 
-	handleWarnings(ctx, resp.Header, r.warningHandler)
+	handleWarnings(resp.Header, r.warningHandler)
 
 	frameReader := framer.NewFrameReader(resp.Body)
 	watchEventDecoder := streaming.NewDecoder(frameReader, streamingSerializer)
 
-	return watch.NewStreamWatcherWithLogger(
-		klog.FromContext(ctx),
+	return watch.NewStreamWatcher(
 		restclientwatch.NewDecoder(watchEventDecoder, objectDecoder),
 		// use 500 to indicate that the cause of the error is unknown - other error codes
 		// are more specific to HTTP interactions, and set a reason
@@ -890,10 +829,6 @@ func sanitize(req *Request, resp *http.Response, err error) (string, string) {
 // Any non-2xx http status code causes an error.  If we get a non-2xx code, we try to convert the body into an APIStatus object.
 // If we can, we return that as an error.  Otherwise, we create an error that lists the http status and the content of the response.
 func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
-	if r.body == nil {
-		logBody(klog.FromContext(ctx), 2, "Request Body", r.bodyBytes)
-	}
-
 	if r.err != nil {
 		return nil, r.err
 	}
@@ -927,7 +862,7 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 
 		switch {
 		case (resp.StatusCode >= 200) && (resp.StatusCode < 300):
-			handleWarnings(ctx, resp.Header, r.warningHandler)
+			handleWarnings(resp.Header, r.warningHandler)
 			return resp.Body, nil
 
 		default:
@@ -937,7 +872,7 @@ func (r *Request) Stream(ctx context.Context) (io.ReadCloser, error) {
 				if retry.IsNextRetry(ctx, r, req, resp, err, neverRetryError) {
 					return false, nil
 				}
-				result := r.transformResponse(ctx, resp, req)
+				result := r.transformResponse(resp, req)
 				if err := result.Error(); err != nil {
 					return true, err
 				}
@@ -1035,7 +970,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 	}()
 
 	if r.err != nil {
-		klog.FromContext(ctx).V(4).Info("Error in request", "err", r.err)
+		klog.V(4).Infof("Error in request: %v", r.err)
 		return r.err
 	}
 
@@ -1069,7 +1004,7 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 			return false
 		}
 		// For connection errors and apiserver shutdown errors retry.
-		if net.IsConnectionReset(err) || net.IsProbableEOF(err) || net.IsHTTP2ConnectionLost(err) {
+		if net.IsConnectionReset(err) || net.IsProbableEOF(err) {
 			return true
 		}
 		return false
@@ -1090,9 +1025,6 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 		// https://pkg.go.dev/net/http#Request
 		if req.ContentLength >= 0 && !(req.Body != nil && req.ContentLength == 0) {
 			metrics.RequestSize.Observe(ctx, r.verb, r.URL().Host, float64(req.ContentLength))
-		}
-		if resp != nil && resp.StatusCode == http.StatusUnsupportedMediaType {
-			r.c.content.UnsupportedMediaType(resp.Request.Header.Get("Content-Type"))
 		}
 		retry.After(ctx, r, resp, err)
 
@@ -1127,17 +1059,12 @@ func (r *Request) request(ctx context.Context, fn func(*http.Request, *http.Resp
 //   - If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
 //   - http.Client.Do errors are returned directly.
 func (r *Request) Do(ctx context.Context) Result {
-	logger := klog.FromContext(ctx)
-	if r.body == nil {
-		logBody(logger, 2, "Request Body", r.bodyBytes)
-	}
-
 	var result Result
 	err := r.request(ctx, func(req *http.Request, resp *http.Response) {
-		result = r.transformResponse(ctx, resp, req)
+		result = r.transformResponse(resp, req)
 	})
 	if err != nil {
-		return Result{err: err, logger: logger}
+		return Result{err: err}
 	}
 	if result.err == nil || len(result.body) > 0 {
 		metrics.ResponseSize.Observe(ctx, r.verb, r.URL().Host, float64(len(result.body)))
@@ -1147,15 +1074,10 @@ func (r *Request) Do(ctx context.Context) Result {
 
 // DoRaw executes the request but does not process the response body.
 func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
-	logger := klog.FromContext(ctx)
-	if r.body == nil {
-		logBody(logger, 2, "Request Body", r.bodyBytes)
-	}
-
 	var result Result
 	err := r.request(ctx, func(req *http.Request, resp *http.Response) {
 		result.body, result.err = io.ReadAll(resp.Body)
-		logBody(logger, 2, "Response Body", result.body)
+		glogBody("Response Body", result.body)
 		if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent {
 			result.err = r.transformUnstructuredResponseError(resp, req, result.body)
 		}
@@ -1170,8 +1092,7 @@ func (r *Request) DoRaw(ctx context.Context) ([]byte, error) {
 }
 
 // transformResponse converts an API response into a structured API object
-func (r *Request) transformResponse(ctx context.Context, resp *http.Response, req *http.Request) Result {
-	logger := klog.FromContext(ctx)
+func (r *Request) transformResponse(resp *http.Response, req *http.Request) Result {
 	var body []byte
 	if resp.Body != nil {
 		data, err := io.ReadAll(resp.Body)
@@ -1186,52 +1107,48 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 			// 2. Apiserver sends back the headers and then part of the body
 			// 3. Apiserver closes connection.
 			// 4. client-go should catch this and return an error.
-			logger.V(2).Info("Stream error when reading response body, may be caused by closed connection", "err", err)
+			klog.V(2).Infof("Stream error %#v when reading response body, may be caused by closed connection.", err)
 			streamErr := fmt.Errorf("stream error when reading response body, may be caused by closed connection. Please retry. Original error: %w", err)
 			return Result{
-				err:    streamErr,
-				logger: logger,
+				err: streamErr,
 			}
 		default:
-			logger.Error(err, "Unexpected error when reading response body")
+			klog.Errorf("Unexpected error when reading response body: %v", err)
 			unexpectedErr := fmt.Errorf("unexpected error when reading response body. Please retry. Original error: %w", err)
 			return Result{
-				err:    unexpectedErr,
-				logger: logger,
+				err: unexpectedErr,
 			}
 		}
 	}
 
-	// Call depth is tricky. This one is okay for Do and DoRaw.
-	logBody(logger, 7, "Response Body", body)
+	glogBody("Response Body", body)
 
 	// verify the content type is accurate
 	var decoder runtime.Decoder
 	contentType := resp.Header.Get("Content-Type")
 	if len(contentType) == 0 {
-		contentType = r.contentConfig.ContentType
+		contentType = r.c.content.ContentType
 	}
 	if len(contentType) > 0 {
 		var err error
 		mediaType, params, err := mime.ParseMediaType(contentType)
 		if err != nil {
-			return Result{err: errors.NewInternalError(err), logger: logger}
+			return Result{err: errors.NewInternalError(err)}
 		}
-		decoder, err = r.contentConfig.Negotiator.Decoder(mediaType, params)
+		decoder, err = r.c.content.Negotiator.Decoder(mediaType, params)
 		if err != nil {
 			// if we fail to negotiate a decoder, treat this as an unstructured error
 			switch {
 			case resp.StatusCode == http.StatusSwitchingProtocols:
 				// no-op, we've been upgraded
 			case resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent:
-				return Result{err: r.transformUnstructuredResponseError(resp, req, body), logger: logger}
+				return Result{err: r.transformUnstructuredResponseError(resp, req, body)}
 			}
 			return Result{
 				body:        body,
 				contentType: contentType,
 				statusCode:  resp.StatusCode,
-				warnings:    handleWarnings(ctx, resp.Header, r.warningHandler),
-				logger:      logger,
+				warnings:    handleWarnings(resp.Header, r.warningHandler),
 			}
 		}
 	}
@@ -1250,8 +1167,7 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 			statusCode:  resp.StatusCode,
 			decoder:     decoder,
 			err:         err,
-			warnings:    handleWarnings(ctx, resp.Header, r.warningHandler),
-			logger:      logger,
+			warnings:    handleWarnings(resp.Header, r.warningHandler),
 		}
 	}
 
@@ -1260,20 +1176,19 @@ func (r *Request) transformResponse(ctx context.Context, resp *http.Response, re
 		contentType: contentType,
 		statusCode:  resp.StatusCode,
 		decoder:     decoder,
-		warnings:    handleWarnings(ctx, resp.Header, r.warningHandler),
-		logger:      logger,
+		warnings:    handleWarnings(resp.Header, r.warningHandler),
 	}
 }
 
 // truncateBody decides if the body should be truncated, based on the glog Verbosity.
-func truncateBody(logger klog.Logger, body string) string {
+func truncateBody(body string) string {
 	max := 0
 	switch {
-	case bool(logger.V(10).Enabled()):
+	case bool(klog.V(10).Enabled()):
 		return body
-	case bool(logger.V(9).Enabled()):
+	case bool(klog.V(9).Enabled()):
 		max = 10240
-	case bool(logger.V(8).Enabled()):
+	case bool(klog.V(8).Enabled()):
 		max = 1024
 	}
 
@@ -1284,20 +1199,17 @@ func truncateBody(logger klog.Logger, body string) string {
 	return body[:max] + fmt.Sprintf(" [truncated %d chars]", len(body)-max)
 }
 
-// logBody logs a body output that could be either JSON or protobuf. It explicitly guards against
+// glogBody logs a body output that could be either JSON or protobuf. It explicitly guards against
 // allocating a new string for the body output unless necessary. Uses a simple heuristic to determine
 // whether the body is printable.
-//
-// It needs to be called by all functions which send or receive the data.
-func logBody(logger klog.Logger, callDepth int, prefix string, body []byte) {
-	if loggerV := logger.V(8); loggerV.Enabled() {
-		loggerV := loggerV.WithCallDepth(callDepth)
+func glogBody(prefix string, body []byte) {
+	if klogV := klog.V(8); klogV.Enabled() {
 		if bytes.IndexFunc(body, func(r rune) bool {
 			return r < 0x0a
 		}) != -1 {
-			loggerV.Info(prefix, "body", truncateBody(logger, hex.Dump(body)))
+			klogV.Infof("%s:\n%s", prefix, truncateBody(hex.Dump(body)))
 		} else {
-			loggerV.Info(prefix, "body", truncateBody(logger, string(body)))
+			klogV.Infof("%s: %s", prefix, truncateBody(string(body)))
 		}
 	}
 }
@@ -1346,7 +1258,7 @@ func (r *Request) newUnstructuredResponseError(body []byte, isTextResponse bool,
 	}
 	var groupResource schema.GroupResource
 	if len(r.resource) > 0 {
-		groupResource.Group = r.contentConfig.GroupVersion.Group
+		groupResource.Group = r.c.content.GroupVersion.Group
 		groupResource.Resource = r.resource
 	}
 	return errors.NewGenericServerResponse(
@@ -1391,7 +1303,6 @@ type Result struct {
 	contentType string
 	err         error
 	statusCode  int
-	logger      klog.Logger
 
 	decoder runtime.Decoder
 }
@@ -1497,7 +1408,7 @@ func (r Result) Error() error {
 	// to be backwards compatible with old servers that do not return a version, default to "v1"
 	out, _, err := r.decoder.Decode(r.body, &schema.GroupVersionKind{Version: "v1"}, nil)
 	if err != nil {
-		r.logger.V(5).Info("Body was not decodable (unable to check for Status)", "err", err)
+		klog.V(5).Infof("body was not decodable (unable to check for Status): %v", err)
 		return r.err
 	}
 	switch t := out.(type) {
