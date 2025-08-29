@@ -1,4 +1,4 @@
-package license
+package licensetool
 
 import (
 	"time"

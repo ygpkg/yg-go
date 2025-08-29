@@ -24,7 +24,7 @@ func LicenseCheckV2(ctx *gin.Context) {
 
 // LogEntryCheck will check latest log entry
 func LogEntryCheck(ctx context.Context) error {
-	lg := &license.DailyLog{}
+	lg := &licensetool.DailyLog{}
 	if err := dbtools.Core().WithContext(ctx).Unscoped().Order("date desc").First(&lg).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			logs.InfoContextf(ctx, "License check log entry not found")
@@ -39,7 +39,7 @@ func LogEntryCheck(ctx context.Context) error {
 	//otherwise verify license and create new log entry
 	if lg.Valid != 1 {
 		logs.ErrorContextf(ctx, "License check log entry[%+v] invalid, message: %v", *lg, lg.Message)
-		return license.ErrInvalidLogEntry
+		return licensetool.ErrInvalidLogEntry
 	}
 	return nil
 }
