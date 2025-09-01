@@ -143,9 +143,6 @@ func (svr *Router) router() {
 	svr.eng.Use(middleware.CORS())
 	svr.eng.Use(middleware.CustomerHeader())
 	svr.eng.Use(middleware.Logger(".Ping", "metrics"))
-	if svr.deployMode != "" {
-		svr.eng.Use(middleware.LicenseCheck())
-	}
 	svr.eng.Use(middleware.Recovery())
 	svr.eng.Use(middleware.LoginStatus())
 	svr.eng.Use(svr.Inject)
