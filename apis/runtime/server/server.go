@@ -92,6 +92,7 @@ func NewRouter(apiPrefix string, opts ...RouterOption) *Router {
 			},
 		},
 	}
+	svr.router()
 
 	for _, opt := range opts {
 		opt(svr)
@@ -105,10 +106,8 @@ func NewRouter(apiPrefix string, opts ...RouterOption) *Router {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	svr.router()
 	for _, p := range svr.prefixes {
 		svr.routeGroups[p] = svr.eng.Group(p)
-
 	}
 
 	svr.pgr = svr.eng.Group(apiPrefix)
