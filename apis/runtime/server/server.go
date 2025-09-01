@@ -73,6 +73,12 @@ func WithDeployMode(deployMode string) RouterOption {
 	}
 }
 
+func WithMiddleware(middleware ...gin.HandlerFunc) RouterOption {
+	return func(svr *Router) {
+		svr.eng.Use(middleware...)
+	}
+}
+
 // NewRouter .
 func NewRouter(apiPrefix string, opts ...RouterOption) *Router {
 	if apiPrefix == "" {
