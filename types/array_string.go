@@ -86,3 +86,42 @@ func (i *StringArray) Add(item string) {
 	// 更新 StringArray
 	*i = NewStringArray(arr)
 }
+
+// Remove 从 StringArray 中移除一个 uint 值
+func (i *StringArray) Remove(item string) {
+	arr := i.Slice()
+	var newArray []string
+	for _, v := range arr {
+		if v != item {
+			newArray = append(newArray, v)
+		}
+	}
+	*i = NewStringArray(newArray)
+}
+
+// Contains 检查 StringArray 是否包含指定值
+func (i StringArray) Contains(value string) bool {
+	arr := i.Slice()
+	for _, v := range arr {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveDuplicates 移除重复值
+func (i *StringArray) RemoveDuplicates() {
+	arr := i.Slice()
+	unique := make(map[string]bool)
+	var result []string
+
+	for _, v := range arr {
+		if !unique[v] {
+			unique[v] = true
+			result = append(result, v)
+		}
+	}
+
+	*i = NewStringArray(result)
+}
