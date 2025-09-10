@@ -96,3 +96,28 @@ func NewStorage(purpose string) (Storager, error) {
 	}
 	return s, nil
 }
+
+// NewStorageWithCfg New a storage with cfg
+func NewStorageWithCfg(cfg config.StorageConfig) (Storager, error) {
+	var (
+		s   Storager
+		err error
+	)
+
+	if cfg.Local != nil {
+		s, err = NewLocalStorage(*cfg.Local)
+	} else if cfg.Tencent != nil {
+		s, err = NewTencentCos(*cfg.Tencent, cfg.StorageOption)
+	} else if cfg.Minoss != nil {
+		s, err = NewMinFs(*cfg.Minoss, cfg.StorageOption)
+	} else if cfg.S3 != nil {
+		s, err = NewS3Fs(*cfg.S3, cfg.StorageOption)
+	} else {
+		return nil, fmt.Errorf("not found useful remote storage config")
+	}
+	if err != nil {
+		logs.Errorf("new storage error: %v", err)
+		return nil, err
+	}
+	return s, nil
+}
