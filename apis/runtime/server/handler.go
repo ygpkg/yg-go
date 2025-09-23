@@ -125,7 +125,11 @@ func fixBaseResponse(ctx *gin.Context, val reflect.Value) {
 				//	br.Message = errcode.GetMessage(br.Code)
 				//}
 				lang := runtime.GetLanguage(ctx)
-				br.Message = i18n.T(lang, br.Message)
+				if len(br.MessageData) > 0 {
+					br.Message = i18n.TWithData(lang, br.Message, br.MessageData)
+				} else {
+					br.Message = i18n.T(lang, br.Message)
+				}
 
 				ctx.Set(constants.CtxKeyCode, int(br.Code))
 				br.RequestID = ctx.GetString(constants.CtxKeyRequestID)

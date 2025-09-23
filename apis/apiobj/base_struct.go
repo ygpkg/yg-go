@@ -9,10 +9,11 @@ type BaseRequest struct {
 
 // BaseResponse base response
 type BaseResponse struct {
-	Code      uint32 `json:"code"`
-	Message   string `json:"message,omitempty"`
-	Env       string `json:"env,omitempty"`
-	RequestID string `json:"request_id,omitempty"`
+	Code        uint32                 `json:"code"`
+	Message     string                 `json:"message,omitempty"`
+	MessageData map[string]interface{} `json:"-"`
+	Env         string                 `json:"env,omitempty"`
+	RequestID   string                 `json:"request_id,omitempty"`
 }
 
 // QueryRequest query request
