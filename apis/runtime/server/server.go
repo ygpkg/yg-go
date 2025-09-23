@@ -145,6 +145,7 @@ func (svr *Router) router() {
 	svr.eng.Use(middleware.Logger(".Ping", "metrics"))
 	svr.eng.Use(middleware.Recovery())
 	svr.eng.Use(middleware.LoginStatus())
+	svr.eng.Use(middleware.AcceptLanguage())
 	svr.eng.Use(svr.Inject)
 
 	svr.eng.NoRoute(func(c *gin.Context) {

@@ -8,9 +8,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ygpkg/yg-go/apis/apiobj"
 	"github.com/ygpkg/yg-go/apis/constants"
-	"github.com/ygpkg/yg-go/apis/errcode"
 	"github.com/ygpkg/yg-go/apis/runtime"
 	"github.com/ygpkg/yg-go/config"
+	"github.com/ygpkg/yg-go/i18n"
 	"github.com/ygpkg/yg-go/logs"
 )
 
@@ -121,9 +121,12 @@ func fixBaseResponse(ctx *gin.Context, val reflect.Value) {
 
 			if field.Type() == reflect.TypeOf(apiobj.BaseResponse{}) {
 				br := field.Interface().(apiobj.BaseResponse)
-				if br.Message == "" {
-					br.Message = errcode.GetMessage(br.Code)
-				}
+				//if br.Message == "" {
+				//	br.Message = errcode.GetMessage(br.Code)
+				//}
+				lang := runtime.GetLanguage(ctx)
+				br.Message = i18n.T(lang, br.Message)
+
 				ctx.Set(constants.CtxKeyCode, int(br.Code))
 				br.RequestID = ctx.GetString(constants.CtxKeyRequestID)
 				br.Env = config.Conf().MainConf.Env
