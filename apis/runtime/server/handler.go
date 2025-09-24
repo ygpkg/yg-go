@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ygpkg/yg-go/apis/apiobj"
 	"github.com/ygpkg/yg-go/apis/constants"
+	"github.com/ygpkg/yg-go/apis/errcode"
 	"github.com/ygpkg/yg-go/apis/runtime"
 	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/i18n"
@@ -67,6 +68,7 @@ func transAPI(hdr interface{}) gin.HandlerFunc {
 					}
 				}
 			}
+			translateMessage(ctx, outVal)
 			if ctx.IsAborted() {
 				return
 			}
@@ -121,14 +123,8 @@ func fixBaseResponse(ctx *gin.Context, val reflect.Value) {
 
 			if field.Type() == reflect.TypeOf(apiobj.BaseResponse{}) {
 				br := field.Interface().(apiobj.BaseResponse)
-				//if br.Message == "" {
-				//	br.Message = errcode.GetMessage(br.Code)
-				//}
-				lang := runtime.GetLanguage(ctx)
-				if len(br.MessageData) > 0 {
-					br.Message = i18n.TWithData(lang, br.Message, br.MessageData)
-				} else {
-					br.Message = i18n.T(lang, br.Message)
+				if br.Message == "" {
+					br.Message = errcode.GetMessage(br.Code)
 				}
 
 				ctx.Set(constants.CtxKeyCode, int(br.Code))
@@ -138,5 +134,30 @@ func fixBaseResponse(ctx *gin.Context, val reflect.Value) {
 				return
 			}
 		}
+	}
+}
+
+// translateMessage 填充基础返回信息
+func translateMessage(ctx *gin.Context, val reflect.Value) {
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() == reflect.Struct {
+		var message string
+		var messageData = make(map[string]interface{})
+		message = val.FieldByName("Message").String()
+		if message == "" {
+			return
+		}
+		dataField := val.FieldByName("MessageData")
+		if dataField.Kind() == reflect.Map {
+			for _, key := range dataField.MapKeys() {
+				v := dataField.MapIndex(key)
+				if key.Kind() == reflect.String && v.IsValid() {
+					messageData[key.String()] = v.Interface()
+				}
+			}
+		}
+		val.FieldByName("Message").Set(reflect.ValueOf(i18n.TWithData(runtime.GetLanguage(ctx), message, messageData)))
 	}
 }
