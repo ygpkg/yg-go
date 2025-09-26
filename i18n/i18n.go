@@ -30,6 +30,14 @@ type LocalesFS interface {
 
 // Init 初始化
 func Init(i18nCfg I18nConfig, fs LocalesFS) {
+	matcher = language.NewMatcher(cfg.SupportedLanguages)
+	defaultLang := MatchLanguage(i18nCfg.DefaultLanguage.String())
+	if defaultLang != language.Und {
+		i18nCfg.DefaultLanguage = defaultLang
+	} else {
+		i18nCfg.DefaultLanguage = language.SimplifiedChinese
+	}
+
 	cfg = i18nCfg
 	// 初始化 i18n Bundle
 	bundle := i18n.NewBundle(cfg.DefaultLanguage)
@@ -47,7 +55,6 @@ func Init(i18nCfg I18nConfig, fs LocalesFS) {
 		loc := i18n.NewLocalizer(bundle, lang.String())
 		localizers[lang] = loc
 	}
-	matcher = language.NewMatcher(cfg.SupportedLanguages)
 }
 
 // NewLocalizer 创建一个新的本地化器
