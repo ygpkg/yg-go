@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	cfg        I18nConfig
-	localizers = make(map[language.Tag]*i18n.Localizer)
-	matcher    language.Matcher
+	cfg                I18nConfig
+	localizers         = make(map[language.Tag]*i18n.Localizer)
+	matcher            language.Matcher
+	sysDefaultLanguage = language.SimplifiedChinese // 系统默认语言
 )
 
 type I18nConfig struct {
@@ -33,11 +34,11 @@ func Init(i18nCfg I18nConfig, fs LocalesFS) {
 	cfg = i18nCfg
 
 	matcher = language.NewMatcher(cfg.SupportedLanguages)
-	defaultLang := MatchLanguage(cfg.DefaultLanguage.String())
-	if defaultLang != language.Und {
-		cfg.DefaultLanguage = defaultLang
-	} else {
-		cfg.DefaultLanguage = language.SimplifiedChinese
+	defaultLang := matchLanguageFromSupported(cfg.DefaultLanguage.String(), cfg.SupportedLanguages)
+	cfg.DefaultLanguage = defaultLang
+	// 没有设置语言，或者设置的语言不在支持列表中，使用系统默认语言
+	if defaultLang == language.Und {
+		cfg.DefaultLanguage = sysDefaultLanguage
 	}
 
 	// 初始化 i18n Bundle
@@ -67,9 +68,25 @@ func NewLocalizer(lang language.Tag) *i18n.Localizer {
 	return localizer
 }
 
-// MatchLanguage 检测语言
+// MatchLanguage 检测语言(从语言配置中进行匹配)，如果没有匹配到，返回默认语言
 func MatchLanguage(acceptLanguage string) (l language.Tag) {
 	l = cfg.DefaultLanguage
+	matchLang := matchLanguageFromSupported(acceptLanguage, cfg.SupportedLanguages)
+	if matchLang != language.Und {
+		l = matchLang
+	}
+	return
+}
+
+// matchLanguageFromSupported 从支持的语言列表中匹配语言
+func matchLanguageFromSupported(acceptLanguage string, supported []language.Tag) (l language.Tag) {
+	// 没有支持的语言，返回 Und
+	if len(supported) == 0 {
+		return language.Und
+	}
+
+	// 默认返回第一个支持的语言
+	l = supported[0]
 	if acceptLanguage == "" {
 		return
 	}
@@ -77,12 +94,10 @@ func MatchLanguage(acceptLanguage string) (l language.Tag) {
 	if err != nil {
 		return
 	}
-	if matcher == nil {
-		return
-	}
-	_, index, confidence := matcher.Match(userPrefs...)
+
+	_, index, confidence := language.NewMatcher(supported).Match(userPrefs...)
 	if confidence == language.No {
 		return
 	}
-	return cfg.SupportedLanguages[index]
+	return supported[index]
 }
