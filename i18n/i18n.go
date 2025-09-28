@@ -30,15 +30,16 @@ type LocalesFS interface {
 
 // Init 初始化
 func Init(i18nCfg I18nConfig, fs LocalesFS) {
+	cfg = i18nCfg
+
 	matcher = language.NewMatcher(cfg.SupportedLanguages)
-	defaultLang := MatchLanguage(i18nCfg.DefaultLanguage.String())
+	defaultLang := MatchLanguage(cfg.DefaultLanguage.String())
 	if defaultLang != language.Und {
-		i18nCfg.DefaultLanguage = defaultLang
+		cfg.DefaultLanguage = defaultLang
 	} else {
-		i18nCfg.DefaultLanguage = language.SimplifiedChinese
+		cfg.DefaultLanguage = language.SimplifiedChinese
 	}
 
-	cfg = i18nCfg
 	// 初始化 i18n Bundle
 	bundle := i18n.NewBundle(cfg.DefaultLanguage)
 	bundle.RegisterUnmarshalFunc("yaml", yaml.Unmarshal)
