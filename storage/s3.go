@@ -219,9 +219,9 @@ func (sfs *S3Fs) UploadDirectory(localDirPath, destDir string) ([]string, error)
 	if localDirPath == "" {
 		return nil, fmt.Errorf("local directory path is empty")
 	}
-	if destDir == "" {
-		return nil, fmt.Errorf("destination storage path is empty")
-	}
+	// if destDir == "" {
+	// 	return nil, fmt.Errorf("destination storage path is empty")
+	// }
 
 	// 遍历本地目录
 	err := filepath.WalkDir(localDirPath, func(filePath string, d fs.DirEntry, err error) error {
