@@ -32,9 +32,9 @@ type MainConfig struct {
 	HttpAddr    string `yaml:"http_addr"`
 	GrpcAddr    string `yaml:"grpc_addr"`
 	OpenDocsAPI bool   `yaml:"open_docs_api"`
-	// MysqlConns Deprecated: 1.23.21 use DatabaseConns
+	// Deprecated: 1.23.21 use DatabaseConns
 	MysqlConns map[string]string `yaml:"mysql_conns"`
-	// PostgresConns Deprecated 1.23.21 use DatabaseConns
+	// Deprecated 1.23.21 use DatabaseConns
 	PostgresConns map[string]string `yaml:"postgres_conns"`
 	DatabaseConns map[string]string `yaml:"database_conns"`
 	Env           string            `yaml:"env"`
