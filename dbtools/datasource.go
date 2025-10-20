@@ -3,6 +3,7 @@ package dbtools
 import (
 	"fmt"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/ygpkg/yg-go/logs"
@@ -26,11 +27,21 @@ func InitDBConn(name, dburl string) (*gorm.DB, error) {
 	var db *gorm.DB
 	switch dsn.Scheme {
 	case "mysql":
-		db, err = gorm.Open(mysql.Open(dburl), &gorm.Config{
+		uri, err := NormalizeMySQL(dsn)
+		if err != nil {
+			logs.Errorf("[init-db] normalize mysql(%s) failed, %s", dburl, err)
+			return nil, err
+		}
+		db, err = gorm.Open(mysql.Open(uri), &gorm.Config{
 			CreateBatchSize: 200,
 		})
 	case "sqlite", "sqlite3":
-		db, err = gorm.Open(sqlite.Open(dburl), &gorm.Config{
+		dbPath := strings.TrimPrefix(dsn.Path, "/")
+		if dbPath == "" {
+			dbPath = ":memory:"
+		}
+
+		db, err = gorm.Open(sqlite.Open(dbPath), &gorm.Config{
 			CreateBatchSize: 200,
 		})
 	case "postgresql", "postgres", "pg":
@@ -111,4 +122,23 @@ func Core() *gorm.DB {
 
 func Account() *gorm.DB {
 	return DB("account")
+}
+
+// NormalizeMySQL 将 mysql:// URI 转换为 go-sql-driver/mysql 的 DSN
+func NormalizeMySQL(u *url.URL) (string, error) {
+	user := u.User.Username()
+	pass, _ := u.User.Password()
+	host := u.Hostname()
+	port := u.Port()
+	if port == "" {
+		port = "3306"
+	}
+	db := strings.TrimPrefix(u.Path, "/")
+
+	query := u.RawQuery
+	if query != "" {
+		query = "?" + query
+	}
+
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s%s", user, pass, host, port, db, query), nil
 }
