@@ -16,15 +16,19 @@ type FileStatus string
 const (
 	// FileStatusUnknown 未知
 	FileStatusUnknown FileStatus = "unknown"
-	// FileStatusNormal 正常
+	// FileStatusInit 初始化
+	FileStatusInit FileStatus = "init"
+	// FileStatusUploading 上传中
+	FileStatusUploading FileStatus = "uploading"
+	// FileStatusNormal 正常，完成
 	FileStatusNormal FileStatus = "normal"
 	// FileStatusDeleted 已删除
 	FileStatusDeleted FileStatus = "deleted"
 	// FileStatusFailed 上传失败
 	FileStatusFailed FileStatus = "failed"
+	// FileStatusAborted 取消上传
+	FileStatusAborted FileStatus = "aborted"
 
-	// FileStatusUploading 上传中
-	FileStatusUploading FileStatus = "uploading"
 	// FileStatusUploadWaitComp 上传等待完成
 	FileStatusUploadWaitComp FileStatus = "upload_wait_comp"
 	// FileStatusUploadSuccess 上传成功
@@ -60,15 +64,27 @@ type FileInfo struct {
 	PublicURL string `gorm:"column:public_url;type:varchar(256);index" json:"-"`
 
 	// CopyNumber 文件副本数量
-	CopyNumber int `gorm:"column:copy_number;type:int;default:1" json:"-"`
-	// Status 文件状态
-	Status FileStatus `gorm:"column:status;type:varchar(15);default:'normal'" json:"status"`
-	// ErrMsg 错误信息
-	ErrMsg string `gorm:"column:err_msg;type:varchar(256)" json:"err_msg"`
+	CopyNumber       int             `gorm:"column:copy_number;type:int;default:1" json:"-"`
+	UploadChunkSize  int             `gorm:"column:upload_chunk_size;type:int;comment:分片大小（字节）"`
+	UploadChunkTotal int             `gorm:"column:upload_chunk_total;type:int;comment:分片总数"`
+	Status           string          `gorm:"column:status;type:varchar(32);not null;default:'normal';comment:文件状态，init：初始化，uploading：上传中，normal：已完成，aborted：已取消，failed：上传失败"`
+	UploadedChunks   []UploadedChunk `gorm:"column:uploaded_chunks;type:json;serializer:json;comment:已上传分片列表，例如 [{\"partNumber\":1,\"etag\":\"xxx\"}]"`
+	Progress         float64         `gorm:"column:progress;type:decimal(5,2);not null;default:0.00;comment:上传进度（%）"`
+	Exists           bool            `gorm:"column:exists;type:boolean;not null;default:false;comment:是否命中秒传"`
+	UploadS3ID       string          `gorm:"column:upload_s3_id;type:varchar(128);default:'';comment:S3 MultipartUpload ID"`
+	RenewCount       int             `gorm:"column:renew_count;type:int;not null;default:0;comment:预签名 URL 续签次数"`
+	AbortAt          *time.Time      `gorm:"column:abort_at;type:datetime;comment:用户取消上传时间"`
+	CompletedAt      *time.Time      `gorm:"column:completed_at;type:datetime;comment:文件上传完成时间"`
+	Extra            string          `gorm:"column:extra;type:json;comment:通用扩展属性，存储自定义元数据，额外业务信息"`
 }
 
 // TableName table name
 func (*FileInfo) TableName() string { return TableNameFileInfo }
+
+type UploadedChunk struct {
+	PartNumber int    `json:"partNumber"`
+	Etag       string `json:"etag"`
+}
 
 // GetFileByChunkHash 通过hash获取文件信息
 func GetFileByChunkHash(db *gorm.DB, hashstr string, size int64) (*FileInfo, error) {
