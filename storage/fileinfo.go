@@ -67,7 +67,7 @@ type FileInfo struct {
 	CopyNumber       int             `gorm:"column:copy_number;type:int;default:1" json:"-"`
 	UploadChunkSize  int             `gorm:"column:upload_chunk_size;type:int;comment:分片大小（字节）"`
 	UploadChunkTotal int             `gorm:"column:upload_chunk_total;type:int;comment:分片总数"`
-	Status           string          `gorm:"column:status;type:varchar(32);not null;default:'normal';comment:文件状态，init：初始化，uploading：上传中，normal：已完成，aborted：已取消，failed：上传失败"`
+	Status           FileStatus      `gorm:"column:status;type:varchar(32);not null;default:'normal';comment:文件状态，init：初始化，uploading：上传中，normal：已完成，aborted：已取消，failed：上传失败"`
 	UploadedChunks   []UploadedChunk `gorm:"column:uploaded_chunks;type:json;serializer:json;comment:已上传分片列表，例如 [{\"partNumber\":1,\"etag\":\"xxx\"}]"`
 	Progress         float64         `gorm:"column:progress;type:decimal(5,2);not null;default:0.00;comment:上传进度（%）"`
 	Exists           bool            `gorm:"column:exists;type:boolean;not null;default:false;comment:是否命中秒传"`
