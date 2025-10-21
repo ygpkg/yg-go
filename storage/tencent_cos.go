@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/tencentyun/cos-go-sdk-v5"
 	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
@@ -17,7 +18,7 @@ import (
 
 var _ iUploader = (*TencentCos)(nil)
 
-// TencentCos ..
+// TencentCos .
 type TencentCos struct {
 	opt    config.StorageOption
 	cosCfg config.TencentCOSConfig
@@ -333,4 +334,95 @@ func (tc *TencentCos) copyDirectory(storagePath, dest string) error {
 	}
 
 	return nil
+}
+
+// TODO 该函数未经测试，勿用于生产
+func (tc *TencentCos) CreateMultipartUpload(ctx context.Context, in *CreateMultipartUploadInput) (*string, error) {
+	if in == nil || in.StoragePath == nil || *in.StoragePath == "" {
+		return nil, fmt.Errorf("storage path is empty")
+	}
+	initRst, _, err := tc.client.Object.InitiateMultipartUpload(ctx, *in.StoragePath, nil)
+	if err != nil {
+		logs.Errorf("tencent cos initiate multipart upload error: %v", err)
+		return nil, err
+	}
+	return &initRst.UploadID, nil
+}
+
+// TODO 该函数未经测试，勿用于生产
+func (tc *TencentCos) GeneratePresignedURL(ctx context.Context, in *GeneratePresignedURLInput) (*string, error) {
+	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.PartNumber == nil {
+		return nil, fmt.Errorf("storagePath, uploadID or partNumber is nil")
+	}
+	host := fmt.Sprintf("https://%s.cos.%s.myqcloud.com/", tc.cosCfg.Bucket, tc.cosCfg.Region)
+	u, _ := url.Parse(host)
+	b := &cos.BaseURL{BucketURL: u}
+	client := cos.NewClient(b, &http.Client{
+		Transport: &cos.AuthorizationTransport{
+			SecretID:  tc.cosCfg.TencentConfig.SecretID,
+			SecretKey: tc.cosCfg.TencentConfig.SecretKey,
+			Expire:    tc.opt.PresignedTimeout,
+		},
+	})
+	params := &url.Values{}
+	params.Set("uploadId", *in.UploadID)
+	params.Set("partNumber", fmt.Sprintf("%d", *in.PartNumber))
+	presignedURL, err := client.Object.GetPresignedURL(ctx, http.MethodPut, *in.StoragePath,
+		tc.cosCfg.TencentConfig.SecretID, tc.cosCfg.TencentConfig.SecretKey, tc.opt.PresignedTimeout, params)
+	if err != nil {
+		logs.Errorf("tencent cos get presigned part url error: %v", err)
+		return nil, err
+	}
+	urlStr := presignedURL.String()
+	return &urlStr, nil
+}
+
+// TODO 该函数未经测试，勿用于生产
+func (tc *TencentCos) UploadPart(ctx context.Context, in *UploadPartInput) (*string, error) {
+	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.PartNumber == nil {
+		return nil, fmt.Errorf("storagePath, uploadID or partNumber is nil")
+	}
+	if *in.StoragePath == "" {
+		return nil, fmt.Errorf("storage path is empty")
+	}
+	if in.Data == nil {
+		return nil, fmt.Errorf("reader is empty")
+	}
+	upOpt := &cos.ObjectUploadPartOptions{}
+	resp, err := tc.client.Object.UploadPart(ctx, *in.StoragePath, *in.UploadID, *in.PartNumber, in.Data, upOpt)
+	if err != nil {
+		logs.Errorf("tencent cos upload part error: %v", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+	etag := strings.Trim(resp.Header.Get("ETag"), "\"")
+	return &etag, nil
+}
+
+// TODO 该函数未经测试，勿用于生产
+func (tc *TencentCos) CompleteMultipartUpload(ctx context.Context, in *CompleteMultipartUploadInput) error {
+	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.Parts == nil {
+		return fmt.Errorf("storagePath, uploadID or parts is nil")
+	}
+	objs := make([]cos.Object, 0, len(in.Parts.Parts))
+	for _, p := range in.Parts.Parts {
+		objs = append(objs, cos.Object{PartNumber: int(aws.ToInt32(p.PartNumber)), ETag: aws.ToString(p.ETag)})
+	}
+	_, _, err := tc.client.Object.CompleteMultipartUpload(ctx, *in.StoragePath, *in.UploadID, &cos.CompleteMultipartUploadOptions{Parts: objs})
+	if err != nil {
+		logs.Errorf("tencent cos complete multipart upload error: %v", err)
+	}
+	return err
+}
+
+// TODO 该函数未经测试，勿用于生产
+func (tc *TencentCos) AbortMultipartUpload(ctx context.Context, in *AbortMultipartUploadInput) error {
+	if in == nil || in.StoragePath == nil || in.UploadID == nil {
+		return fmt.Errorf("storagePath or uploadID is nil")
+	}
+	_, err := tc.client.Object.AbortMultipartUpload(ctx, *in.StoragePath, *in.UploadID, nil)
+	if err != nil {
+		logs.Errorf("tencent cos abort multipart upload error: %v", err)
+	}
+	return err
 }

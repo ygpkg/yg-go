@@ -6,6 +6,7 @@ import (
 	"io"
 	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/logs"
@@ -35,6 +36,55 @@ type Storager interface {
 	DeleteFile(storagePath string) error
 	CopyDir(storagePath, dest string) error
 	UploadDirectory(localDirPath, destDir string) ([]string, error)
+
+	// CreateMultipartUpload 创建分片上传
+	CreateMultipartUpload(ctx context.Context, in *CreateMultipartUploadInput) (*string, error)
+	// GeneratePresignedPartURL 生成上传预签名URL
+	GeneratePresignedURL(ctx context.Context, in *GeneratePresignedURLInput) (*string, error)
+	// UploadPart 上传分片
+	UploadPart(ctx context.Context, in *UploadPartInput) (*string, error)
+	// CompleteMultipartUpload 完成分片上传
+	CompleteMultipartUpload(ctx context.Context, in *CompleteMultipartUploadInput) error
+	// AbortMultipartUpload 取消分片上传
+	AbortMultipartUpload(ctx context.Context, in *AbortMultipartUploadInput) error
+}
+
+// CreateMultipartUploadInput 请求对象
+type CreateMultipartUploadInput struct {
+	Bucket      *string
+	StoragePath *string
+}
+
+// GeneratePresignedURLInput 请求对象
+type GeneratePresignedURLInput struct {
+	Bucket      *string
+	StoragePath *string
+	UploadID    *string
+	PartNumber  *int
+}
+
+// UploadPartInput 请求对象
+type UploadPartInput struct {
+	Bucket      *string
+	StoragePath *string
+	UploadID    *string
+	PartNumber  *int
+	Data        io.Reader
+}
+
+// CompleteMultipartUploadInput 请求对象
+type CompleteMultipartUploadInput struct {
+	Bucket      *string
+	StoragePath *string
+	UploadID    *string
+	Parts       *types.CompletedMultipartUpload
+}
+
+// AbortMultipartUploadInput 请求对象
+type AbortMultipartUploadInput struct {
+	Bucket      *string
+	StoragePath *string
+	UploadID    *string
 }
 
 // InitDB .

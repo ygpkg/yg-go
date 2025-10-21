@@ -342,3 +342,85 @@ func (sfs *S3Fs) copyDirectory(sourcePrefix, destPrefix string) error {
 
 	return nil
 }
+
+func (s3fs *S3Fs) CreateMultipartUpload(ctx context.Context, in *CreateMultipartUploadInput) (*string, error) {
+	if in == nil || in.StoragePath == nil || aws.ToString(in.StoragePath) == "" {
+		return nil, fmt.Errorf("storage path is empty")
+	}
+	out, err := s3fs.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+		Bucket: s3fs.getBucketName(in.Bucket),
+		Key:    in.StoragePath,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.UploadId, nil
+}
+func (s3fs *S3Fs) GeneratePresignedURL(ctx context.Context, in *GeneratePresignedURLInput) (*string, error) {
+	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.PartNumber == nil {
+		return nil, fmt.Errorf("storagePath, uploadID or partNumber is nil")
+	}
+	presigner := s3.NewPresignClient(s3fs.client)
+	urlReq, err := presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
+		Bucket:     s3fs.getBucketName(in.Bucket),
+		Key:        in.StoragePath,
+		UploadId:   in.UploadID,
+		PartNumber: aws.Int32(int32(*in.PartNumber)),
+	}, func(o *s3.PresignOptions) {
+		o.Expires = s3fs.opt.PresignedTimeout
+	})
+	if err != nil {
+		return nil, err
+	}
+	return aws.String(urlReq.URL), nil
+}
+func (s3fs *S3Fs) UploadPart(ctx context.Context, in *UploadPartInput) (*string, error) {
+	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.PartNumber == nil {
+		return nil, fmt.Errorf("storagePath, uploadID or partNumber is nil")
+	}
+	if in.Data == nil {
+		return nil, fmt.Errorf("reader is empty")
+	}
+	out, err := s3fs.client.UploadPart(ctx, &s3.UploadPartInput{
+		Bucket:     s3fs.getBucketName(in.Bucket),
+		Key:        in.StoragePath,
+		UploadId:   in.UploadID,
+		PartNumber: aws.Int32(int32(*in.PartNumber)),
+		Body:       in.Data,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.ETag, nil
+}
+func (s3fs *S3Fs) CompleteMultipartUpload(ctx context.Context, in *CompleteMultipartUploadInput) error {
+	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.Parts == nil {
+		return fmt.Errorf("storagePath, uploadID or parts is nil")
+	}
+	_, err := s3fs.client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket:          s3fs.getBucketName(in.Bucket),
+		Key:             in.StoragePath,
+		UploadId:        in.UploadID,
+		MultipartUpload: in.Parts,
+	})
+	return err
+}
+func (s3fs *S3Fs) AbortMultipartUpload(ctx context.Context, in *AbortMultipartUploadInput) error {
+	if in == nil || in.StoragePath == nil || in.UploadID == nil {
+		return fmt.Errorf("storagePath or uploadID is nil")
+	}
+	_, err := s3fs.client.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{
+		Bucket:   s3fs.getBucketName(in.Bucket),
+		Key:      in.StoragePath,
+		UploadId: in.UploadID,
+	})
+	return err
+}
+
+func (s3fs *S3Fs) getBucketName(bucket *string) *string {
+	if bucket != nil && *bucket != "" {
+		return bucket
+	}
+	defaultBucket := s3fs.s3fsCfg.Bucket
+	return &defaultBucket
+}

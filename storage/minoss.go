@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	minio "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/ygpkg/yg-go/config"
@@ -211,4 +212,73 @@ func (mfs *MinFs) copyDirectory(storagePath, dest string) error {
 	}
 
 	return nil
+}
+
+// TODO 该函数未经测试，勿用于生产
+func (mfs *MinFs) CreateMultipartUpload(ctx context.Context, in *CreateMultipartUploadInput) (*string, error) {
+	if in == nil || in.StoragePath == nil || *in.StoragePath == "" {
+		return nil, fmt.Errorf("storage path is empty")
+	}
+	core := minio.Core{Client: mfs.client}
+	uploadID, err := core.NewMultipartUpload(ctx, mfs.mfsCfg.Bucket, *in.StoragePath, minio.PutObjectOptions{})
+	if err != nil {
+		logs.Errorf("minoss initiate multipart upload error: %v", err)
+		return nil, err
+	}
+	return &uploadID, nil
+}
+
+// TODO 该函数未经测试，勿用于生产
+func (mfs *MinFs) GeneratePresignedURL(ctx context.Context, in *GeneratePresignedURLInput) (*string, error) {
+	return nil, fmt.Errorf("presigned part URL not supported for MinIO")
+}
+
+// TODO 该函数未经测试，勿用于生产
+func (mfs *MinFs) UploadPart(ctx context.Context, in *UploadPartInput) (*string, error) {
+	if in == nil || in.StoragePath == nil || *in.StoragePath == "" {
+		return nil, fmt.Errorf("storage path is empty")
+	}
+	if in.UploadID == nil || in.PartNumber == nil {
+		return nil, fmt.Errorf("uploadID or partNumber is nil")
+	}
+	if in.Data == nil {
+		return nil, fmt.Errorf("reader is empty")
+	}
+	core := minio.Core{Client: mfs.client}
+	objPart, err := core.PutObjectPart(ctx, mfs.mfsCfg.Bucket, *in.StoragePath, *in.UploadID, *in.PartNumber, in.Data, -1, minio.PutObjectPartOptions{})
+	if err != nil {
+		logs.Errorf("minoss upload part error: %v", err)
+		return nil, err
+	}
+	return &objPart.ETag, nil
+}
+
+// TODO 该函数未经测试，勿用于生产
+func (mfs *MinFs) CompleteMultipartUpload(ctx context.Context, in *CompleteMultipartUploadInput) error {
+	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.Parts == nil {
+		return fmt.Errorf("storagePath, uploadID or parts is nil")
+	}
+	core := minio.Core{Client: mfs.client}
+	compParts := make([]minio.CompletePart, 0, len(in.Parts.Parts))
+	for _, p := range in.Parts.Parts {
+		compParts = append(compParts, minio.CompletePart{ETag: aws.ToString(p.ETag), PartNumber: int(aws.ToInt32(p.PartNumber))})
+	}
+	_, err := core.CompleteMultipartUpload(ctx, mfs.mfsCfg.Bucket, *in.StoragePath, *in.UploadID, compParts, minio.PutObjectOptions{})
+	if err != nil {
+		logs.Errorf("minoss complete multipart upload error: %v", err)
+	}
+	return err
+}
+
+// TODO 该函数未经测试，勿用于生产
+func (mfs *MinFs) AbortMultipartUpload(ctx context.Context, in *AbortMultipartUploadInput) error {
+	if in == nil || in.StoragePath == nil || in.UploadID == nil {
+		return fmt.Errorf("storagePath or uploadID is nil")
+	}
+	core := minio.Core{Client: mfs.client}
+	err := core.AbortMultipartUpload(ctx, mfs.mfsCfg.Bucket, *in.StoragePath, *in.UploadID)
+	if err != nil {
+		logs.Errorf("minoss abort multipart upload error: %v", err)
+	}
+	return err
 }

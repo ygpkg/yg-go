@@ -209,3 +209,19 @@ func (ls *LocalStorage) copyDirectory(srcPath, destPath string) error {
 
 	return nil
 }
+
+func (l *LocalStorage) CreateMultipartUpload(ctx context.Context, in *CreateMultipartUploadInput) (*string, error) {
+	return nil, fmt.Errorf("multipart upload not supported for LocalStorage")
+}
+func (l *LocalStorage) GeneratePresignedURL(ctx context.Context, in *GeneratePresignedURLInput) (*string, error) {
+	return nil, fmt.Errorf("presigned part URL not supported for LocalStorage")
+}
+func (l *LocalStorage) UploadPart(ctx context.Context, in *UploadPartInput) (*string, error) {
+	return nil, fmt.Errorf("multipart upload not supported for LocalStorage")
+}
+func (l *LocalStorage) CompleteMultipartUpload(ctx context.Context, in *CompleteMultipartUploadInput) error {
+	return fmt.Errorf("multipart upload not supported for LocalStorage")
+}
+func (l *LocalStorage) AbortMultipartUpload(ctx context.Context, in *AbortMultipartUploadInput) error {
+	return fmt.Errorf("multipart upload not supported for LocalStorage")
+}
