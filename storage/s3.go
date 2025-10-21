@@ -357,7 +357,7 @@ func (s3fs *S3Fs) CreateMultipartUpload(ctx context.Context, in *CreateMultipart
 	return out.UploadId, nil
 }
 func (s3fs *S3Fs) GeneratePresignedURL(ctx context.Context, in *GeneratePresignedURLInput) (*string, error) {
-	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.PartNumber == nil {
+	if in == nil || in.StoragePath == nil {
 		return nil, fmt.Errorf("storagePath, uploadID or partNumber is nil")
 	}
 	presigner := s3.NewPresignClient(s3fs.client)
@@ -375,6 +375,19 @@ func (s3fs *S3Fs) GeneratePresignedURL(ctx context.Context, in *GeneratePresigne
 		}
 		return aws.String(urlReq.URL), nil
 	case http.MethodPut:
+		if in.UploadID == nil || *in.UploadID == "" {
+			urlReq, err := presigner.PresignPutObject(s3fs.ctx, &s3.PutObjectInput{
+				Bucket: s3fs.getBucketName(in.Bucket),
+				Key:    in.StoragePath,
+			}, func(opts *s3.PresignOptions) {
+				opts.Expires = s3fs.opt.PresignedTimeout // 链接有效期，默认15分钟，最大不能超过 7 天
+			})
+			if err != nil {
+				return nil, err
+			}
+			return aws.String(urlReq.URL), nil
+		}
+
 		urlReq, err := presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
 			Bucket:     s3fs.getBucketName(in.Bucket),
 			Key:        in.StoragePath,
