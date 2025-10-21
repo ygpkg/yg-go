@@ -295,12 +295,16 @@ func TestS3FsPresignedUpload(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	method := http.MethodPut
 	path := "test/presigned/test-presigned.bin"
 
 	t.Run("direct-put-presigned", func(t *testing.T) {
-		url, err := s3c.GetPresignedURL(http.MethodPut, path)
+		url, err := s3c.GeneratePresignedURL(ctx, &GeneratePresignedURLInput{
+			Method:      &method,
+			StoragePath: &path,
+		})
 		if err != nil {
-			t.Fatalf("GetPresignedURL error: %v", err)
+			t.Fatalf("GeneratePresignedURL error: %v", err)
 		}
 		fmt.Println("Direct PUT presigned URL:", url)
 	})
@@ -324,6 +328,7 @@ func TestS3FsPresignedUpload(t *testing.T) {
 				t.Fatalf("uploadID empty")
 			}
 			in := &GeneratePresignedURLInput{
+				Method:      &method,
 				StoragePath: &path,
 				UploadID:    uploadID,
 				PartNumber:  &n,
