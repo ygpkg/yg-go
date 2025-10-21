@@ -57,6 +57,7 @@ type CreateMultipartUploadInput struct {
 
 // GeneratePresignedURLInput 请求对象
 type GeneratePresignedURLInput struct {
+	Method      *string
 	Bucket      *string
 	StoragePath *string
 	UploadID    *string

@@ -361,18 +361,35 @@ func (s3fs *S3Fs) GeneratePresignedURL(ctx context.Context, in *GeneratePresigne
 		return nil, fmt.Errorf("storagePath, uploadID or partNumber is nil")
 	}
 	presigner := s3.NewPresignClient(s3fs.client)
-	urlReq, err := presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
-		Bucket:     s3fs.getBucketName(in.Bucket),
-		Key:        in.StoragePath,
-		UploadId:   in.UploadID,
-		PartNumber: aws.Int32(int32(*in.PartNumber)),
-	}, func(o *s3.PresignOptions) {
-		o.Expires = s3fs.opt.PresignedTimeout
-	})
-	if err != nil {
-		return nil, err
+	method := aws.ToString(in.Method)
+	switch method {
+	case http.MethodGet:
+		urlReq, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+			Bucket: s3fs.getBucketName(in.Bucket),
+			Key:    in.StoragePath,
+		}, func(o *s3.PresignOptions) {
+			o.Expires = s3fs.opt.PresignedTimeout
+		})
+		if err != nil {
+			return nil, err
+		}
+		return aws.String(urlReq.URL), nil
+	case http.MethodPut:
+		urlReq, err := presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
+			Bucket:     s3fs.getBucketName(in.Bucket),
+			Key:        in.StoragePath,
+			UploadId:   in.UploadID,
+			PartNumber: aws.Int32(int32(*in.PartNumber)),
+		}, func(o *s3.PresignOptions) {
+			o.Expires = s3fs.opt.PresignedTimeout
+		})
+		if err != nil {
+			return nil, err
+		}
+		return aws.String(urlReq.URL), nil
+	default:
+		return nil, fmt.Errorf("only GET and PUT are allowed,now: %s", method)
 	}
-	return aws.String(urlReq.URL), nil
 }
 func (s3fs *S3Fs) UploadPart(ctx context.Context, in *UploadPartInput) (*string, error) {
 	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.PartNumber == nil {
