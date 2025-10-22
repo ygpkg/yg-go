@@ -53,6 +53,7 @@ type Storager interface {
 type CreateMultipartUploadInput struct {
 	Bucket      *string
 	StoragePath *string
+	ContentType *string
 }
 
 // GeneratePresignedURLInput 请求对象
