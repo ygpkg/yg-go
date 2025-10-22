@@ -348,8 +348,9 @@ func (s3fs *S3Fs) CreateMultipartUpload(ctx context.Context, in *CreateMultipart
 		return nil, fmt.Errorf("storage path is empty")
 	}
 	out, err := s3fs.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
-		Bucket: s3fs.getBucketName(in.Bucket),
-		Key:    in.StoragePath,
+		Bucket:      s3fs.getBucketName(in.Bucket),
+		Key:         in.StoragePath,
+		ContentType: in.ContentType,
 	})
 	if err != nil {
 		return nil, err
