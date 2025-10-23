@@ -378,8 +378,9 @@ func (s3fs *S3Fs) GeneratePresignedURL(ctx context.Context, in *GeneratePresigne
 	case http.MethodPut:
 		if in.UploadID == nil || *in.UploadID == "" {
 			urlReq, err := presigner.PresignPutObject(s3fs.ctx, &s3.PutObjectInput{
-				Bucket: s3fs.getBucketName(in.Bucket),
-				Key:    in.StoragePath,
+				Bucket:      s3fs.getBucketName(in.Bucket),
+				Key:         in.StoragePath,
+				ContentType: in.ContentType,
 			}, func(opts *s3.PresignOptions) {
 				opts.Expires = s3fs.opt.PresignedTimeout // 链接有效期，默认15分钟，最大不能超过 7 天
 			})
@@ -390,10 +391,12 @@ func (s3fs *S3Fs) GeneratePresignedURL(ctx context.Context, in *GeneratePresigne
 		}
 
 		urlReq, err := presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
-			Bucket:     s3fs.getBucketName(in.Bucket),
-			Key:        in.StoragePath,
-			UploadId:   in.UploadID,
-			PartNumber: aws.Int32(int32(*in.PartNumber)),
+			Bucket:        s3fs.getBucketName(in.Bucket),
+			Key:           in.StoragePath,
+			UploadId:      in.UploadID,
+			PartNumber:    aws.Int32(int32(*in.PartNumber)),
+			ContentMD5:    in.ContentMD5,
+			ContentLength: in.ContentLength,
 		}, func(o *s3.PresignOptions) {
 			o.Expires = s3fs.opt.PresignedTimeout
 		})
