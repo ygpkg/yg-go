@@ -96,7 +96,7 @@ func RegistryDB(name string, db *gorm.DB) {
 	defer dbsLocker.Unlock()
 	if _, ok := dbs[name]; ok {
 		logs.Errorf("[init-db] db %s is already exist", name)
-		return
+		panic(fmt.Errorf("db %s is already exist", name))
 	}
 	dbs[name] = db
 	logs.Infof("[init-db] registry db %s success", name)
