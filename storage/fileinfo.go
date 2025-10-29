@@ -208,6 +208,13 @@ func GetFileByID(db *gorm.DB, id uint) (*FileInfo, error) {
 	return fi, nil
 }
 
+func UpdateByID(db *gorm.DB, id uint, updateMap map[string]interface{}) error {
+	if err := db.Model(&FileInfo{}).Where("id = ?", id).Updates(updateMap).Error; err != nil {
+		return err
+	}
+	return nil
+}
+
 // GenerateFileStoragePath 生成文件存储路径
 func GenerateFileStoragePath(purpose string, owner uint, fileExt string) string {
 	storagePath := fmt.Sprintf("%s/%s/%d-%s%s",
