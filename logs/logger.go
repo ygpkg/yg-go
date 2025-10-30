@@ -173,6 +173,9 @@ func SetContextLogger(ctx context.Context, l *zap.SugaredLogger) {
 
 // LoggerFromContext 获取日志上下文
 func LoggerFromContext(ctx context.Context) *zap.SugaredLogger {
+	if ctx == nil {
+		return logger
+	}
 	if gctx, ok := ctx.(*gin.Context); ok {
 		val, ok := gctx.Get(string(contextKeyLogger))
 		if !ok {
