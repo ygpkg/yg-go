@@ -299,6 +299,9 @@ func (sfs *S3Fs) isDirectory(storagePath string) (bool, error) {
 
 // copyObject 单个文件复制
 func (sfs *S3Fs) copyObject(sourceKey, destKey string) error {
+	if sourceKey == destKey {
+		return nil
+	}
 	src := fmt.Sprintf("%s/%s", sfs.s3fsCfg.Bucket, sourceKey)
 
 	_, err := sfs.client.CopyObject(sfs.ctx, &s3.CopyObjectInput{
