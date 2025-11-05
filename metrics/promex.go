@@ -12,8 +12,16 @@ var (
 )
 
 func init() {
+	Init("ygpkg", "core")
+}
+
+// Init 初始化全局的Prometheus指标管理器
+func Init(project, model string) {
 	std = prometheus.NewRegistry()
-	em = NewEasyMetrics(std)
+	em = NewEasyMetrics(std, Options{
+		Namespace: project,
+		Subsystem: model,
+	})
 }
 
 // 全局便捷函数
