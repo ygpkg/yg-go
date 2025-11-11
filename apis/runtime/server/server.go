@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -194,6 +195,7 @@ func (svr *Router) ListAllRouters() {
 func (svr *Router) HandleDoc(model string) {
 	for _, pg := range svr.routeGroups {
 		pg.GET(model+".docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, ginSwagger.InstanceName(model)))
+		pg.GET(model+".redocs", ReDocHandler(model, fmt.Sprintf("%s%s.docs/doc.json", pg.BasePath(), model)))
 	}
 }
 

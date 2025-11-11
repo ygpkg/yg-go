@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"reflect"
 
@@ -159,5 +160,34 @@ func translateMessage(ctx *gin.Context, val reflect.Value) {
 			}
 		}
 		val.FieldByName("Message").Set(reflect.ValueOf(i18n.TWithData(runtime.GetLanguage(ctx), message, messageData)))
+	}
+}
+
+// ReDocHandler 生成 ReDoc 文档页面的 ReDocHandler
+// appName: 应用名称，如 "demoapp"
+// swaggerURL: Swagger JSON 的 URL，如 "/v1/demoapp.docs/doc.json"
+func ReDocHandler(appName, swaggerURL string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head>
+	<title>%s API Documentation</title>
+	<meta charset="utf-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<style>
+		body {
+			margin: 0;
+			padding: 0;
+		}
+	</style>
+</head>
+<body>
+	<redoc spec-url='%s'></redoc>
+	<script src="https://cdn.redoc.ly/redoc/latest/bundles/redoc.standalone.js"></script>
+</body>
+</html>`, appName, swaggerURL)
+
+		c.Header("Content-Type", "text/html; charset=utf-8")
+		c.String(http.StatusOK, html)
 	}
 }
