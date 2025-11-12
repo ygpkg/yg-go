@@ -50,7 +50,7 @@ func Logger(whitelist ...string) gin.HandlerFunc {
 				"code": fmt.Sprint(ctx.Writer.Status()),
 			}).Buckets(0.2, 0.8, 1.6, 5, 10, 60).
 			Observe(cost.Seconds())
-		if ctx.Writer.Status() >= 400 && ctx.Writer.Status() != 401 {
+		if ctx.Writer.Status() >= 500 {
 			logs.LoggerFromContext(ctx).Errorw(fmt.Sprint(ctx.Writer.Status()),
 				"method", ctx.Request.Method,
 				"uri", ctx.Request.RequestURI,
