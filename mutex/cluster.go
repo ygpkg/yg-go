@@ -39,7 +39,11 @@ func NewClusterMutex(ctx context.Context, cli *redis.Client, name string) *Clust
 
 // IsMaster 是否是主节点
 func (m *ClusterMutex) IsMaster() bool {
-	return m.myName == m.currentMaster
+	isMaster := m.myName == m.currentMaster
+	if !isMaster {
+		logs.InfoContextf(m.ctx, "my name: %s, current master: %s", m.myName, m.currentMaster)
+	}
+	return isMaster
 }
 
 // daemonRoutine 后台守护协程
