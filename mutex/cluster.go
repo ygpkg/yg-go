@@ -41,7 +41,7 @@ func NewClusterMutex(ctx context.Context, cli *redis.Client, name string) *Clust
 func (m *ClusterMutex) IsMaster() bool {
 	isMaster := m.myName == m.currentMaster
 	if !isMaster {
-		logs.InfoContextf(m.ctx, "my name: %s, current master: %s", m.myName, m.currentMaster)
+		logs.InfoContextf(m.ctx, "[ClusterMutex] master info not match, my name: %s, current master: %s", m.myName, m.currentMaster)
 	}
 	return isMaster
 }
