@@ -1,9 +1,13 @@
 package job
 
 import (
+	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/robfig/cron/v3"
+	"github.com/ygpkg/yg-go/dbtools/redispool"
+	"github.com/ygpkg/yg-go/lifecycle"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/mutex"
 	"github.com/ygpkg/yg-go/types"
@@ -19,13 +23,28 @@ func RegistryCronFunc(db *gorm.DB, spec string, purpose string, taskFunc func() 
 		stdCron = cron.New(cron.WithSeconds())
 		stdCron.Start()
 	}
+
+	// K8s pod name
+	nodeID := os.Getenv("HOSTNAME")
+	if nodeID == "" {
+		nodeID = uuid.NewString()
+	}
+
+	mutexR := mutex.NewClusterMutex(
+		lifecycle.Std().Context(), redispool.Std(), "default_cluster_mutex", nodeID,
+	)
+
+	if err := mutexR.WaitReady(lifecycle.Std().Context()); err != nil {
+		panic(err)
+	}
+
 	_, err := stdCron.AddFunc(spec, func() {
 		defer func() {
 			if r := recover(); r != nil {
 				logs.Errorf("Crash during task execution: %v", r)
 			}
 		}()
-		if !mutex.IsMaster() {
+		if !mutexR.IsMaster() {
 			logs.Debugf("Not master")
 			return
 		}
