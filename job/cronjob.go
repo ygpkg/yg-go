@@ -31,7 +31,7 @@ func RegistryCronFunc(db *gorm.DB, spec string, purpose string, taskFunc func() 
 	}
 
 	mutexR := mutex.NewClusterMutex(
-		lifecycle.Std().Context(), redispool.Std(), "default_cluster_mutex", nodeID,
+		lifecycle.Std().Context(), redispool.Std(), purpose, nodeID,
 	)
 
 	if err := mutexR.WaitReady(lifecycle.Std().Context()); err != nil {
