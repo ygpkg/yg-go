@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ygpkg/yg-go/logs"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 )
@@ -42,37 +41,76 @@ func (m FloatMetric) GetFloatValue() float64 {
 	return m.Value
 }
 
+// GroupKey 分组键的约束
+type GroupKey interface {
+	comparable
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+		~string
+}
+
 // Query 查询接口，所有查询类型都需要实现此接口
 type Query interface {
 	// Validate 验证查询参数的合法性
 	Validate() error
 }
 
-// StatFunc 统计函数签名（泛型）
-type StatFunc[Q Query] func(ctx context.Context, query Q) (MetricValue, error)
+// StatFunc 统计函数签名，支持单值和分组两种模式
+// 返回 (单个值, 分组值map, error)
+// - 如果是单值统计：返回 (value, nil, nil)
+// - 如果是分组统计：返回 (nil, map, nil)
+// - 如果出错：返回 (nil, nil, error)
+//
+// 注意：不应同时返回单值和分组值，Execute 方法会验证并返回错误
+type StatFunc[Q Query, K GroupKey] func(ctx context.Context, query Q) (MetricValue, map[K]MetricValue, error)
 
-// StatResult 执行结果
-type StatResult struct {
-	Name  string
-	Value MetricValue
-	Error error
+// StatResult 单个统计函数的执行结果
+type StatResult[K GroupKey] struct {
+	Name         string
+	SingleValue  MetricValue
+	GroupedValue map[K]MetricValue
+	IsGrouped    bool
+	Error        error
 }
 
-// StatManager 统计管理器（泛型），每个 Manager 服务一种查询类型
-type StatManager[Q Query] struct {
-	funcs map[string]StatFunc[Q]
+// IsSuccess 判断是否执行成功
+func (r StatResult[K]) IsSuccess() bool {
+	return r.Error == nil
+}
+
+// GetSingleValue 获取单值，如果不是单值类型则返回 nil
+func (r StatResult[K]) GetSingleValue() MetricValue {
+	if r.IsGrouped || r.Error != nil {
+		return nil
+	}
+	return r.SingleValue
+}
+
+// GetGroupedValue 获取分组值，如果不是分组类型则返回 nil
+func (r StatResult[K]) GetGroupedValue() map[K]MetricValue {
+	if !r.IsGrouped || r.Error != nil {
+		return nil
+	}
+	return r.GroupedValue
+}
+
+// StatManager 统计管理器（泛型）
+// Q: 查询类型
+// K: 分组键类型
+type StatManager[Q Query, K GroupKey] struct {
+	funcs map[string]StatFunc[Q, K]
 	mu    sync.RWMutex
 }
 
 // NewStatManager 创建统计管理器
-func NewStatManager[Q Query]() *StatManager[Q] {
-	return &StatManager[Q]{
-		funcs: make(map[string]StatFunc[Q]),
+func NewStatManager[Q Query, K GroupKey]() *StatManager[Q, K] {
+	return &StatManager[Q, K]{
+		funcs: make(map[string]StatFunc[Q, K]),
 	}
 }
 
-// Register 注册统计函数（完全类型安全，无需任何断言）
-func (m *StatManager[Q]) Register(name string, fn StatFunc[Q]) error {
+// Register 注册统计函数
+func (m *StatManager[Q, K]) Register(name string, fn StatFunc[Q, K]) error {
 	if name == "" {
 		return fmt.Errorf("stat name cannot be empty")
 	}
@@ -92,7 +130,7 @@ func (m *StatManager[Q]) Register(name string, fn StatFunc[Q]) error {
 }
 
 // BatchRegister 批量注册统计函数
-func (m *StatManager[Q]) BatchRegister(funcs map[string]StatFunc[Q]) error {
+func (m *StatManager[Q, K]) BatchRegister(funcs map[string]StatFunc[Q, K]) error {
 	for name, fn := range funcs {
 		if err := m.Register(name, fn); err != nil {
 			return err
@@ -102,27 +140,29 @@ func (m *StatManager[Q]) BatchRegister(funcs map[string]StatFunc[Q]) error {
 }
 
 // Execute 并发执行所有统计函数，最大并发数为 15
-func (m *StatManager[Q]) Execute(ctx context.Context, query Q) (map[string]MetricValue, error) {
+// 如果任何统计函数失败，会返回错误，但 result 仍包含成功执行的结果
+// 失败的统计函数会在 result 中标记 Error 字段
+func (m *StatManager[Q, K]) Execute(ctx context.Context, query Q) (map[string]StatResult[K], error) {
 	// 先验证查询参数
 	if err := query.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid query: %w", err)
 	}
+
 	m.mu.RLock()
-	funcs := make(map[string]StatFunc[Q], len(m.funcs))
+	funcs := make(map[string]StatFunc[Q, K], len(m.funcs))
 	for name, fn := range m.funcs {
 		funcs[name] = fn
 	}
 	m.mu.RUnlock()
 
 	if len(funcs) == 0 {
-		return make(map[string]MetricValue), nil
+		return make(map[string]StatResult[K]), nil
 	}
 
-	result := make(map[string]MetricValue, len(funcs))
+	result := make(map[string]StatResult[K], len(funcs))
 	resultMu := sync.Mutex{}
 
 	g, gCtx := errgroup.WithContext(ctx)
-	// 限制最大并发数为 15
 	sem := semaphore.NewWeighted(15)
 
 	for key, v := range funcs {
@@ -134,18 +174,35 @@ func (m *StatManager[Q]) Execute(ctx context.Context, query Q) (map[string]Metri
 			}
 			defer sem.Release(1)
 
-			value, err := fn(gCtx, query)
+			singleValue, groupedValue, err := fn(gCtx, query)
 
 			resultMu.Lock()
 			defer resultMu.Unlock()
 
 			if err != nil {
-				result[name] = nil
-				logs.ErrorContextf(ctx, "[Execute] stat function %s failed: %v", name, err)
+				result[name] = StatResult[K]{
+					Name:  name,
+					Error: err,
+				}
 				return fmt.Errorf("stat function %s failed: %w", name, err)
 			}
 
-			result[name] = value
+			// 验证返回值的合法性：不应同时返回单值和分组值
+			if singleValue != nil && groupedValue != nil {
+				result[name] = StatResult[K]{
+					Name:  name,
+					Error: fmt.Errorf("stat function returned both single and grouped values"),
+				}
+				return fmt.Errorf("stat function %s returned invalid result: both single and grouped values present", name)
+			}
+
+			isGrouped := groupedValue != nil
+			result[name] = StatResult[K]{
+				Name:         name,
+				SingleValue:  singleValue,
+				GroupedValue: groupedValue,
+				IsGrouped:    isGrouped,
+			}
 			return nil
 		})
 	}
