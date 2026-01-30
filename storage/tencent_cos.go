@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"path"
@@ -58,7 +59,11 @@ func (tc *TencentCos) Save(ctx context.Context, fi *FileInfo, r io.Reader) error
 		return fmt.Errorf("reader is empty")
 	}
 
-	resp, err := tc.client.Object.Put(ctx, fi.StoragePath, r, nil)
+	resp, err := tc.client.Object.Put(ctx, fi.StoragePath, r, &cos.ObjectPutOptions{
+		ObjectPutHeaderOptions: &cos.ObjectPutHeaderOptions{
+			ContentType: mime.TypeByExtension(fi.FileExt),
+		},
+	})
 	if err != nil {
 		logs.Errorf("tencent cos put object error: %v", err)
 		return err
