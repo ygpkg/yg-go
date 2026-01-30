@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	reqBodyMaxSize = 1024
+	reqBodyMaxSize = 128
 )
 
 // Logger .
