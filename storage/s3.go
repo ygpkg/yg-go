@@ -88,6 +88,7 @@ func (s3fs *S3Fs) Save(ctx context.Context, fi *FileInfo, r io.Reader) error {
 	if err != nil {
 		return err
 	}
+	fi.PublicURL = s3fs.GetPublicURL(fi.StoragePath, false)
 	return nil
 }
 
