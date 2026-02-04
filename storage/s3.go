@@ -131,7 +131,7 @@ func (s3fs *S3Fs) GetPresignedURL(method, storagePath string) (string, error) {
 		err error
 		url *v4.PresignedHTTPRequest
 	)
-
+	storagePath = strings.TrimPrefix(storagePath, "/")
 	switch method {
 	case http.MethodGet:
 		url, err = presigner.PresignGetObject(s3fs.ctx, &s3.GetObjectInput{
