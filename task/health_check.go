@@ -2,11 +2,13 @@ package task
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/dbtools/redispool"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -165,6 +167,31 @@ func (h *HealthChecker) checkTaskTypeWorkers(ctx context.Context, taskType strin
 	}
 
 	return nil
+}
+
+// IsWorkerAlive 检查 Worker 是否存活
+func (h *HealthChecker) IsWorkerAlive(ctx context.Context, taskType, workerID string) (bool, error) {
+	key := h.heartbeatKey(taskType)
+	value, err := redispool.Redis().HGet(ctx, key, workerID).Result()
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return false, nil // Worker 不存在
+		}
+		return false, err
+	}
+
+	parts := strings.Split(value, "-")
+	if len(parts) < 2 {
+		return false, nil
+	}
+
+	timestamp, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return false, nil
+	}
+
+	// 检查心跳是否在有效期内
+	return time.Now().Unix()-timestamp <= HeartbeatTimeout, nil
 }
 
 // SyncQueueCount 同步队列数量

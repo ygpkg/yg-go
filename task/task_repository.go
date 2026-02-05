@@ -193,7 +193,9 @@ func (repo *TaskRepository) GetPendingTaskCount(ctx context.Context, taskType st
 }
 
 // CheckAndTimeoutTasks 检查并标记超时任务
-func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context) error {
+// 只处理心跳丢失且超时的任务（Worker 崩溃场景）
+// healthChecker 用于检查 Worker 心跳状态，如果为 nil 则使用缓冲时间判断
+func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context, healthChecker *HealthChecker) error {
 	now := time.Now()
 
 	// 查找所有运行中的任务
@@ -206,12 +208,40 @@ func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context) error {
 
 	var timeoutIDs []uint
 	for _, taskEntity := range tasks {
-		if taskEntity.StartAt != nil {
-			timeoutTime := taskEntity.StartAt.Add(taskEntity.Timeout)
-			if now.After(timeoutTime) {
-				timeoutIDs = append(timeoutIDs, taskEntity.ID)
+		if taskEntity.StartAt == nil {
+			continue
+		}
+
+		// 检查任务是否已超时
+		timeoutTime := taskEntity.StartAt.Add(taskEntity.Timeout)
+		if !now.After(timeoutTime) {
+			continue // 未超时
+		}
+
+		// 检查 Worker 心跳是否正常
+		// 如果心跳正常，说明任务仍在执行中，由执行层处理超时
+		if healthChecker != nil {
+			isWorkerAlive, err := healthChecker.IsWorkerAlive(ctx, taskEntity.TaskType, taskEntity.WorkerID)
+			if err != nil {
+				logs.WarnContextf(ctx, "[task] failed to check worker status: %v", err)
+				continue
+			}
+
+			if isWorkerAlive {
+				// Worker 心跳正常，由执行层处理超时
+				continue
+			}
+		} else {
+			// 没有 healthChecker，使用缓冲时间判断（2倍心跳周期）
+			// 如果任务已超时超过心跳周期*2，说明 Worker 可能已崩溃
+			bufferTime := timeoutTime.Add(HeartbeatTimeout * 2 * time.Second)
+			if !now.After(bufferTime) {
+				continue
 			}
 		}
+
+		// Worker 心跳丢失或超过缓冲时间，标记任务超时
+		timeoutIDs = append(timeoutIDs, taskEntity.ID)
 	}
 
 	if len(timeoutIDs) > 0 {
@@ -221,7 +251,7 @@ func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context) error {
 			Where("task_status = ?", TaskStatusRunning).
 			Updates(map[string]interface{}{
 				"task_status": TaskStatusTimeout,
-				"err_msg":     "task execution timeout",
+				"err_msg":     "task execution timeout (worker heartbeat lost)",
 				"redo":        gorm.Expr("redo + 1"),
 				"end_at":      now,
 			}).Error
@@ -230,7 +260,7 @@ func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context) error {
 			return fmt.Errorf("failed to update timeout tasks: %w", err)
 		}
 
-		logs.InfoContextf(ctx, "[task] marked %repo tasks as timeout", len(timeoutIDs))
+		logs.InfoContextf(ctx, "[task] marked %d tasks as timeout", len(timeoutIDs))
 	}
 
 	return nil

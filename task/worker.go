@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -49,13 +50,11 @@ func NewWorker(config *TaskConfig, db *gorm.DB) (*Worker, error) {
 }
 
 // NewWorkerWithDBInstance 使用数据库实例名称创建分布式 Worker
-// dbInstance: 数据库实例名称，通过 dbtools 获取 gorm.DB
 func NewWorkerWithDBInstance(config *TaskConfig) (*Worker, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
 
-	// 获取数据库实例
 	db := dbtools.DB(config.DBInstance)
 	if db == nil {
 		return nil, fmt.Errorf("database instance not found: %s", config.DBInstance)
@@ -71,12 +70,10 @@ func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory) {
 
 // CreateTask 创建任务
 func (w *Worker) CreateTask(ctx context.Context, taskEntity *TaskEntity) error {
-	// 创建任务记录
 	if err := w.repo.CreateTask(ctx, taskEntity); err != nil {
 		return err
 	}
 
-	// 推入队列
 	if err := w.queue.Push(ctx, taskEntity.TaskType); err != nil {
 		return err
 	}
@@ -85,18 +82,16 @@ func (w *Worker) CreateTask(ctx context.Context, taskEntity *TaskEntity) error {
 	return nil
 }
 
-// BatchCreateTasks 批量创建任务，并将第一个任务推入队列
+// BatchCreateTasks 批量创建任务
 func (w *Worker) BatchCreateTasks(ctx context.Context, tasks []*TaskEntity) error {
 	if len(tasks) == 0 {
 		return nil
 	}
 
-	// 批量创建任务记录
 	if err := w.repo.BatchCreateTasks(ctx, tasks); err != nil {
 		return fmt.Errorf("failed to batch create tasks: %w", err)
 	}
 
-	// 将第一个任务推入队列
 	firstTask := tasks[0]
 	if err := w.queue.Push(ctx, firstTask.TaskType); err != nil {
 		return fmt.Errorf("failed to push first task to queue: %w", err)
@@ -121,25 +116,23 @@ func (w *Worker) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to init task status: %w", err)
 	}
 
-	// 创建上下文
 	w.ctx, w.cancel = context.WithCancel(ctx)
 
-	// 启动超时检查协程（仅主节点）
-	w.wg.Add(1)
-	go w.timeoutCheckRoutine()
+	// 启动超时检查
+	w.startRoutine("timeout-checker", w.timeoutCheckRoutine)
 
-	// 启动健康检查协程（仅主节点）
+	// 启动健康检查
 	if w.config.EnableHealthCheck {
-		w.wg.Add(1)
-		go w.healthCheckRoutine()
+		w.startRoutine("health-checker", w.healthCheckRoutine)
 	}
 
-	// 为每个注册的任务类型启动工作协程
+	// 为每个任务类型启动工作协程
 	taskTypes := w.registry.GetAll()
 	for _, taskType := range taskTypes {
 		for i := 0; i < w.config.MaxConcurrency; i++ {
-			w.wg.Add(1)
-			go w.workRoutine(taskType)
+			w.startRoutine(fmt.Sprintf("worker-%s-%d", taskType, i), func() {
+				w.workRoutine(taskType)
+			})
 		}
 		logs.InfoContextf(ctx, "[task] started %d workers for task type: %s", w.config.MaxConcurrency, taskType)
 	}
@@ -149,24 +142,52 @@ func (w *Worker) Start(ctx context.Context) error {
 	return nil
 }
 
+// startRoutine 启动协程的统一封装
+func (w *Worker) startRoutine(name string, fn func()) {
+	w.wg.Add(1)
+	go func() {
+		defer w.wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				logs.ErrorContextf(w.ctx, "[task] routine %s panic: %v", name, r)
+			}
+		}()
+		fn()
+	}()
+}
+
 // Stop 停止 Worker
 func (w *Worker) Stop(ctx context.Context) error {
 	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	if !w.started {
+		w.mu.Unlock()
 		return ErrManagerNotStarted
 	}
+	w.mu.Unlock()
 
-	// 取消上下文
-	if w.cancel != nil {
-		w.cancel()
+	logs.InfoContextf(ctx, "[task] stopping worker...")
+
+	// 取消上下文，通知所有协程退出
+	w.cancel()
+
+	// 等待所有协程退出（带超时）
+	done := make(chan struct{})
+	go func() {
+		w.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		logs.InfoContextf(ctx, "[task] all goroutines stopped")
+	case <-time.After(30 * time.Second):
+		logs.WarnContextf(ctx, "[task] stop timeout after 30s")
 	}
 
-	// 等待所有协程退出
-	w.wg.Wait()
-
+	w.mu.Lock()
 	w.started = false
+	w.mu.Unlock()
+
 	logs.InfoContextf(ctx, "[task] worker stopped")
 	return nil
 }
@@ -183,13 +204,11 @@ func (w *Worker) CancelTask(ctx context.Context, taskID uint, reason string) err
 
 // PullTask 拉取任务
 func (w *Worker) PullTask(ctx context.Context, taskType string) (*TaskEntity, error) {
-	// 从队列中取出消息
 	_, err := w.queue.Pop(ctx, taskType, w.config.WorkerID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 从数据库获取待处理任务
 	task, err := w.repo.GetOnePendingTask(ctx, taskType, w.config.WorkerID)
 	if err != nil {
 		return nil, err
@@ -212,16 +231,13 @@ func (w *Worker) CompleteTask(ctx context.Context, taskEntity *TaskEntity) error
 	return w.repo.SaveTask(ctx, taskEntity)
 }
 
-// workRoutine 工作协程
+// workRoutine 工作协程（优化版：使用阻塞式消费）
 func (w *Worker) workRoutine(taskType string) {
-	defer w.wg.Done()
-
 	for {
 		select {
 		case <-w.ctx.Done():
-			logs.InfoContextf(w.ctx, "[task] work routine exit, taskType: %s", taskType)
 			return
-		case <-time.After(time.Second):
+		default:
 			w.processOneTask(taskType)
 		}
 	}
@@ -231,19 +247,21 @@ func (w *Worker) workRoutine(taskType string) {
 func (w *Worker) processOneTask(taskType string) {
 	ctx := logs.WithContextFields(w.ctx, "worker_id", w.config.WorkerID, "task_type", taskType)
 
-	// 拉取任务
+	// 拉取任务（阻塞等待）
 	task, err := w.PullTask(ctx, taskType)
 	if err != nil {
-		logs.ErrorContextf(ctx, "[task] failed to pull task: %v", err)
+		// 忽略 context 取消的错误
+		if !errors.Is(err, context.Canceled) {
+			logs.ErrorContextf(ctx, "[task] failed to pull task: %v", err)
+		}
 		return
 	}
 
 	if task == nil {
-		// 没有待处理任务
-		return
+		return // 没有任务，继续循环（Pop 已经阻塞过了）
 	}
 
-	// 处理任务
+	// 执行任务
 	w.executeTask(ctx, task)
 }
 
@@ -260,95 +278,96 @@ func (w *Worker) executeTask(ctx context.Context, taskEntity *TaskEntity) {
 		return
 	}
 
-	// 创建执行器实例
 	executor := factory()
 
 	// Prepare 执行器
 	if err := executor.Prepare(ctx, taskEntity); err != nil {
-		logs.ErrorContextf(ctx, "[task] failed to setup executor: %v", err)
-		taskEntity.MarkAsFailed(fmt.Sprintf("setup failed: %v", err))
+		logs.ErrorContextf(ctx, "[task] failed to prepare executor: %v", err)
+		taskEntity.MarkAsFailed(fmt.Sprintf("prepare failed: %v", err))
 		w.repo.SaveTask(ctx, taskEntity)
 		return
 	}
 
-	// 执行任务（带超时控制）
-	execCtx, cancel := context.WithTimeout(ctx, taskEntity.Timeout)
-	defer cancel()
+	// 创建执行上下文（带超时）
+	execCtx, execCancel := context.WithTimeout(ctx, taskEntity.Timeout)
+	defer execCancel()
 
-	// 启动心跳上报
-	heartbeatDone := make(chan struct{})
-	go w.heartbeatRoutine(ctx, taskEntity.ID, heartbeatDone)
+	// 启动心跳
+	heartbeatCtx, heartbeatCancel := context.WithCancel(ctx)
+	defer heartbeatCancel()
+
+	w.startRoutine("heartbeat", func() {
+		w.heartbeatRoutine(heartbeatCtx, taskEntity.ID)
+	})
 
 	// 执行任务
-	execDone := make(chan error, 1)
-	go func() {
-		execDone <- executor.Execute(execCtx)
-	}()
+	execErr := w.doExecute(execCtx, executor)
 
-	var execErr error
-	select {
-	case <-execCtx.Done():
-		// 超时
+	// 根据结果更新任务状态
+	if execCtx.Err() == context.DeadlineExceeded {
 		taskEntity.MarkAsTimeout()
 		logs.WarnContextf(ctx, "[task] task timeout")
-	case execErr = <-execDone:
-		// 执行完成
-		if execErr != nil {
-			taskEntity.MarkAsFailed(execErr.Error())
-			logs.ErrorContextf(ctx, "[task] task failed: %v", execErr)
-		} else {
-			taskEntity.MarkAsSuccess("")
-			logs.InfoContextf(ctx, "[task] task success")
-		}
+	} else if execErr != nil {
+		taskEntity.MarkAsFailed(execErr.Error())
+		logs.ErrorContextf(ctx, "[task] task failed: %v", execErr)
+	} else {
+		taskEntity.MarkAsSuccess("")
+		logs.InfoContextf(ctx, "[task] task success")
 	}
 
-	// 停止心跳
-	close(heartbeatDone)
-
-	// 保存任务结果
+	// 保存结果
 	if err := w.saveTaskResult(ctx, taskEntity, executor); err != nil {
 		logs.ErrorContextf(ctx, "[task] failed to save task result: %v", err)
 	}
 
-	// 如果任务失败且可以重试，重新推入队列
+	// 失败重试
 	if taskEntity.CanRetry() {
-		if err := w.queue.Push(ctx, taskEntity.TaskType); err != nil {
-			logs.ErrorContextf(ctx, "[task] failed to repush task: %v", err)
-		}
+		_ = w.pushWithRetry(ctx, taskEntity.TaskType) // 错误已在 pushWithRetry 中记录
+		return
 	}
+
+	// 只有任务成功时，才主动触发下一个任务
+	if taskEntity.IsSuccess() {
+		w.triggerNextTask(ctx, taskEntity)
+	}
+}
+
+// doExecute 执行任务（带 panic 恢复）
+func (w *Worker) doExecute(ctx context.Context, executor TaskExecutor) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("task panic: %v", r)
+		}
+	}()
+
+	return executor.Execute(ctx)
 }
 
 // saveTaskResult 保存任务结果
 func (w *Worker) saveTaskResult(ctx context.Context, taskEntity *TaskEntity, executor TaskExecutor) error {
 	return w.db.Transaction(func(tx *gorm.DB) error {
-		// 保存任务
 		if err := tx.Save(taskEntity).Error; err != nil {
 			return err
 		}
 
-		// 调用回调
 		if taskEntity.IsSuccess() {
-			if err := executor.OnSuccess(ctx, tx); err != nil {
-				return err
-			}
-		} else {
-			if err := executor.OnFailure(ctx, tx); err != nil {
-				return err
-			}
+			return executor.OnSuccess(ctx, tx)
 		}
-
-		return nil
+		return executor.OnFailure(ctx, tx)
 	})
 }
 
 // heartbeatRoutine 心跳协程
-func (w *Worker) heartbeatRoutine(ctx context.Context, taskID uint, done chan struct{}) {
+func (w *Worker) heartbeatRoutine(ctx context.Context, taskID uint) {
+	// 立即发送一次心跳
+	w.ReportHeartbeat(ctx, taskID)
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-done:
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			if err := w.ReportHeartbeat(ctx, taskID); err != nil {
@@ -360,18 +379,15 @@ func (w *Worker) heartbeatRoutine(ctx context.Context, taskID uint, done chan st
 
 // timeoutCheckRoutine 超时检查协程
 func (w *Worker) timeoutCheckRoutine() {
-	defer w.wg.Done()
-
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-w.ctx.Done():
-			logs.InfoContextf(w.ctx, "[task] timeout check routine exit")
 			return
 		case <-ticker.C:
-			if err := w.repo.CheckAndTimeoutTasks(w.ctx); err != nil {
+			if err := w.repo.CheckAndTimeoutTasks(w.ctx, w.healthChecker); err != nil {
 				logs.ErrorContextf(w.ctx, "[task] failed to check timeout tasks: %v", err)
 			}
 			if err := w.healthChecker.SyncQueueCount(w.ctx); err != nil {
@@ -383,20 +399,104 @@ func (w *Worker) timeoutCheckRoutine() {
 
 // healthCheckRoutine 健康检查协程
 func (w *Worker) healthCheckRoutine() {
-	defer w.wg.Done()
-
 	ticker := time.NewTicker(w.config.HealthCheckPeriod)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-w.ctx.Done():
-			logs.InfoContextf(w.ctx, "[task] health check routine exit")
 			return
 		case <-ticker.C:
 			if err := w.healthChecker.CheckWorkerHealth(w.ctx); err != nil {
 				logs.ErrorContextf(w.ctx, "[task] failed to check worker health: %v", err)
 			}
 		}
+	}
+}
+
+// pushWithRetry 带重试的消息推送
+func (w *Worker) pushWithRetry(ctx context.Context, taskType string) error {
+	maxRetries := 3
+	retryInterval := 100 * time.Millisecond
+	var lastErr error
+
+	for i := 0; i < maxRetries; i++ {
+		if err := w.queue.Push(ctx, taskType); err != nil {
+			lastErr = err
+			logs.WarnContextf(ctx, "[task] push retry %d/%d failed: %v", i+1, maxRetries, err)
+			if i < maxRetries-1 {
+				time.Sleep(retryInterval)
+				retryInterval *= 2 // 指数退避
+			}
+			continue
+		}
+		return nil // 成功
+	}
+
+	// 所有重试失败，记录错误日志
+	// SyncQueueCount 会作为最终兜底
+	logs.ErrorContextf(ctx, "[task] all push retries failed for taskType: %s", taskType)
+	return lastErr
+}
+
+// triggerNextTask 触发下一个任务
+// 前提条件：当前任务已成功完成
+func (w *Worker) triggerNextTask(ctx context.Context, completedTask *TaskEntity) {
+	// 场景 1：步骤化任务（有 AppGroup）
+	if completedTask.AppGroup != "" {
+		w.triggerNextStepTask(ctx, completedTask)
+		return
+	}
+
+	// 场景 2：普通任务（无 AppGroup）
+	w.triggerNextNormalTask(ctx, completedTask.TaskType)
+}
+
+// triggerNextStepTask 触发下一个步骤的任务
+// 参考 GetNextStepTasks 逻辑：只有当前 step 的所有任务都成功后，才触发下一个 step
+func (w *Worker) triggerNextStepTask(ctx context.Context, completedTask *TaskEntity) {
+	// 获取下一步待执行的任务
+	nextTasks, err := w.repo.GetNextStepTasks(ctx, completedTask.SubjectID, completedTask.AppGroup)
+	if err != nil {
+		logs.ErrorContextf(ctx, "[task] failed to get next step tasks: %v", err)
+		return
+	}
+
+	if len(nextTasks) == 0 {
+		logs.DebugContextf(ctx, "[task] no next step tasks for subject %d, appGroup %s",
+			completedTask.SubjectID, completedTask.AppGroup)
+		return
+	}
+
+	// 收集需要触发的任务类型（去重）
+	taskTypeSet := make(map[string]struct{})
+	for _, task := range nextTasks {
+		// 只推送 pending 状态的任务（failed 由重试机制处理）
+		if task.IsPending() {
+			taskTypeSet[task.TaskType] = struct{}{}
+		}
+	}
+
+	// 为每个任务类型推送一条消息
+	for taskType := range taskTypeSet {
+		if err := w.pushWithRetry(ctx, taskType); err == nil {
+			logs.InfoContextf(ctx, "[task] triggered next step task, type: %s, subject: %d, appGroup: %s",
+				taskType, completedTask.SubjectID, completedTask.AppGroup)
+		}
+		// 错误已在 pushWithRetry 中记录
+	}
+}
+
+// triggerNextNormalTask 触发下一个普通任务
+func (w *Worker) triggerNextNormalTask(ctx context.Context, taskType string) {
+	// 检查数据库中是否还有待处理任务
+	count, err := w.repo.GetPendingTaskCount(ctx, taskType)
+	if err != nil {
+		logs.ErrorContextf(ctx, "[task] failed to get pending task count: %v", err)
+		return
+	}
+
+	if count > 0 {
+		_ = w.pushWithRetry(ctx, taskType) // 错误已在 pushWithRetry 中记录
 	}
 }

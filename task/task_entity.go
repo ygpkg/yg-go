@@ -3,7 +3,6 @@ package task
 import (
 	"time"
 
-	"github.com/ygpkg/yg-go/dbtools"
 	"gorm.io/gorm"
 )
 
@@ -77,11 +76,6 @@ const TableNameCoreTask = "core_task"
 // TableName 表名
 func (TaskEntity) TableName() string {
 	return TableNameCoreTask
-}
-
-// InitDB 初始化数据库表
-func InitDB(db *gorm.DB) error {
-	return dbtools.InitModel(db, &TaskEntity{})
 }
 
 // IsPending 是否为待处理状态

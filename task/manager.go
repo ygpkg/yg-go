@@ -2,7 +2,6 @@ package task
 
 import (
 	"context"
-	"time"
 )
 
 // TaskManager 任务管理器接口
@@ -44,18 +43,4 @@ type DistributedWorker interface {
 	// CompleteTask 完成任务
 	// 由 Worker 调用来保存任务结果
 	CompleteTask(ctx context.Context, task *TaskEntity) error
-}
-
-// LocalScheduler 本地调度器接口
-type LocalScheduler interface {
-	TaskManager
-
-	// SetConcurrency 设置并发数
-	SetConcurrency(max int)
-
-	// SetTimeout 设置超时时间
-	SetTimeout(timeout time.Duration)
-
-	// GetPendingCount 获取待处理任务数量
-	GetPendingCount(ctx context.Context, taskType string) (int64, error)
 }
