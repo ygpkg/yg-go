@@ -174,7 +174,6 @@ import (
 func main() {
 	// 配置 Worker
 	config := &task.TaskConfig{
-		DBInstance:        "default",    // 数据库实例名称
 		WorkerID:          "worker-001", // Worker 唯一标识
 		MaxConcurrency:    5,            // 最大并发数
 		Timeout:           10 * time.Minute, // 默认超时
@@ -185,13 +184,18 @@ func main() {
 	}
 	
 	// 获取数据库实例
-	db := dbtools.DB(config.DBInstance)
+	db := dbtools.DB("default")
 	if db == nil {
-		panic(fmt.Sprintf("Database instance not found: %s", config.DBInstance))
+		panic(fmt.Sprintf("Database instance not found: %s", "default"))
 	}
 	
+	// 创建 Redis 客户端
+	redisClient := redis.NewClient(&redis.Options{
+		Addr: "localhost:6379",
+	})
+	
 	// 创建 Worker
-	worker, err := task.NewWorker(config, db)
+	worker, err := task.NewWorker(config, db, redisClient)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create worker: %v", err))
 	}
@@ -486,7 +490,6 @@ func CancelTask(worker *task.Worker, taskID uint) error {
 
 | 字段 | 类型 | 说明 | 默认值 | 必填 |
 |------|------|------|--------|------|
-| DBInstance | string | 数据库实例名称（通过 dbtools 获取） | "" | 是 |
 | WorkerID | string | Worker 唯一标识 | "" | 是 |
 | MaxConcurrency | int | 每个任务类型的最大并发数 | 5 | 否 |
 | Timeout | time.Duration | 任务默认超时时间 | 10分钟 | 否 |
@@ -499,7 +502,6 @@ func CancelTask(worker *task.Worker, taskID uint) error {
 
 ```go
 config := &task.TaskConfig{
-	DBInstance:        "default",         // 数据库实例
 	WorkerID:          "worker-prod-001", // Worker ID（建议包含环境和编号）
 	MaxConcurrency:    10,                // 并发数（根据机器性能调整）
 	Timeout:           15 * time.Minute,  // 默认超时

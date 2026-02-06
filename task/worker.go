@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 )
@@ -29,7 +30,7 @@ type Worker struct {
 }
 
 // NewWorker 创建分布式 Worker
-func NewWorker(config *TaskConfig, db *gorm.DB) (*Worker, error) {
+func NewWorker(config *TaskConfig, db *gorm.DB, redisClient *redis.Client) (*Worker, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -38,11 +39,21 @@ func NewWorker(config *TaskConfig, db *gorm.DB) (*Worker, error) {
 
 	// 创建队列配置
 	queueConfig := &QueueConfig{
-		KeyPrefix: config.RedisKeyPrefix,
-		BlockTime: config.QueueBlockTime,
+		KeyPrefix:   config.RedisKeyPrefix,
+		BlockTime:   config.QueueBlockTime,
+		RedisClient: redisClient,
+		DB:          db,
 	}
 	queue := NewQueue(queueConfig)
-	healthChecker := NewHealthChecker(config.RedisKeyPrefix, repo, queue)
+
+	// 创建健康检查器配置
+	healthCheckerConfig := &HealthCheckerConfig{
+		KeyPrefix:   config.RedisKeyPrefix,
+		RedisClient: redisClient,
+		DB:          db,
+		Queue:       queue,
+	}
+	healthChecker := NewHealthChecker(healthCheckerConfig)
 
 	return &Worker{
 		config:        config,

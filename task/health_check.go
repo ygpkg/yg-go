@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/ygpkg/yg-go/dbtools/redispool"
 	"github.com/ygpkg/yg-go/logs"
+	"gorm.io/gorm"
 )
 
 const (
@@ -18,25 +18,62 @@ const (
 	HeartbeatTimeout = 30
 )
 
+// HealthCheckerConfig 健康检查器配置
+type HealthCheckerConfig struct {
+	// KeyPrefix Redis 键前缀
+	KeyPrefix string
+	// RedisClient Redis 客户端
+	RedisClient *redis.Client
+	// DB 数据库连接
+	DB *gorm.DB
+	// Queue 任务队列
+	Queue *Queue
+}
+
+// Validate 验证配置
+func (c *HealthCheckerConfig) Validate() error {
+	if c.RedisClient == nil {
+		return fmt.Errorf("health checker config: redis client is required")
+	}
+	if c.DB == nil {
+		return fmt.Errorf("health checker config: db is required")
+	}
+	if c.Queue == nil {
+		return fmt.Errorf("health checker config: queue is required")
+	}
+	if c.KeyPrefix == "" {
+		return fmt.Errorf("health checker config: key prefix cannot be empty")
+	}
+	return nil
+}
+
 // HealthChecker 健康检查器
 type HealthChecker struct {
-	keyPrefix string
-	dao       *TaskRepository
-	queue     *Queue
+	config *HealthCheckerConfig
 }
 
 // NewHealthChecker 创建健康检查器
-func NewHealthChecker(keyPrefix string, dao *TaskRepository, queue *Queue) *HealthChecker {
-	return &HealthChecker{
-		keyPrefix: keyPrefix,
-		dao:       dao,
-		queue:     queue,
+func NewHealthChecker(config *HealthCheckerConfig) *HealthChecker {
+	if config == nil {
+		panic("health checker config is required")
 	}
+	if err := config.Validate(); err != nil {
+		panic(fmt.Sprintf("invalid health checker config: %v", err))
+	}
+
+	return &HealthChecker{
+		config: config,
+	}
+}
+
+// getRepo 按需创建 TaskRepository
+func (h *HealthChecker) getRepo() *TaskRepository {
+	return NewTaskRepository(h.config.DB)
 }
 
 // heartbeatKey 获取心跳 key
 func (h *HealthChecker) heartbeatKey(taskType string) string {
-	return fmt.Sprintf("%stask_heartbeat:%s", h.keyPrefix, taskType)
+	return fmt.Sprintf("%stask_heartbeat:%s", h.config.KeyPrefix, taskType)
 }
 
 // SetHeartbeat 设置心跳
@@ -46,7 +83,7 @@ func (h *HealthChecker) SetHeartbeat(ctx context.Context, taskType, workerID str
 	timestamp := time.Now().Unix()
 	value := fmt.Sprintf("%d-%d", timestamp, taskID)
 
-	_, err := redispool.CacheInstance().HSet(key, workerID, value)
+	_, err := h.config.RedisClient.HSet(ctx, key, workerID, value).Result()
 	if err != nil {
 		return fmt.Errorf("failed to set heartbeat: %w", err)
 	}
@@ -58,7 +95,7 @@ func (h *HealthChecker) SetHeartbeat(ctx context.Context, taskType, workerID str
 // DeleteHeartbeat 删除心跳
 func (h *HealthChecker) DeleteHeartbeat(ctx context.Context, taskType, workerID string) error {
 	key := h.heartbeatKey(taskType)
-	_, err := redispool.CacheInstance().HDel(key, workerID)
+	_, err := h.config.RedisClient.HDel(ctx, key, workerID).Result()
 	if err != nil {
 		return fmt.Errorf("failed to delete heartbeat: %w", err)
 	}
@@ -68,7 +105,7 @@ func (h *HealthChecker) DeleteHeartbeat(ctx context.Context, taskType, workerID 
 // GetWorkerCount 获取 Worker 数量
 func (h *HealthChecker) GetWorkerCount(ctx context.Context, taskType string) (int64, error) {
 	key := h.heartbeatKey(taskType)
-	count, err := redispool.Redis().HLen(ctx, key).Result()
+	count, err := h.config.RedisClient.HLen(ctx, key).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get worker count: %w", err)
 	}
@@ -81,7 +118,7 @@ func (h *HealthChecker) CheckWorkerHealth(ctx context.Context) error {
 	now := time.Now().Unix()
 
 	// 获取所有任务类型
-	types, err := h.queue.GetAllTaskTypes(ctx)
+	types, err := h.config.Queue.GetAllTaskTypes(ctx)
 	if err != nil {
 		logs.ErrorContextf(ctx, "[task] failed to get task types: %v", err)
 		return err
@@ -101,7 +138,7 @@ func (h *HealthChecker) checkTaskTypeWorkers(ctx context.Context, taskType strin
 	key := h.heartbeatKey(taskType)
 
 	// 获取所有 Worker 的心跳信息
-	workerMap, err := redispool.Redis().HGetAll(ctx, key).Result()
+	workerMap, err := h.config.RedisClient.HGetAll(ctx, key).Result()
 	if err != nil {
 		return fmt.Errorf("failed to get workers: %w", err)
 	}
@@ -143,7 +180,8 @@ func (h *HealthChecker) checkTaskTypeWorkers(ctx context.Context, taskType strin
 			}
 
 			// 获取任务并标记为失败
-			taskEntity, err := h.dao.GetTaskByIDAndWorkerID(ctx, uint(taskID), workerID)
+			repo := h.getRepo()
+			taskEntity, err := repo.GetTaskByIDAndWorkerID(ctx, uint(taskID), workerID)
 			if err != nil {
 				logs.WarnContextf(ctx, "[task] failed to get task: %v, taskID: %d, workerID: %s", err, taskID, workerID)
 				continue
@@ -151,14 +189,14 @@ func (h *HealthChecker) checkTaskTypeWorkers(ctx context.Context, taskType strin
 
 			if taskEntity.IsRunning() {
 				taskEntity.MarkAsFailed("worker heartbeat timeout")
-				if err := h.dao.SaveTask(ctx, taskEntity); err != nil {
+				if err := repo.SaveTask(ctx, taskEntity); err != nil {
 					logs.ErrorContextf(ctx, "[task] failed to save task: %v", err)
 					continue
 				}
 
 				// 重新推入队列（如果还可以重试）
 				if taskEntity.CanRetry() {
-					if err := h.queue.Push(ctx, taskEntity.TaskType); err != nil {
+					if err := h.config.Queue.Push(ctx, taskEntity.TaskType); err != nil {
 						logs.ErrorContextf(ctx, "[task] failed to repush task: %v", err)
 					}
 				}
@@ -172,7 +210,7 @@ func (h *HealthChecker) checkTaskTypeWorkers(ctx context.Context, taskType strin
 // IsWorkerAlive 检查 Worker 是否存活
 func (h *HealthChecker) IsWorkerAlive(ctx context.Context, taskType, workerID string) (bool, error) {
 	key := h.heartbeatKey(taskType)
-	value, err := redispool.Redis().HGet(ctx, key, workerID).Result()
+	value, err := h.config.RedisClient.HGet(ctx, key, workerID).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
 			return false, nil // Worker 不存在
@@ -197,7 +235,7 @@ func (h *HealthChecker) IsWorkerAlive(ctx context.Context, taskType, workerID st
 // SyncQueueCount 同步队列数量
 // 检查队列中的消息数量，如果小于待处理任务数，则补充消息
 func (h *HealthChecker) SyncQueueCount(ctx context.Context) error {
-	types, err := h.queue.GetAllTaskTypes(ctx)
+	types, err := h.config.Queue.GetAllTaskTypes(ctx)
 	if err != nil {
 		logs.ErrorContextf(ctx, "[task] failed to get task types: %v", err)
 		return err
@@ -215,13 +253,14 @@ func (h *HealthChecker) SyncQueueCount(ctx context.Context) error {
 // syncTaskTypeQueue 同步特定任务类型的队列
 func (h *HealthChecker) syncTaskTypeQueue(ctx context.Context, taskType string) error {
 	// 获取队列中的消息数量
-	queueCount, err := h.queue.GetPendingCount(ctx, taskType)
+	queueCount, err := h.config.Queue.GetPendingCount(ctx, taskType)
 	if err != nil {
 		return fmt.Errorf("failed to get queue count: %w", err)
 	}
 
 	// 获取数据库中的待处理任务数量
-	taskCount, err := h.dao.GetPendingTaskCount(ctx, taskType)
+	repo := h.getRepo()
+	taskCount, err := repo.GetPendingTaskCount(ctx, taskType)
 	if err != nil {
 		return fmt.Errorf("failed to get task count: %w", err)
 	}
@@ -230,7 +269,7 @@ func (h *HealthChecker) syncTaskTypeQueue(ctx context.Context, taskType string) 
 	if queueCount < taskCount {
 		diff := taskCount - queueCount
 		for i := int64(0); i < diff; i++ {
-			if err := h.queue.Push(ctx, taskType); err != nil {
+			if err := h.config.Queue.Push(ctx, taskType); err != nil {
 				logs.ErrorContextf(ctx, "[task] failed to push task: %v", err)
 				continue
 			}

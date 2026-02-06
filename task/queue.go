@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/ygpkg/yg-go/dbtools/redispool"
 	"github.com/ygpkg/yg-go/logs"
+	"gorm.io/gorm"
 )
 
 // QueueConfig 队列配置
@@ -19,6 +19,10 @@ type QueueConfig struct {
 	BlockTime time.Duration
 	// MaxRetries 最大重试次数（预留字段）
 	MaxRetries int
+	// RedisClient Redis 客户端
+	RedisClient *redis.Client
+	// DB 数据库连接（预留字段，供未来扩展使用）
+	DB *gorm.DB
 }
 
 // DefaultQueueConfig 返回默认队列配置
@@ -34,6 +38,9 @@ func DefaultQueueConfig() *QueueConfig {
 func (c *QueueConfig) Validate() error {
 	if c.KeyPrefix == "" {
 		return fmt.Errorf("queue config: key prefix cannot be empty")
+	}
+	if c.RedisClient == nil {
+		return fmt.Errorf("queue config: redis client is required")
 	}
 	if c.BlockTime <= 0 {
 		c.BlockTime = 5 * time.Second // 使用默认值
@@ -55,7 +62,9 @@ func NewQueue(config *QueueConfig) *Queue {
 		config = DefaultQueueConfig()
 	}
 	// 验证并设置默认值
-	_ = config.Validate()
+	if err := config.Validate(); err != nil {
+		panic(fmt.Sprintf("invalid queue config: %v", err))
+	}
 
 	return &Queue{
 		config: config,
@@ -75,7 +84,7 @@ func (q *Queue) groupKey(taskType string) string {
 // Push 将任务推入队列
 func (q *Queue) Push(ctx context.Context, taskType string) error {
 	stream := q.streamKey(taskType)
-	msgID, err := redispool.Redis().XAdd(ctx, &redis.XAddArgs{
+	msgID, err := q.config.RedisClient.XAdd(ctx, &redis.XAddArgs{
 		Stream: stream,
 		Values: map[string]interface{}{"task_type": taskType, "timestamp": time.Now().Unix()},
 	}).Result()
@@ -93,10 +102,10 @@ func (q *Queue) Pop(ctx context.Context, taskType, workerID string) (string, err
 	group := q.groupKey(taskType)
 
 	// 创建消费组（如果不存在）
-	_ = redispool.Redis().XGroupCreateMkStream(ctx, stream, group, "$").Err()
+	_ = q.config.RedisClient.XGroupCreateMkStream(ctx, stream, group, "$").Err()
 
 	// 阻塞读取消息
-	res, err := redispool.Redis().XReadGroup(ctx, &redis.XReadGroupArgs{
+	res, err := q.config.RedisClient.XReadGroup(ctx, &redis.XReadGroupArgs{
 		Group:    group,
 		Consumer: workerID,
 		Streams:  []string{stream, ">"},
@@ -126,7 +135,7 @@ func (q *Queue) Pop(ctx context.Context, taskType, workerID string) (string, err
 func (q *Queue) Ack(ctx context.Context, taskType, msgID string) error {
 	stream := q.streamKey(taskType)
 	group := q.groupKey(taskType)
-	err := redispool.Redis().XAck(ctx, stream, group, msgID).Err()
+	err := q.config.RedisClient.XAck(ctx, stream, group, msgID).Err()
 	if err != nil {
 		return fmt.Errorf("failed to ack task: %w", err)
 	}
@@ -139,7 +148,7 @@ func (q *Queue) GetPendingCount(ctx context.Context, taskType string) (int64, er
 	group := q.groupKey(taskType)
 
 	// 获取 last-delivered-id
-	groupInfo, err := redispool.Redis().XInfoGroups(ctx, stream).Result()
+	groupInfo, err := q.config.RedisClient.XInfoGroups(ctx, stream).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get group info: %w", err)
 	}
@@ -158,7 +167,7 @@ func (q *Queue) GetPendingCount(ctx context.Context, taskType string) (int64, er
 	}
 
 	// 获取从 last-delivered-id 到末尾的消息数
-	entries, err := redispool.Redis().XRangeN(ctx, stream, lastID, "+", 10000).Result()
+	entries, err := q.config.RedisClient.XRangeN(ctx, stream, lastID, "+", 10000).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get pending count: %w", err)
 	}
@@ -177,7 +186,7 @@ func (q *Queue) CheckPendingMessages(ctx context.Context, taskType string, idleT
 	stream := q.streamKey(taskType)
 	group := q.groupKey(taskType)
 
-	pending, err := redispool.Redis().XPendingExt(ctx, &redis.XPendingExtArgs{
+	pending, err := q.config.RedisClient.XPendingExt(ctx, &redis.XPendingExtArgs{
 		Stream: stream,
 		Group:  group,
 		Start:  "-",
@@ -195,7 +204,7 @@ func (q *Queue) CheckPendingMessages(ctx context.Context, taskType string, idleT
 			continue
 		}
 		// 确认旧消息
-		if err := redispool.Redis().XAck(ctx, stream, group, p.ID).Err(); err != nil {
+		if err := q.config.RedisClient.XAck(ctx, stream, group, p.ID).Err(); err != nil {
 			logs.ErrorContextf(ctx, "[task] failed to ack old message: %v", err)
 			continue
 		}
@@ -211,7 +220,7 @@ func (q *Queue) GetAllTaskTypes(ctx context.Context) ([]string, error) {
 	pattern := fmt.Sprintf("%stask_queue:*", q.config.KeyPrefix)
 
 	for {
-		kk, nextCursor, err := redispool.Redis().Scan(ctx, cursor, pattern, 100).Result()
+		kk, nextCursor, err := q.config.RedisClient.Scan(ctx, cursor, pattern, 100).Result()
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan keys: %w", err)
 		}

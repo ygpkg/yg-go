@@ -10,8 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ygpkg/yg-go/dbtools"
+	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/task"
+	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -79,6 +80,38 @@ func (e *StepTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
 	return nil
 }
 
+// setupDB 使用 gorm 原生方式创建数据库连接
+func setupDB() (*gorm.DB, error) {
+	// MySQL DSN 格式: user:pass@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
+	dsn := "root:root@tcp(localhost:3306)/task_demo?charset=utf8mb4&parseTime=True&loc=Local"
+
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		CreateBatchSize: 200,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect database: %w", err)
+	}
+
+	return db, nil
+}
+
+// setupRedis 使用 go-redis 原生方式创建 Redis 客户端
+func setupRedis() (*redis.Client, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // 无密码
+		DB:       0,  // 默认 DB
+	})
+
+	// 测试连接
+	ctx := context.Background()
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to connect redis: %w", err)
+	}
+
+	return client, nil
+}
+
 func main() {
 	fmt.Println("========================================")
 	fmt.Println("Task 包 - 步骤化任务流程演示")
@@ -86,7 +119,6 @@ func main() {
 
 	// 配置 Worker
 	config := &task.TaskConfig{
-		DBInstance:        "default",
 		WorkerID:          "steps-worker-001",
 		MaxConcurrency:    3, // 即使设置多个并发，步骤也会按顺序执行
 		Timeout:           10 * time.Minute,
@@ -97,14 +129,21 @@ func main() {
 	}
 
 	// 创建 Worker
-	db := dbtools.DB(config.DBInstance)
-	if db == nil {
-		fmt.Printf("✗ 数据库实例未找到: %s\n", config.DBInstance)
-		fmt.Println("\n提示: 请确保已初始化 dbtools 和 redispool")
+	db, err := setupDB()
+	if err != nil {
+		fmt.Printf("✗ 数据库连接失败: %v\n", err)
+		fmt.Println("\n提示: 请确保 MySQL 服务正在运行")
 		os.Exit(1)
 	}
 
-	worker, err := task.NewWorker(config, db)
+	redisClient, err := setupRedis()
+	if err != nil {
+		fmt.Printf("✗ Redis 连接失败: %v\n", err)
+		fmt.Println("\n提示: 请确保 Redis 服务正在运行")
+		os.Exit(1)
+	}
+
+	worker, err := task.NewWorker(config, db, redisClient)
 	if err != nil {
 		fmt.Printf("✗ 创建 Worker 失败: %v\n", err)
 		os.Exit(1)

@@ -30,26 +30,39 @@ docker run -d \
 
 ### 3. 配置数据库连接
 
-示例代码假设你已经配置了 `dbtools` 包：
+示例代码使用硬编码的数据库连接配置：
+
+- **Host**: localhost
+- **Port**: 3306
+- **User**: root
+- **Password**: root
+- **Database**: task_demo
+
+如需修改配置，请编辑各示例文件中的 `setupDB()` 函数。
 
 ```go
-import (
-    "github.com/ygpkg/yg-go/dbtools"
-    "github.com/ygpkg/yg-go/dbtools/redispool"
-)
-
-// 初始化数据库连接
-func init() {
-    // 配置 MySQL
-    dbtools.InitDB("default", &dbtools.DBConfig{
-        Host:     "localhost",
-        Port:     3306,
-        User:     "root",
-        Password: "root",
-        Database: "task_demo",
-    })
+// setupDB 函数在每个示例文件中都有定义
+func setupDB() (*gorm.DB, error) {
+    dsn := "root:root@tcp(localhost:3306)/task_demo?charset=utf8mb4&parseTime=True&loc=Local"
     
-    // 配置 Redis
+    db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+        CreateBatchSize: 200,
+    })
+    if err != nil {
+        return nil, fmt.Errorf("failed to connect database: %w", err)
+    }
+    
+    return db, nil
+}
+```
+
+配置 Redis（示例代码仍需要 redispool）：
+
+```go
+import "github.com/ygpkg/yg-go/dbtools/redispool"
+
+// 初始化 Redis
+func init() {
     redispool.InitRedis(&redispool.RedisConfig{
         Addr: "localhost:6379",
     })
@@ -169,7 +182,6 @@ go run main.go
 
 ```go
 config := &task.TaskConfig{
-    DBInstance:        "default",    // 数据库实例名
     WorkerID:          "worker-001", // Worker 唯一标识
     MaxConcurrency:    5,            // 最大并发数
     Timeout:           10 * time.Minute,

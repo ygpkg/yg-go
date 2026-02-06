@@ -12,8 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ygpkg/yg-go/dbtools"
-	"github.com/ygpkg/yg-go/dbtools/redispool"
+	"github.com/redis/go-redis/v9"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 // 测试执行器：简单的计数任务
@@ -89,6 +90,37 @@ func (e *StepTaskExecutor) Execute(ctx context.Context) error {
 	return nil
 }
 
+// setupDB 使用 gorm 原生方式创建数据库连接
+func setupDB() (*gorm.DB, error) {
+	// MySQL DSN 格式: user:pass@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
+	dsn := "root:root@tcp(localhost:3306)/task_demo?charset=utf8mb4&parseTime=True&loc=Local"
+
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		CreateBatchSize: 200,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect database: %w", err)
+	}
+
+	return db, nil
+}
+
+// setupRedis 使用 go-redis 原生方式创建 Redis 客户端
+func setupRedis() (*redis.Client, error) {
+	client := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
+
+	ctx := context.Background()
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to connect redis: %w", err)
+	}
+
+	return client, nil
+}
+
 // TestIntegration_CompleteWorkflow 测试完整的任务执行流程
 func TestIntegration_CompleteWorkflow(t *testing.T) {
 	if testing.Short() {
@@ -98,9 +130,9 @@ func TestIntegration_CompleteWorkflow(t *testing.T) {
 	ctx := context.Background()
 	
 	// 初始化数据库
-	db := dbtools.DB("default")
-	if db == nil {
-		t.Skip("Database not configured")
+	db, err := setupDB()
+	if err != nil {
+		t.Skipf("Database not available: %v", err)
 	}
 
 	// 初始化表
@@ -108,16 +140,15 @@ func TestIntegration_CompleteWorkflow(t *testing.T) {
 		t.Fatalf("Failed to init DB: %v", err)
 	}
 
-	// 清理 Redis
-	redisClient := redispool.Redis()
-	if redisClient == nil {
-		t.Skip("Redis not configured")
+	// 初始化 Redis
+	redisClient, err := setupRedis()
+	if err != nil {
+		t.Skipf("Redis not available: %v", err)
 	}
 
 	// 创建 Worker 配置
 	config := &TaskConfig{
 		Mode:              ModeDistributed,
-		DBInstance:        "default",
 		WorkerID:          "test-worker-001",
 		MaxConcurrency:    2,
 		Timeout:           5 * time.Minute,
@@ -127,7 +158,7 @@ func TestIntegration_CompleteWorkflow(t *testing.T) {
 	}
 
 	// 创建 Worker
-	worker, err := NewWorker(config, db)
+	worker, err := NewWorker(config, db, redisClient)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -190,14 +221,18 @@ func TestIntegration_TaskRetry(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db := dbtools.DB("default")
-	if db == nil {
-		t.Skip("Database not configured")
+	db, err := setupDB()
+	if err != nil {
+		t.Skipf("Database not available: %v", err)
+	}
+
+	redisClient, err := setupRedis()
+	if err != nil {
+		t.Skipf("Redis not available: %v", err)
 	}
 
 	config := &TaskConfig{
 		Mode:              ModeDistributed,
-		DBInstance:        "default",
 		WorkerID:          "test-worker-002",
 		MaxConcurrency:    1,
 		Timeout:           5 * time.Minute,
@@ -206,7 +241,7 @@ func TestIntegration_TaskRetry(t *testing.T) {
 		EnableHealthCheck: false,
 	}
 
-	worker, err := NewWorker(config, db)
+	worker, err := NewWorker(config, db, redisClient)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -274,14 +309,18 @@ func TestIntegration_TaskTimeout(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db := dbtools.DB("default")
-	if db == nil {
-		t.Skip("Database not configured")
+	db, err := setupDB()
+	if err != nil {
+		t.Skipf("Database not available: %v", err)
+	}
+
+	redisClient, err := setupRedis()
+	if err != nil {
+		t.Skipf("Redis not available: %v", err)
 	}
 
 	config := &TaskConfig{
 		Mode:              ModeDistributed,
-		DBInstance:        "default",
 		WorkerID:          "test-worker-003",
 		MaxConcurrency:    1,
 		Timeout:           5 * time.Minute,
@@ -290,7 +329,7 @@ func TestIntegration_TaskTimeout(t *testing.T) {
 		EnableHealthCheck: false,
 	}
 
-	worker, err := NewWorker(config, db)
+	worker, err := NewWorker(config, db, redisClient)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -346,14 +385,18 @@ func TestIntegration_ConcurrentTasks(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db := dbtools.DB("default")
-	if db == nil {
-		t.Skip("Database not configured")
+	db, err := setupDB()
+	if err != nil {
+		t.Skipf("Database not available: %v", err)
+	}
+
+	redisClient, err := setupRedis()
+	if err != nil {
+		t.Skipf("Redis not available: %v", err)
 	}
 
 	config := &TaskConfig{
 		Mode:              ModeDistributed,
-		DBInstance:        "default",
 		WorkerID:          "test-worker-004",
 		MaxConcurrency:    5, // 高并发
 		Timeout:           5 * time.Minute,
@@ -362,7 +405,7 @@ func TestIntegration_ConcurrentTasks(t *testing.T) {
 		EnableHealthCheck: false,
 	}
 
-	worker, err := NewWorker(config, db)
+	worker, err := NewWorker(config, db, redisClient)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -432,14 +475,18 @@ func TestIntegration_StepTasks(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db := dbtools.DB("default")
-	if db == nil {
-		t.Skip("Database not configured")
+	db, err := setupDB()
+	if err != nil {
+		t.Skipf("Database not available: %v", err)
+	}
+
+	redisClient, err := setupRedis()
+	if err != nil {
+		t.Skipf("Redis not available: %v", err)
 	}
 
 	config := &TaskConfig{
 		Mode:              ModeDistributed,
-		DBInstance:        "default",
 		WorkerID:          "test-worker-005",
 		MaxConcurrency:    1,
 		Timeout:           5 * time.Minute,
@@ -448,7 +495,7 @@ func TestIntegration_StepTasks(t *testing.T) {
 		EnableHealthCheck: false,
 	}
 
-	worker, err := NewWorker(config, db)
+	worker, err := NewWorker(config, db, redisClient)
 	if err != nil {
 		t.Fatalf("Failed to create worker: %v", err)
 	}
@@ -562,9 +609,9 @@ func TestIntegration_TaskCancellation(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	db := dbtools.DB("default")
-	if db == nil {
-		t.Skip("Database not configured")
+	db, err := setupDB()
+	if err != nil {
+		t.Skipf("Database not available: %v", err)
 	}
 
 	// 创建任务但不启动 Worker
@@ -611,9 +658,14 @@ func TestIntegration_TaskCancellation(t *testing.T) {
 // BenchmarkTaskCreation 任务创建性能基准测试
 func BenchmarkTaskCreation(b *testing.B) {
 	ctx := context.Background()
-	db := dbtools.DB("default")
-	if db == nil {
-		b.Skip("Database not configured")
+	db, err := setupDB()
+	if err != nil {
+		b.Skipf("Database not available: %v", err)
+	}
+
+	_, err = setupRedis()
+	if err != nil {
+		b.Skipf("Redis not available: %v", err)
 	}
 
 	repo := NewTaskRepository(db)
@@ -638,9 +690,14 @@ func BenchmarkTaskCreation(b *testing.B) {
 // BenchmarkBatchTaskCreation 批量任务创建性能基准测试
 func BenchmarkBatchTaskCreation(b *testing.B) {
 	ctx := context.Background()
-	db := dbtools.DB("default")
-	if db == nil {
-		b.Skip("Database not configured")
+	db, err := setupDB()
+	if err != nil {
+		b.Skipf("Database not available: %v", err)
+	}
+
+	_, err = setupRedis()
+	if err != nil {
+		b.Skipf("Redis not available: %v", err)
 	}
 
 	repo := NewTaskRepository(db)

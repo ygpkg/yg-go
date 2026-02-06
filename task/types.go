@@ -19,8 +19,6 @@ const (
 type TaskConfig struct {
 	// Mode 任务模式：distributed 或 local
 	Mode TaskMode
-	// DBInstance 数据库实例名称（用于获取 gorm.DB）
-	DBInstance string
 	// Timeout 默认超时时间
 	Timeout time.Duration
 	// MaxRedo 默认重试次数
@@ -45,7 +43,6 @@ type TaskConfig struct {
 func DefaultConfig() *TaskConfig {
 	return &TaskConfig{
 		Mode:              ModeLocal,
-		DBInstance:        "",
 		Timeout:           10 * time.Minute,
 		MaxRedo:           3,
 		MaxConcurrency:    5,
