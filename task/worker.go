@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
 )
@@ -36,7 +35,13 @@ func NewWorker(config *TaskConfig, db *gorm.DB) (*Worker, error) {
 	}
 
 	repo := NewTaskRepository(db)
-	queue := NewQueue(config.RedisKeyPrefix)
+
+	// 创建队列配置
+	queueConfig := &QueueConfig{
+		KeyPrefix: config.RedisKeyPrefix,
+		BlockTime: config.QueueBlockTime,
+	}
+	queue := NewQueue(queueConfig)
 	healthChecker := NewHealthChecker(config.RedisKeyPrefix, repo, queue)
 
 	return &Worker{
@@ -49,46 +54,18 @@ func NewWorker(config *TaskConfig, db *gorm.DB) (*Worker, error) {
 	}, nil
 }
 
-// NewWorkerWithDBInstance 使用数据库实例名称创建分布式 Worker
-func NewWorkerWithDBInstance(config *TaskConfig) (*Worker, error) {
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
-
-	db := dbtools.DB(config.DBInstance)
-	if db == nil {
-		return nil, fmt.Errorf("database instance not found: %s", config.DBInstance)
-	}
-
-	return NewWorker(config, db)
-}
-
 // RegisterExecutor 注册任务执行器
 func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory) {
 	w.registry.Register(taskType, factory)
 }
 
-// CreateTask 创建任务
-func (w *Worker) CreateTask(ctx context.Context, taskEntity *TaskEntity) error {
-	if err := w.repo.CreateTask(ctx, taskEntity); err != nil {
-		return err
-	}
-
-	if err := w.queue.Push(ctx, taskEntity.TaskType); err != nil {
-		return err
-	}
-
-	logs.InfoContextf(ctx, "[task] created task, id: %d, type: %s", taskEntity.ID, taskEntity.TaskType)
-	return nil
-}
-
-// BatchCreateTasks 批量创建任务
-func (w *Worker) BatchCreateTasks(ctx context.Context, tasks []*TaskEntity) error {
+// CreateTasks 批量创建任务
+func (w *Worker) CreateTasks(ctx context.Context, tasks []*TaskEntity) error {
 	if len(tasks) == 0 {
 		return nil
 	}
 
-	if err := w.repo.BatchCreateTasks(ctx, tasks); err != nil {
+	if err := w.repo.CreateTasks(ctx, tasks); err != nil {
 		return fmt.Errorf("failed to batch create tasks: %w", err)
 	}
 
@@ -244,7 +221,8 @@ func (w *Worker) workRoutine(taskType string) {
 }
 
 // processOneTask 处理一个任务
-func (w *Worker) processOneTask(taskType string) {
+// 返回值：true 表示处理了任务，false 表示无任务
+func (w *Worker) processOneTask(taskType string) bool {
 	ctx := logs.WithContextFields(w.ctx, "worker_id", w.config.WorkerID, "task_type", taskType)
 
 	// 拉取任务（阻塞等待）
@@ -254,15 +232,16 @@ func (w *Worker) processOneTask(taskType string) {
 		if !errors.Is(err, context.Canceled) {
 			logs.ErrorContextf(ctx, "[task] failed to pull task: %v", err)
 		}
-		return
+		return false
 	}
 
 	if task == nil {
-		return // 没有任务，继续循环（Pop 已经阻塞过了）
+		return false // 没有任务，继续循环（Pop 已经阻塞过了）
 	}
 
 	// 执行任务
 	w.executeTask(ctx, task)
+	return true
 }
 
 // executeTask 执行任务

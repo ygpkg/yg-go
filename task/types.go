@@ -29,6 +29,8 @@ type TaskConfig struct {
 	MaxConcurrency int
 	// PollInterval 轮询间隔（本地模式）
 	PollInterval time.Duration
+	// QueueBlockTime Redis Stream 阻塞时间（分布式模式）
+	QueueBlockTime time.Duration
 	// HealthCheckPeriod 健康检查周期（分布式模式）
 	HealthCheckPeriod time.Duration
 	// RedisKeyPrefix Redis 键前缀
@@ -48,6 +50,7 @@ func DefaultConfig() *TaskConfig {
 		MaxRedo:           3,
 		MaxConcurrency:    5,
 		PollInterval:      5 * time.Second,
+		QueueBlockTime:    5 * time.Second, // Redis Stream 阻塞 5 秒
 		HealthCheckPeriod: 30 * time.Second,
 		RedisKeyPrefix:    "task:",
 		WorkerID:          "",

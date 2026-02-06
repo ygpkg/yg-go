@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package task
@@ -13,7 +14,6 @@ import (
 
 	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/dbtools/redispool"
-	"gorm.io/gorm"
 )
 
 // 测试执行器：简单的计数任务
@@ -394,7 +394,7 @@ func TestIntegration_ConcurrentTasks(t *testing.T) {
 		tasks = append(tasks, task)
 	}
 
-	if err := worker.BatchCreateTasks(ctx, tasks); err != nil {
+	if err := worker.CreateTasks(ctx, tasks); err != nil {
 		t.Fatalf("Failed to create tasks: %v", err)
 	}
 
@@ -511,7 +511,7 @@ func TestIntegration_StepTasks(t *testing.T) {
 		},
 	}
 
-	if err := worker.BatchCreateTasks(ctx, tasks); err != nil {
+	if err := worker.CreateTasks(ctx, tasks); err != nil {
 		t.Fatalf("Failed to create tasks: %v", err)
 	}
 
@@ -663,6 +663,6 @@ func BenchmarkBatchTaskCreation(b *testing.B) {
 			}
 			tasks = append(tasks, task)
 		}
-		repo.BatchCreateTasks(ctx, tasks)
+		repo.CreateTasks(ctx, tasks)
 	}
 }

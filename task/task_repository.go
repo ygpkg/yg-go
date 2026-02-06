@@ -128,8 +128,8 @@ func (repo *TaskRepository) CreateTask(ctx context.Context, taskEntity *TaskEnti
 	return repo.taskDao.Insert(ctx, taskEntity)
 }
 
-// BatchCreateTasks 批量创建任务
-func (repo *TaskRepository) BatchCreateTasks(ctx context.Context, tasks []*TaskEntity) error {
+// CreateTasks 批量创建任务
+func (repo *TaskRepository) CreateTasks(ctx context.Context, tasks []*TaskEntity) error {
 	if len(tasks) == 0 {
 		return nil
 	}
@@ -280,7 +280,6 @@ func (repo *TaskRepository) InitTaskDBStatus(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to init task status: %w", err)
 	}
-	logs.InfoContextf(ctx, "[task] initialized database task status")
 	return nil
 }
 

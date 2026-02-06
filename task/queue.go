@@ -11,26 +11,65 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
-// Queue Redis Stream 队列
-type Queue struct {
-	keyPrefix string
+// QueueConfig 队列配置
+type QueueConfig struct {
+	// KeyPrefix Redis 键前缀
+	KeyPrefix string
+	// BlockTime 阻塞读取时间
+	BlockTime time.Duration
+	// MaxRetries 最大重试次数（预留字段）
+	MaxRetries int
 }
 
-// NewQueue 创建队列
-func NewQueue(keyPrefix string) *Queue {
+// DefaultQueueConfig 返回默认队列配置
+func DefaultQueueConfig() *QueueConfig {
+	return &QueueConfig{
+		KeyPrefix:  "task:",
+		BlockTime:  5 * time.Second,
+		MaxRetries: 3,
+	}
+}
+
+// Validate 验证配置
+func (c *QueueConfig) Validate() error {
+	if c.KeyPrefix == "" {
+		return fmt.Errorf("queue config: key prefix cannot be empty")
+	}
+	if c.BlockTime <= 0 {
+		c.BlockTime = 5 * time.Second // 使用默认值
+	}
+	if c.MaxRetries < 0 {
+		c.MaxRetries = 3 // 使用默认值
+	}
+	return nil
+}
+
+// Queue Redis Stream 队列
+type Queue struct {
+	config *QueueConfig
+}
+
+// NewQueue 使用配置创建队列
+func NewQueue(config *QueueConfig) *Queue {
+	if config == nil {
+		config = DefaultQueueConfig()
+	}
+	// 验证并设置默认值
+	_ = config.Validate()
+
 	return &Queue{
-		keyPrefix: keyPrefix,
+		config: config,
 	}
 }
 
 // streamKey 获取 stream 的 key
 func (q *Queue) streamKey(taskType string) string {
-	return fmt.Sprintf("%stask_queue:%s", q.keyPrefix, taskType)
+	return fmt.Sprintf("%s_task_queue:%s", q.config.KeyPrefix, taskType)
 }
 
 // groupKey 获取 consumer group 的 key
 func (q *Queue) groupKey(taskType string) string {
-	return fmt.Sprintf("%stask_group:%s", q.keyPrefix, taskType)
+	return fmt.Sprintf("%s_task_group:%s", q.config.KeyPrefix, taskType)
 }
 
 // Push 将任务推入队列
@@ -62,8 +101,8 @@ func (q *Queue) Pop(ctx context.Context, taskType, workerID string) (string, err
 		Consumer: workerID,
 		Streams:  []string{stream, ">"},
 		Count:    1,
-		Block:    time.Millisecond * 100, // 阻塞 100ms
-		NoAck:    true,                   // 自动确认
+		Block:    q.config.BlockTime, // 阻塞等待，减少轮询频率
+		NoAck:    true,               // 自动确认
 	}).Result()
 
 	if err != nil {
@@ -169,7 +208,7 @@ func (q *Queue) CheckPendingMessages(ctx context.Context, taskType string, idleT
 func (q *Queue) GetAllTaskTypes(ctx context.Context) ([]string, error) {
 	var keys []string
 	var cursor uint64
-	pattern := fmt.Sprintf("%stask_queue:*", q.keyPrefix)
+	pattern := fmt.Sprintf("%stask_queue:*", q.config.KeyPrefix)
 
 	for {
 		kk, nextCursor, err := redispool.Redis().Scan(ctx, cursor, pattern, 100).Result()
@@ -186,7 +225,7 @@ func (q *Queue) GetAllTaskTypes(ctx context.Context) ([]string, error) {
 	}
 
 	// 提取任务类型
-	prefix := fmt.Sprintf("%stask_queue:", q.keyPrefix)
+	prefix := fmt.Sprintf("%stask_queue:", q.config.KeyPrefix)
 	types := make([]string, 0, len(keys))
 	for _, key := range keys {
 		if len(key) > len(prefix) {

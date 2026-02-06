@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/task"
 	"gorm.io/gorm"
 )
@@ -79,9 +80,9 @@ func main() {
 	// 1. 配置 Worker
 	fmt.Println("步骤 1: 配置 Worker")
 	config := &task.TaskConfig{
-		DBInstance:        "default",       // 数据库实例名
+		DBInstance:        "default",         // 数据库实例名
 		WorkerID:          "demo-worker-001", // Worker 唯一标识
-		MaxConcurrency:    3,               // 最大并发数
+		MaxConcurrency:    3,                 // 最大并发数
 		Timeout:           10 * time.Minute,
 		MaxRedo:           3,
 		RedisKeyPrefix:    "task:demo:",
@@ -94,10 +95,16 @@ func main() {
 
 	// 2. 创建 Worker
 	fmt.Println("步骤 2: 创建 Worker")
-	worker, err := task.NewWorkerWithDBInstance(config)
+	db := dbtools.DB(config.DBInstance)
+	if db == nil {
+		fmt.Printf("✗ 数据库实例未找到: %s\n", config.DBInstance)
+		fmt.Println("\n提示: 请确保已初始化 dbtools 和 redispool")
+		os.Exit(1)
+	}
+
+	worker, err := task.NewWorker(config, db)
 	if err != nil {
 		fmt.Printf("✗ 创建 Worker 失败: %v\n", err)
-		fmt.Println("\n提示: 请确保已初始化 dbtools 和 redispool")
 		os.Exit(1)
 	}
 	fmt.Println("  ✓ Worker 创建成功\n")
@@ -152,8 +159,9 @@ func main() {
 		CompanyID:   1,
 		Uin:         1001,
 	}
+	taskEntityList := []*task.TaskEntity{taskEntity}
 
-	if err := worker.CreateTask(ctx, taskEntity); err != nil {
+	if err := worker.CreateTasks(ctx, taskEntityList); err != nil {
 		fmt.Printf("✗ 创建任务失败: %v\n", err)
 		os.Exit(1)
 	}

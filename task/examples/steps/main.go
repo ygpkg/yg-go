@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/task"
 	"gorm.io/gorm"
 )
@@ -96,10 +97,16 @@ func main() {
 	}
 
 	// 创建 Worker
-	worker, err := task.NewWorkerWithDBInstance(config)
+	db := dbtools.DB(config.DBInstance)
+	if db == nil {
+		fmt.Printf("✗ 数据库实例未找到: %s\n", config.DBInstance)
+		fmt.Println("\n提示: 请确保已初始化 dbtools 和 redispool")
+		os.Exit(1)
+	}
+
+	worker, err := task.NewWorker(config, db)
 	if err != nil {
 		fmt.Printf("✗ 创建 Worker 失败: %v\n", err)
-		fmt.Println("\n提示: 请确保已初始化 dbtools 和 redispool")
 		os.Exit(1)
 	}
 	fmt.Println("✓ Worker 创建成功")
@@ -233,7 +240,7 @@ func main() {
 	}
 
 	// 批量创建任务
-	if err := worker.BatchCreateTasks(ctx, tasks); err != nil {
+	if err := worker.CreateTasks(ctx, tasks); err != nil {
 		fmt.Printf("✗ 创建任务失败: %v\n", err)
 		os.Exit(1)
 	}

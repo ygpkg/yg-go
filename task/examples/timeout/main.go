@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/task"
 	"gorm.io/gorm"
 )
@@ -143,10 +144,16 @@ func main() {
 	}
 
 	// 创建 Worker
-	worker, err := task.NewWorkerWithDBInstance(config)
+	db := dbtools.DB(config.DBInstance)
+	if db == nil {
+		fmt.Printf("✗ 数据库实例未找到: %s\n", config.DBInstance)
+		fmt.Println("\n提示: 请确保已初始化 dbtools 和 redispool")
+		os.Exit(1)
+	}
+
+	worker, err := task.NewWorker(config, db)
 	if err != nil {
 		fmt.Printf("✗ 创建 Worker 失败: %v\n", err)
-		fmt.Println("\n提示: 请确保已初始化 dbtools 和 redispool")
 		os.Exit(1)
 	}
 	fmt.Println("✓ Worker 创建成功")
@@ -202,23 +209,6 @@ func main() {
 		CompanyID:   1,
 		Uin:         1001,
 	}
-
-	if err := worker.CreateTask(ctx, task1); err != nil {
-		fmt.Printf("✗ 创建任务失败: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("✓ 任务 1 已创建，ID: %d\n", task1.ID)
-
-	// 等待第一个任务完成
-	monitorTask(worker, task1.ID, "场景 1", 30*time.Second)
-
-	// 演示场景 2: 任务正常完成（检查上下文）
-	fmt.Println("\n========================================")
-	fmt.Println("场景 2: 任务正常完成（检查上下文）")
-	fmt.Println("========================================")
-	fmt.Println("任务配置: 执行 3 秒，超时时间 10 秒")
-	fmt.Println("预期结果: 正常完成\n")
-
 	payload2 := TimeoutPayload{
 		Message:      "这是一个正常完成的任务",
 		Duration:     3,    // 执行 3 秒
@@ -238,12 +228,32 @@ func main() {
 		CompanyID:   1,
 		Uin:         1001,
 	}
-
-	if err := worker.CreateTask(ctx, task2); err != nil {
+	taskEntityList := []*task.TaskEntity{task1, task2}
+	if err := worker.CreateTasks(ctx, taskEntityList); err != nil {
 		fmt.Printf("✗ 创建任务失败: %v\n", err)
 		os.Exit(1)
 	}
+	fmt.Printf("✓ 任务 1 已创建，ID: %d\n", task1.ID)
 	fmt.Printf("✓ 任务 2 已创建，ID: %d\n", task2.ID)
+
+	// 监控任务状态
+	fmt.Println("\n========================================")
+	fmt.Println("监控任务执行")
+	fmt.Println("========================================")
+
+	// 演示场景 1: 任务会超时（不检查上下文）
+	fmt.Println("\n场景 1: 任务超时（不检查上下文）")
+	fmt.Println("预期结果: 任务会超时并重试，最终失败\n")
+
+	// 等待第一个任务完成
+	monitorTask(worker, task1.ID, "场景 1", 30*time.Second)
+
+	// 演示场景 2: 任务正常完成（检查上下文）
+	fmt.Println("\n========================================")
+	fmt.Println("场景 2: 任务正常完成（检查上下文）")
+	fmt.Println("========================================")
+	fmt.Println("任务配置: 执行 3 秒，超时时间 10 秒")
+	fmt.Println("预期结果: 正常完成\n")
 
 	// 等待第二个任务完成
 	monitorTask(worker, task2.ID, "场景 2", 30*time.Second)

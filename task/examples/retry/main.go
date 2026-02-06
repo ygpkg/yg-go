@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ygpkg/yg-go/dbtools"
 	"github.com/ygpkg/yg-go/task"
 	"gorm.io/gorm"
 )
@@ -24,8 +25,8 @@ type RetryPayload struct {
 // RetryTaskExecutor 演示重试机制的任务执行器
 type RetryTaskExecutor struct {
 	task.BaseExecutor
-	payload       RetryPayload
-	attemptCount  *int32 // 记录执行次数（跨实例共享需要外部传入）
+	payload        RetryPayload
+	attemptCount   *int32 // 记录执行次数（跨实例共享需要外部传入）
 	currentAttempt int32
 }
 
@@ -57,15 +58,15 @@ func (e *RetryTaskExecutor) Prepare(ctx context.Context, taskEntity *task.TaskEn
 // Execute 执行任务
 func (e *RetryTaskExecutor) Execute(ctx context.Context) error {
 	fmt.Printf("\n→ 开始执行任务...\n")
-	
+
 	// 模拟任务处理
 	time.Sleep(1 * time.Second)
 
 	// 根据配置决定是否失败
 	if int(e.currentAttempt) <= e.payload.FailTimes {
-		errMsg := fmt.Sprintf("%s (尝试 %d/%d)", 
-			e.payload.FailReason, 
-			e.currentAttempt, 
+		errMsg := fmt.Sprintf("%s (尝试 %d/%d)",
+			e.payload.FailReason,
+			e.currentAttempt,
 			e.payload.FailTimes)
 		fmt.Printf("✗ 任务执行失败: %s\n", errMsg)
 		return fmt.Errorf("%s", errMsg)
@@ -87,13 +88,13 @@ func (e *RetryTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
 func (e *RetryTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
 	fmt.Printf("\n✗ OnFailure: 任务执行失败\n")
 	fmt.Printf("  当前重试次数: %d\n", e.Task.Redo)
-	
+
 	if e.Task.CanRetry() {
-		fmt.Printf("  → 将进行重试 (剩余 %d 次)\n", e.Task.MaxRedo - e.Task.Redo)
+		fmt.Printf("  → 将进行重试 (剩余 %d 次)\n", e.Task.MaxRedo-e.Task.Redo)
 	} else {
 		fmt.Printf("  ✗ 已达到最大重试次数，不再重试\n")
 	}
-	
+
 	return nil
 }
 
@@ -115,10 +116,16 @@ func main() {
 	}
 
 	// 创建 Worker
-	worker, err := task.NewWorkerWithDBInstance(config)
+	db := dbtools.DB(config.DBInstance)
+	if db == nil {
+		fmt.Printf("✗ 数据库实例未找到: %s\n", config.DBInstance)
+		fmt.Println("\n提示: 请确保已初始化 dbtools 和 redispool")
+		os.Exit(1)
+	}
+
+	worker, err := task.NewWorker(config, db)
 	if err != nil {
 		fmt.Printf("✗ 创建 Worker 失败: %v\n", err)
-		fmt.Println("\n提示: 请确保已初始化 dbtools 和 redispool")
 		os.Exit(1)
 	}
 	fmt.Println("✓ Worker 创建成功")
@@ -183,8 +190,9 @@ func main() {
 		CompanyID:   1,
 		Uin:         1001,
 	}
+	taskEntityList := []*task.TaskEntity{taskEntity}
 
-	if err := worker.CreateTask(ctx, taskEntity); err != nil {
+	if err := worker.CreateTasks(ctx, taskEntityList); err != nil {
 		fmt.Printf("✗ 创建任务失败: %v\n", err)
 		os.Exit(1)
 	}
@@ -218,7 +226,7 @@ func main() {
 
 			// 只在状态改变时输出
 			if string(result.TaskStatus) != lastStatus || result.Redo != lastRedo {
-				fmt.Printf("\n[监控] 状态: %s | 重试次数: %d/%d\n", 
+				fmt.Printf("\n[监控] 状态: %s | 重试次数: %d/%d\n",
 					result.TaskStatus, result.Redo, result.MaxRedo)
 				lastStatus = string(result.TaskStatus)
 				lastRedo = result.Redo
@@ -237,11 +245,11 @@ func main() {
 
 				if result.IsSuccess() {
 					fmt.Println("\n✓ 任务最终执行成功！")
-					fmt.Printf("  说明: 任务前 %d 次失败，经过 %d 次重试后成功\n", 
+					fmt.Printf("  说明: 任务前 %d 次失败，经过 %d 次重试后成功\n",
 						payload.FailTimes, result.Redo)
 				} else {
 					fmt.Printf("\n✗ 任务最终失败: %s\n", result.ErrMsg)
-					fmt.Printf("  说明: 任务在 %d 次尝试后仍然失败\n", 
+					fmt.Printf("  说明: 任务在 %d 次尝试后仍然失败\n",
 						atomic.LoadInt32(&attemptCount))
 				}
 

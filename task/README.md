@@ -184,8 +184,14 @@ func main() {
 		HealthCheckPeriod: 30 * time.Second, // 健康检查周期
 	}
 	
+	// 获取数据库实例
+	db := dbtools.DB(config.DBInstance)
+	if db == nil {
+		panic(fmt.Sprintf("Database instance not found: %s", config.DBInstance))
+	}
+	
 	// 创建 Worker
-	worker, err := task.NewWorkerWithDBInstance(config)
+	worker, err := task.NewWorker(config, db)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create worker: %v", err))
 	}
@@ -328,7 +334,7 @@ func CreateStepTasks(worker *task.Worker) error {
 	}
 	
 	// 批量创建任务
-	if err := worker.BatchCreateTasks(ctx, tasks); err != nil {
+	if err := worker.CreateTasks(ctx, tasks); err != nil {
 		return err
 	}
 	
@@ -386,7 +392,7 @@ func CreateParentChildTasks(worker *task.Worker) error {
 		},
 	}
 	
-	if err := worker.BatchCreateTasks(ctx, childTasks); err != nil {
+	if err := worker.CreateTasks(ctx, childTasks); err != nil {
 		return err
 	}
 	
@@ -418,7 +424,7 @@ func CreateBatchTasks(worker *task.Worker) error {
 	}
 	
 	// 批量创建
-	if err := worker.BatchCreateTasks(ctx, tasks); err != nil {
+	if err := worker.CreateTasks(ctx, tasks); err != nil {
 		return err
 	}
 	
@@ -865,7 +871,6 @@ Worker 会自动进行健康检查：
 ```go
 // 创建 Worker
 func NewWorker(config *TaskConfig, db *gorm.DB) (*Worker, error)
-func NewWorkerWithDBInstance(config *TaskConfig) (*Worker, error)
 
 // 注册执行器
 func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory)
@@ -876,7 +881,7 @@ func (w *Worker) Stop(ctx context.Context) error
 
 // 任务操作
 func (w *Worker) CreateTask(ctx context.Context, task *TaskEntity) error
-func (w *Worker) BatchCreateTasks(ctx context.Context, tasks []*TaskEntity) error
+func (w *Worker) CreateTasks(ctx context.Context, tasks []*TaskEntity) error
 func (w *Worker) GetTask(ctx context.Context, taskID uint) (*TaskEntity, error)
 func (w *Worker) CancelTask(ctx context.Context, taskID uint, reason string) error
 ```
