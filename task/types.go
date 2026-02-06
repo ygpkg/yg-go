@@ -14,11 +14,8 @@ const (
 	ModeLocal TaskMode = "local"
 )
 
-
 // TaskConfig 任务配置
 type TaskConfig struct {
-	// Mode 任务模式：distributed 或 local
-	Mode TaskMode
 	// Timeout 默认超时时间
 	Timeout time.Duration
 	// MaxRedo 默认重试次数
@@ -42,7 +39,6 @@ type TaskConfig struct {
 // DefaultConfig 默认配置
 func DefaultConfig() *TaskConfig {
 	return &TaskConfig{
-		Mode:              ModeLocal,
 		Timeout:           10 * time.Minute,
 		MaxRedo:           3,
 		MaxConcurrency:    5,
@@ -57,10 +53,7 @@ func DefaultConfig() *TaskConfig {
 
 // Validate 验证配置
 func (c *TaskConfig) Validate() error {
-	if c.Mode != ModeDistributed && c.Mode != ModeLocal {
-		return ErrInvalidMode
-	}
-	if c.Mode == ModeDistributed && c.WorkerID == "" {
+	if c.WorkerID == "" {
 		return ErrEmptyWorkerID
 	}
 	if c.Timeout <= 0 {

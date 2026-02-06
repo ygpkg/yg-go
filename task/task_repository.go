@@ -2,7 +2,6 @@ package task
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -31,51 +30,44 @@ func NewTaskRepository(db *gorm.DB) *TaskRepository {
 func (repo *TaskRepository) GetOnePendingTask(ctx context.Context, taskType, workerID string) (*TaskEntity, error) {
 	var taskEntity TaskEntity
 
-	// 开启事务
-	tx := repo.db.WithContext(ctx).Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
+	// 使用事务执行查询和更新
+	err := repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		err := tx.
+			Where("task_type = ?", taskType).
+			Where("task_status IN ?", []TaskStatus{TaskStatusPending, TaskStatusFailed}).
+			Where("redo < max_redo").
+			Where(`
+				NOT EXISTS (
+					SELECT 1 FROM core_task t2
+					WHERE t2.subject_id = core_task.subject_id
+					  AND t2.app_group = core_task.app_group
+					  AND t2.step < core_task.step
+					  AND t2.deleted_at IS NULL
+					  AND t2.task_status NOT IN ?
+				)
+			`, []TaskStatus{TaskStatusCanceled, TaskStatusSuccess}).
+			Order("priority DESC, updated_at ASC").
+			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+			Find(&taskEntity).Error
+		// 加锁查询，排除 step 更小但未成功的任务
+		if err != nil {
+			return fmt.Errorf("failed to find pending task: %w", err)
 		}
-	}()
+		if taskEntity.ID == 0 {
+			return nil
+		}
 
-	// 加锁查询，排除 step 更小但未成功的任务
-	err := tx.
-		Where("task_type = ?", taskType).
-		Where("task_status IN ?", []TaskStatus{TaskStatusPending, TaskStatusFailed}).
-		Where("redo < max_redo").
-		Where(`
-			NOT EXISTS (
-				SELECT 1 FROM core_task t2
-				WHERE t2.subject_id = core_task.subject_id
-				  AND t2.app_group = core_task.app_group
-				  AND t2.step < core_task.step
-				  AND t2.deleted_at IS NULL
-				  AND t2.task_status NOT IN ?
-			)
-		`, []TaskStatus{TaskStatusCanceled, TaskStatusSuccess}).
-		Order("priority DESC, updated_at ASC").
-		Clauses(clause.Locking{Strength: "UPDATE", Options: clause.LockingOptionsSkipLocked}).
-		First(&taskEntity).Error
+		// 更新任务状态为 Running
+		taskEntity.MarkAsRunning(workerID)
+		if err := tx.Save(&taskEntity).Error; err != nil {
+			return fmt.Errorf("failed to update task status: %w", err)
+		}
+
+		return nil // 返回 nil 表示成功，事务会自动提交
+	})
 
 	if err != nil {
-		tx.Rollback()
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to find pending task: %w", err)
-	}
-
-	// 更新任务状态为 Running
-	taskEntity.MarkAsRunning(workerID)
-	if err := tx.Save(&taskEntity).Error; err != nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("failed to update task status: %w", err)
-	}
-
-	// 提交事务
-	if err := tx.Commit().Error; err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+		return nil, err
 	}
 
 	return &taskEntity, nil

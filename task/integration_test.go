@@ -93,7 +93,7 @@ func (e *StepTaskExecutor) Execute(ctx context.Context) error {
 // setupDB 使用 gorm 原生方式创建数据库连接
 func setupDB() (*gorm.DB, error) {
 	// MySQL DSN 格式: user:pass@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
-	dsn := "root:root@tcp(localhost:3306)/task_demo?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := "root:root@tcp(localhost:3306)/demo?charset=utf8mb4&parseTime=True&loc=Local"
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		CreateBatchSize: 200,

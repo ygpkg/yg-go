@@ -13,7 +13,7 @@
 docker run -d \
   --name mysql-task-examples \
   -e MYSQL_ROOT_PASSWORD=root \
-  -e MYSQL_DATABASE=task_demo \
+  -e MYSQL_DATABASE=demo \
   -p 3306:3306 \
   mysql:8.0
 ```
@@ -36,14 +36,14 @@ docker run -d \
 - **Port**: 3306
 - **User**: root
 - **Password**: root
-- **Database**: task_demo
+- **Database**: demo
 
 如需修改配置，请编辑各示例文件中的 `setupDB()` 函数。
 
 ```go
 // setupDB 函数在每个示例文件中都有定义
 func setupDB() (*gorm.DB, error) {
-    dsn := "root:root@tcp(localhost:3306)/task_demo?charset=utf8mb4&parseTime=True&loc=Local"
+    dsn := "root:root@tcp(localhost:3306)/demo?charset=utf8mb4&parseTime=True&loc=Local"
     
     db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
         CreateBatchSize: 200,
