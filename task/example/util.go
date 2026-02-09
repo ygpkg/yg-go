@@ -9,6 +9,23 @@ import (
 	"gorm.io/gorm"
 )
 
+// setupInfra 初始化基础设施（数据库和 Redis）
+func setupInfra() (*gorm.DB, *redis.Client, error) {
+	// 初始化数据库
+	db, err := setupDB()
+	if err != nil {
+		return nil, nil, fmt.Errorf("数据库连接失败: %w\n\n提示: 请确保 MySQL 服务正在运行", err)
+	}
+
+	// 初始化 Redis
+	redisClient, err := setupRedis()
+	if err != nil {
+		return nil, nil, fmt.Errorf("Redis 连接失败: %w\n\n提示: 请确保 Redis 服务正在运行", err)
+	}
+
+	return db, redisClient, nil
+}
+
 // setupDB 使用 gorm 原生方式创建数据库连接
 func setupDB() (*gorm.DB, error) {
 	// MySQL DSN 格式: user:pass@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
@@ -39,4 +56,13 @@ func setupRedis() (*redis.Client, error) {
 	}
 
 	return client, nil
+}
+
+// printSection 打印分隔线和标题
+func printSection(title string) {
+	fmt.Println()
+	fmt.Println("========================================")
+	fmt.Println(title)
+	fmt.Println("========================================")
+	fmt.Println()
 }

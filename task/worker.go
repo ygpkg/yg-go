@@ -12,14 +12,30 @@ import (
 	"gorm.io/gorm"
 )
 
+// ExecutorOption 执行器注册选项
+type ExecutorOption func(*executorOptions)
+
+// executorOptions 执行器选项配置
+type executorOptions struct {
+	maxConcurrency int
+}
+
+// WithConcurrency 设置任务类型的最大并发数
+func WithConcurrency(n int) ExecutorOption {
+	return func(opts *executorOptions) {
+		opts.maxConcurrency = n
+	}
+}
+
 // Worker 分布式 Worker 实现
 type Worker struct {
-	config        *TaskConfig
-	db            *gorm.DB
-	repo          *TaskRepository
-	queue         *Queue
-	healthChecker *HealthChecker
-	registry      *ExecutorRegistry
+	config         *TaskConfig
+	db             *gorm.DB
+	repo           *TaskRepository
+	queue          *Queue
+	healthChecker  *HealthChecker
+	registry       *ExecutorRegistry
+	concurrencyMap map[string]int // 任务类型 -> 并发数映射
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -56,18 +72,37 @@ func NewWorker(config *TaskConfig, db *gorm.DB, redisClient *redis.Client) (*Wor
 	healthChecker := NewHealthChecker(healthCheckerConfig)
 
 	return &Worker{
-		config:        config,
-		db:            db,
-		repo:          repo,
-		queue:         queue,
-		healthChecker: healthChecker,
-		registry:      NewExecutorRegistry(),
+		config:         config,
+		db:             db,
+		repo:           repo,
+		queue:          queue,
+		healthChecker:  healthChecker,
+		registry:       NewExecutorRegistry(),
+		concurrencyMap: make(map[string]int),
 	}, nil
 }
 
 // RegisterExecutor 注册任务执行器
-func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory) {
+// 可通过 WithConcurrency 选项设置该任务类型的最大并发数，不设置时使用全局默认并发数
+func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory, opts ...ExecutorOption) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// 默认选项配置
+	options := &executorOptions{
+		maxConcurrency: w.config.MaxConcurrency, // 默认使用全局配置
+	}
+
+	// 应用选项
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	// 注册执行器
 	w.registry.Register(taskType, factory)
+
+	// 设置并发数
+	w.concurrencyMap[taskType] = options.maxConcurrency
 }
 
 // CreateTasks 批量创建任务
@@ -112,12 +147,14 @@ func (w *Worker) Start(ctx context.Context) error {
 		w.startRoutine("health-checker", w.healthCheckRoutine)
 	}
 
-	// 为每个任务类型启动工作协程
+	// 为每个任务类型启动工作协程（支持不同并发数）
 	taskTypes := w.registry.GetAll()
 	for _, taskType := range taskTypes {
-		for i := 0; i < w.config.MaxConcurrency; i++ {
+		concurrency := w.getConcurrency(taskType)
+		taskTypeCopy := taskType // 避免闭包捕获问题
+		for i := 0; i < concurrency; i++ {
 			w.startRoutine(fmt.Sprintf("worker-%s-%d", taskType, i), func() {
-				w.workRoutine(taskType)
+				w.workRoutine(taskTypeCopy)
 			})
 		}
 	}
@@ -494,4 +531,15 @@ func (w *Worker) triggerNextNormalTask(ctx context.Context, taskType string) {
 	if count > 0 {
 		_ = w.pushWithRetry(ctx, taskType) // 错误已在 pushWithRetry 中记录
 	}
+}
+
+// getConcurrency 获取指定任务类型的并发数
+func (w *Worker) getConcurrency(taskType string) int {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
+	if concurrency, ok := w.concurrencyMap[taskType]; ok {
+		return concurrency
+	}
+	return w.config.MaxConcurrency
 }
