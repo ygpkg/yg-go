@@ -28,9 +28,9 @@ type TimeoutTaskExecutor struct {
 	payload TimeoutPayload
 }
 
-// Prepare 初始化执行器
-func (e *TimeoutTaskExecutor) Prepare(ctx context.Context, taskEntity *task.TaskEntity) error {
-	if err := e.BaseExecutor.Prepare(ctx, taskEntity); err != nil {
+// OnStart 初始化执行器
+func (e *TimeoutTaskExecutor) OnStart(ctx context.Context, taskEntity *task.TaskEntity) error {
+	if err := e.BaseExecutor.OnStart(ctx, taskEntity); err != nil {
 		return err
 	}
 

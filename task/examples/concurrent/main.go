@@ -34,9 +34,9 @@ type ConcurrentTaskExecutor struct {
 	startTimes     *map[int]time.Time
 }
 
-// Prepare 初始化执行器
-func (e *ConcurrentTaskExecutor) Prepare(ctx context.Context, taskEntity *task.TaskEntity) error {
-	if err := e.BaseExecutor.Prepare(ctx, taskEntity); err != nil {
+// OnStart 初始化执行器
+func (e *ConcurrentTaskExecutor) OnStart(ctx context.Context, taskEntity *task.TaskEntity) error {
+	if err := e.BaseExecutor.OnStart(ctx, taskEntity); err != nil {
 		return err
 	}
 

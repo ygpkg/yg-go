@@ -63,8 +63,6 @@ type TaskEntity struct {
 	EndAt *time.Time `gorm:"type:datetime" json:"end_at" comment:"结束时间"`
 	// Cost 任务执行耗时（单位：秒）
 	Cost int64 `gorm:"type:bigint;default:0" json:"cost" comment:"任务执行耗时(秒)"`
-	// ParentID 父任务 ID，用于构建父子任务关系
-	ParentID uint `gorm:"type:bigint;index:idx_parent_id;default:0" json:"parent_id" comment:"父任务ID"`
 	// AppGroup 应用分组，用于将同一业务流程的多个步骤任务组织在一起，支持同一 SubjectID 下多个流程并行
 	AppGroup string `gorm:"type:varchar(32);index:idx_app_group" json:"app_group" comment:"应用分组"`
 }

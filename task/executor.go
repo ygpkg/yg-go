@@ -9,8 +9,8 @@ import (
 
 // TaskExecutor 任务执行器接口
 type TaskExecutor interface {
-	// Prepare 构建任务执行器，在任务执行前调用，用于根据任务实体初始化执行器
-	Prepare(ctx context.Context, task *TaskEntity) error
+	// OnStart 构建任务执行器，在任务执行前调用，用于根据任务实体初始化执行器
+	OnStart(ctx context.Context, task *TaskEntity) error
 
 	// Execute 执行任务，包含任务的核心业务逻辑
 	Execute(ctx context.Context) error
@@ -74,8 +74,8 @@ type BaseExecutor struct {
 	Task *TaskEntity
 }
 
-// Prepare 默认 Prepare 实现
-func (e *BaseExecutor) Prepare(ctx context.Context, task *TaskEntity) error {
+// OnStart 默认 OnStart 实现
+func (e *BaseExecutor) OnStart(ctx context.Context, task *TaskEntity) error {
 	e.Task = task
 	return nil
 }

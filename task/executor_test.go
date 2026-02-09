@@ -40,9 +40,9 @@ func TestBaseExecutor_Setup(t *testing.T) {
 		TaskType: "test",
 	}
 
-	err := executor.Prepare(context.Background(), task)
+	err := executor.OnStart(context.Background(), task)
 	if err != nil {
-		t.Errorf("Prepare() error = %v", err)
+		t.Errorf("OnStart() error = %v", err)
 	}
 
 	if executor.Task != task {

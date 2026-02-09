@@ -68,7 +68,7 @@ Worker 是任务的执行者，包含以下核心组件：
 
 ```go
 type TaskExecutor interface {
-    Prepare(ctx context.Context, task *TaskEntity) error
+    OnStart(ctx context.Context, task *TaskEntity) error
     Execute(ctx context.Context) error
     OnSuccess(ctx context.Context, tx *gorm.DB) error
     OnFailure(ctx context.Context, tx *gorm.DB) error
@@ -116,10 +116,10 @@ type MyTaskExecutor struct {
 	payload MyTaskPayload
 }
 
-// Prepare 初始化执行器
-func (e *MyTaskExecutor) Prepare(ctx context.Context, taskEntity *task.TaskEntity) error {
-	// 调用基类 Prepare
-	if err := e.BaseExecutor.Prepare(ctx, taskEntity); err != nil {
+// OnStart 初始化执行器
+func (e *MyTaskExecutor) OnStart(ctx context.Context, taskEntity *task.TaskEntity) error {
+	// 调用基类 OnStart
+	if err := e.BaseExecutor.OnStart(ctx, taskEntity); err != nil {
 		return err
 	}
 	
@@ -592,7 +592,7 @@ func InitDB(db *gorm.DB) error {
 // ✅ 好的做法：使用 BaseExecutor，状态存储在实例中
 type GoodExecutor struct {
 	task.BaseExecutor
-	config MyConfig // 从 Prepare 中初始化
+	config MyConfig // 从 OnStart 中初始化
 }
 
 // ❌ 避免：使用全局变量或包级变量
@@ -608,8 +608,8 @@ type TaskPayload struct {
 	Metadata map[string]interface{} `json:"metadata"`
 }
 
-func (e *MyExecutor) Prepare(ctx context.Context, t *task.TaskEntity) error {
-	if err := e.BaseExecutor.Prepare(ctx, t); err != nil {
+func (e *MyExecutor) OnStart(ctx context.Context, t *task.TaskEntity) error {
+	if err := e.BaseExecutor.OnStart(ctx, t); err != nil {
 		return err
 	}
 	
@@ -893,7 +893,7 @@ func (w *Worker) CancelTask(ctx context.Context, taskID uint, reason string) err
 ```go
 type TaskExecutor interface {
     // 初始化执行器
-    Prepare(ctx context.Context, task *TaskEntity) error
+    OnStart(ctx context.Context, task *TaskEntity) error
     
     // 执行任务
     Execute(ctx context.Context) error

@@ -31,9 +31,9 @@ type StepTaskExecutor struct {
 	mu             *sync.Mutex
 }
 
-// Prepare 初始化执行器
-func (e *StepTaskExecutor) Prepare(ctx context.Context, taskEntity *task.TaskEntity) error {
-	if err := e.BaseExecutor.Prepare(ctx, taskEntity); err != nil {
+// OnStart 初始化执行器
+func (e *StepTaskExecutor) OnStart(ctx context.Context, taskEntity *task.TaskEntity) error {
+	if err := e.BaseExecutor.OnStart(ctx, taskEntity); err != nil {
 		return err
 	}
 

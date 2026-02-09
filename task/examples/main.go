@@ -9,97 +9,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/task"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 )
 
 // DemoPayload 演示任务的参数结构
 type DemoPayload struct {
 	Message string `json:"message"`
 	UserID  int    `json:"user_id"`
-}
-
-// DemoTaskExecutor 演示任务执行器
-type DemoTaskExecutor struct {
-	task.BaseExecutor
-	payload DemoPayload
-}
-
-// Prepare 初始化执行器
-func (e *DemoTaskExecutor) Prepare(ctx context.Context, taskEntity *task.TaskEntity) error {
-	// 调用基类 Prepare
-	if err := e.BaseExecutor.Prepare(ctx, taskEntity); err != nil {
-		return err
-	}
-
-	// 解析任务参数
-	if err := json.Unmarshal([]byte(taskEntity.Payload), &e.payload); err != nil {
-		return fmt.Errorf("failed to parse payload: %w", err)
-	}
-
-	fmt.Printf("✓ Prepare: 任务 %d 已初始化，参数: %+v\n", taskEntity.ID, e.payload)
-	return nil
-}
-
-// Execute 执行任务
-func (e *DemoTaskExecutor) Execute(ctx context.Context) error {
-	fmt.Printf("→ Execute: 开始执行任务 %d\n", e.Task.ID)
-	fmt.Printf("  处理消息: %s\n", e.payload.Message)
-	fmt.Printf("  用户 ID: %d\n", e.payload.UserID)
-
-	// 模拟任务处理
-	time.Sleep(2 * time.Second)
-
-	fmt.Printf("✓ Execute: 任务 %d 执行完成\n", e.Task.ID)
-	return nil
-}
-
-// OnSuccess 成功回调
-func (e *DemoTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
-	fmt.Printf("✓ OnSuccess: 任务 %d 执行成功\n", e.Task.ID)
-	// 这里可以执行事务性操作，如更新数据库
-	return nil
-}
-
-// OnFailure 失败回调
-func (e *DemoTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
-	fmt.Printf("✗ OnFailure: 任务 %d 执行失败\n", e.Task.ID)
-	// 这里可以执行清理操作或记录日志
-	return nil
-}
-
-// setupDB 使用 gorm 原生方式创建数据库连接
-func setupDB() (*gorm.DB, error) {
-	// MySQL DSN 格式: user:pass@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
-	dsn := "root:123456@tcp(localhost:3306)/demo?charset=utf8mb4&parseTime=True&loc=Local"
-
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		CreateBatchSize: 200,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect database: %w", err)
-	}
-
-	return db, nil
-}
-
-// setupRedis 使用 go-redis 原生方式创建 Redis 客户端
-func setupRedis() (*redis.Client, error) {
-	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // 无密码
-		DB:       0,  // 默认 DB
-	})
-
-	// 测试连接
-	ctx := context.Background()
-	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect redis: %w", err)
-	}
-
-	return client, nil
 }
 
 func main() {

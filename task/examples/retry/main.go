@@ -31,9 +31,9 @@ type RetryTaskExecutor struct {
 	currentAttempt int32
 }
 
-// Prepare 初始化执行器
-func (e *RetryTaskExecutor) Prepare(ctx context.Context, taskEntity *task.TaskEntity) error {
-	if err := e.BaseExecutor.Prepare(ctx, taskEntity); err != nil {
+// OnStart 初始化执行器
+func (e *RetryTaskExecutor) OnStart(ctx context.Context, taskEntity *task.TaskEntity) error {
+	if err := e.BaseExecutor.OnStart(ctx, taskEntity); err != nil {
 		return err
 	}
 

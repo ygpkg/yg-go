@@ -85,8 +85,6 @@ func (w *Worker) CreateTasks(ctx context.Context, tasks []*TaskEntity) error {
 		return fmt.Errorf("failed to push first task to queue: %w", err)
 	}
 
-	logs.InfoContextf(ctx, "[task] batch created %d tasks, first task id: %d, type: %s",
-		len(tasks), firstTask.ID, firstTask.TaskType)
 	return nil
 }
 
@@ -122,7 +120,6 @@ func (w *Worker) Start(ctx context.Context) error {
 				w.workRoutine(taskType)
 			})
 		}
-		logs.InfoContextf(ctx, "[task] started %d workers for task type: %s", w.config.MaxConcurrency, taskType)
 	}
 
 	w.started = true
@@ -246,8 +243,10 @@ func (w *Worker) processOneTask(taskType string) bool {
 		return false
 	}
 
-	if task == nil {
-		return false // 没有任务，继续循环（Pop 已经阻塞过了）
+	if task == nil || task.ID == 0 {
+		// 没有任务或任务为空，继续循环
+		// 这种情况可能是：队列中有消息但数据库中没有可执行的任务（已被其他 worker 处理或因 step 依赖暂不可执行）
+		return false
 	}
 
 	// 执行任务
@@ -257,12 +256,18 @@ func (w *Worker) processOneTask(taskType string) bool {
 
 // executeTask 执行任务
 func (w *Worker) executeTask(ctx context.Context, taskEntity *TaskEntity) {
+	// 防御性检查：确保任务对象有效
+	if taskEntity == nil || taskEntity.ID == 0 {
+		logs.ErrorContextf(ctx, "[task] invalid task entity: task is nil or ID is 0")
+		return
+	}
+
 	ctx = logs.WithContextFields(ctx, "task_id", taskEntity.ID)
 
 	// 获取执行器
 	factory, ok := w.registry.Get(taskEntity.TaskType)
 	if !ok {
-		logs.ErrorContextf(ctx, "[task] executor not found for task type: %s", taskEntity.TaskType)
+		logs.ErrorContextf(ctx, "[task] executor not found for task type: %s, task_id: %d", taskEntity.TaskType, taskEntity.ID)
 		taskEntity.MarkAsFailed("executor not found")
 		w.repo.SaveTask(ctx, taskEntity)
 		return
@@ -270,8 +275,8 @@ func (w *Worker) executeTask(ctx context.Context, taskEntity *TaskEntity) {
 
 	executor := factory()
 
-	// Prepare 执行器
-	if err := executor.Prepare(ctx, taskEntity); err != nil {
+	// OnStart 执行器
+	if err := executor.OnStart(ctx, taskEntity); err != nil {
 		logs.ErrorContextf(ctx, "[task] failed to prepare executor: %v", err)
 		taskEntity.MarkAsFailed(fmt.Sprintf("prepare failed: %v", err))
 		w.repo.SaveTask(ctx, taskEntity)
