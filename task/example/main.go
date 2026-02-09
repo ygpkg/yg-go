@@ -12,26 +12,30 @@ import (
 func main() {
 	printBanner()
 
-	// 1. 初始化数据库和 Redis
-	db, redisClient, err := setupInfra()
-	if err != nil {
-		fmt.Printf("✗ 初始化失败: %v\n", err)
-		os.Exit(1)
-	}
-
-	// 初始化 Task 包
-	if err := task.Init(db); err != nil {
-		fmt.Printf("✗ 初始化 Task 包失败: %v\n", err)
-		os.Exit(1)
-	}
-
-	// 2. 显示菜单并获取用户选择
+	// 1. 显示菜单并获取用户选择（先选择，避免不必要的连接）
 	choice := showMenuAndGetChoice()
 
 	if choice == 0 {
 		fmt.Println("再见！")
 		return
 	}
+
+	// 2. 初始化数据库和 Redis
+	fmt.Println("正在连接数据库和 Redis...")
+	db, redisClient, err := setupInfra()
+	if err != nil {
+		fmt.Printf("✗ 初始化失败: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("✓ 数据库和 Redis 连接成功")
+
+	// 初始化 Task 包
+	if err := task.Init(db); err != nil {
+		fmt.Printf("✗ 初始化 Task 包失败: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("✓ Task 包初始化完成")
+	fmt.Println()
 
 	// 3. 根据选择创建对应配置的 Worker
 	config := createWorkerConfig(choice)
@@ -41,13 +45,33 @@ func main() {
 		os.Exit(1)
 	}
 
-	// 4. 启动 Worker
 	ctx := context.Background()
+
+	// 4. 根据场景注册执行器（必须在 Worker.Start() 之前）
+	switch choice {
+	case 1:
+		registerBasicExecutors(worker)
+	case 2:
+		registerRetryExecutors(worker)
+	case 3:
+		registerTimeoutExecutors(worker)
+	case 4:
+		registerConcurrentExecutors(worker)
+	case 5:
+		registerStepsExecutors(worker)
+	case 6:
+		registerMixedConcurrencyExecutors(worker)
+	default:
+		fmt.Println("无效的选项")
+		return
+	}
+
+	// 5. 启动 Worker
 	if err := worker.Start(ctx); err != nil {
 		fmt.Printf("✗ 启动 Worker 失败: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Println("\n✓ Worker 已启动")
+	fmt.Println("✓ Worker 已启动")
 	fmt.Println()
 
 	// 延迟停止 Worker
@@ -62,7 +86,7 @@ func main() {
 		}
 	}()
 
-	// 5. 运行对应场景
+	// 6. 运行对应场景
 	var scenarioErr error
 	switch choice {
 	case 1:

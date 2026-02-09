@@ -150,7 +150,11 @@ func (w *Worker) Start(ctx context.Context) error {
 	// 为每个任务类型启动工作协程（支持不同并发数）
 	taskTypes := w.registry.GetAll()
 	for _, taskType := range taskTypes {
-		concurrency := w.getConcurrency(taskType)
+		// 直接访问 concurrencyMap，避免死锁（已持有写锁）
+		concurrency, ok := w.concurrencyMap[taskType]
+		if !ok {
+			concurrency = w.config.MaxConcurrency
+		}
 		taskTypeCopy := taskType // 避免闭包捕获问题
 		for i := 0; i < concurrency; i++ {
 			w.startRoutine(fmt.Sprintf("worker-%s-%d", taskType, i), func() {

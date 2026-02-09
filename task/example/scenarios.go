@@ -14,15 +14,116 @@ import (
 	"github.com/ygpkg/yg-go/task"
 )
 
-// runBasicScenario 基本任务创建和执行
-func runBasicScenario(ctx context.Context, worker *task.Worker) error {
-	printSection("基本任务创建和执行")
+// ===== 场景共享状态 =====
 
-	// 注册执行器
+// ConcurrentScenarioState 并发场景的共享状态
+type ConcurrentScenarioState struct {
+	executingCount int32
+	completedCount int32
+	mu             sync.Mutex
+	startTimes     map[int]time.Time
+}
+
+// StepsScenarioState 步骤场景的共享状态
+type StepsScenarioState struct {
+	executionOrder []int
+	mu             sync.Mutex
+}
+
+var (
+	concurrentState         *ConcurrentScenarioState
+	stepsState              *StepsScenarioState
+	mixedConcurrencyStats   *TaskStats
+	retryAttemptCount       int32
+)
+
+// ===== 执行器注册函数 =====
+
+// registerBasicExecutors 注册基本示例的执行器
+func registerBasicExecutors(worker *task.Worker) {
 	worker.RegisterExecutor("demo_task", func() task.TaskExecutor {
 		return &DemoTaskExecutor{}
 	})
-	fmt.Println("✓ 已注册执行器: demo_task\n")
+}
+
+// registerRetryExecutors 注册重试示例的执行器
+func registerRetryExecutors(worker *task.Worker) {
+	// 重置共享计数器
+	atomic.StoreInt32(&retryAttemptCount, 0)
+	
+	worker.RegisterExecutor("retry_task", func() task.TaskExecutor {
+		return &RetryTaskExecutor{
+			attemptCount: &retryAttemptCount,
+		}
+	})
+}
+
+// registerTimeoutExecutors 注册超时示例的执行器
+func registerTimeoutExecutors(worker *task.Worker) {
+	worker.RegisterExecutor("timeout_task", func() task.TaskExecutor {
+		return &TimeoutTaskExecutor{}
+	})
+}
+
+// registerConcurrentExecutors 注册并发示例的执行器
+func registerConcurrentExecutors(worker *task.Worker) {
+	// 初始化共享状态
+	concurrentState = &ConcurrentScenarioState{
+		startTimes: make(map[int]time.Time),
+	}
+
+	worker.RegisterExecutor("concurrent_task", func() task.TaskExecutor {
+		return &ConcurrentTaskExecutor{
+			executingCount: &concurrentState.executingCount,
+			completedCount: &concurrentState.completedCount,
+			mu:             &concurrentState.mu,
+			startTimes:     &concurrentState.startTimes,
+		}
+	})
+}
+
+// registerStepsExecutors 注册步骤示例的执行器
+func registerStepsExecutors(worker *task.Worker) {
+	// 初始化共享状态
+	stepsState = &StepsScenarioState{
+		executionOrder: make([]int, 0),
+	}
+
+	worker.RegisterExecutor("step_task", func() task.TaskExecutor {
+		return &StepTaskExecutor{
+			executionOrder: &stepsState.executionOrder,
+			mu:             &stepsState.mu,
+		}
+	})
+}
+
+// registerMixedConcurrencyExecutors 注册混合并发示例的执行器
+func registerMixedConcurrencyExecutors(worker *task.Worker) {
+	// 初始化共享统计
+	mixedConcurrencyStats = NewTaskStats()
+
+	worker.RegisterExecutor("fast_task", func() task.TaskExecutor {
+		return &FastTaskExecutor{stats: mixedConcurrencyStats}
+	}, task.WithConcurrency(10))
+
+	worker.RegisterExecutor("slow_task", func() task.TaskExecutor {
+		return &SlowTaskExecutor{stats: mixedConcurrencyStats}
+	}, task.WithConcurrency(2))
+
+	worker.RegisterExecutor("api_task", func() task.TaskExecutor {
+		return &ApiTaskExecutor{stats: mixedConcurrencyStats}
+	}, task.WithConcurrency(5))
+
+	worker.RegisterExecutor("default_task", func() task.TaskExecutor {
+		return &DefaultTaskExecutor{stats: mixedConcurrencyStats}
+	})
+}
+
+// ===== 场景执行函数 =====
+
+// runBasicScenario 基本任务创建和执行
+func runBasicScenario(ctx context.Context, worker *task.Worker) error {
+	printSection("基本任务创建和执行")
 
 	// 创建任务
 	fmt.Println("创建任务...")
@@ -60,17 +161,6 @@ func runBasicScenario(ctx context.Context, worker *task.Worker) error {
 // runRetryScenario 任务重试机制演示
 func runRetryScenario(ctx context.Context, worker *task.Worker) error {
 	printSection("任务重试机制演示")
-
-	// 共享尝试计数
-	var attemptCount int32
-
-	// 注册执行器
-	worker.RegisterExecutor("retry_task", func() task.TaskExecutor {
-		return &RetryTaskExecutor{
-			attemptCount: &attemptCount,
-		}
-	})
-	fmt.Println("✓ 已注册执行器: retry_task\n")
 
 	// 创建任务
 	fmt.Println("创建重试任务...")
@@ -112,12 +202,6 @@ func runRetryScenario(ctx context.Context, worker *task.Worker) error {
 // runTimeoutScenario 任务超时处理演示
 func runTimeoutScenario(ctx context.Context, worker *task.Worker) error {
 	printSection("任务超时处理演示")
-
-	// 注册执行器
-	worker.RegisterExecutor("timeout_task", func() task.TaskExecutor {
-		return &TimeoutTaskExecutor{}
-	})
-	fmt.Println("✓ 已注册执行器: timeout_task\n")
 
 	// 创建两个任务：一个超时，一个不超时
 	fmt.Println("创建两个任务:")
@@ -172,23 +256,6 @@ func runTimeoutScenario(ctx context.Context, worker *task.Worker) error {
 func runConcurrentScenario(ctx context.Context, worker *task.Worker) error {
 	printSection("并发任务处理演示")
 
-	// 共享状态
-	var executingCount int32
-	var completedCount int32
-	var mu sync.Mutex
-	startTimes := make(map[int]time.Time)
-
-	// 注册执行器
-	worker.RegisterExecutor("concurrent_task", func() task.TaskExecutor {
-		return &ConcurrentTaskExecutor{
-			executingCount: &executingCount,
-			completedCount: &completedCount,
-			mu:             &mu,
-			startTimes:     &startTimes,
-		}
-	})
-	fmt.Println("✓ 已注册执行器: concurrent_task\n")
-
 	// 批量创建任务
 	taskCount := 20
 	fmt.Printf("创建 %d 个并发任务（每个耗时 500ms）...\n", taskCount)
@@ -232,8 +299,8 @@ func runConcurrentScenario(ctx context.Context, worker *task.Worker) error {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				executing := atomic.LoadInt32(&executingCount)
-				completed := atomic.LoadInt32(&completedCount)
+				executing := atomic.LoadInt32(&concurrentState.executingCount)
+				completed := atomic.LoadInt32(&concurrentState.completedCount)
 
 				if completed >= int32(taskCount) {
 					return
@@ -256,7 +323,7 @@ func runConcurrentScenario(ctx context.Context, worker *task.Worker) error {
 			return fmt.Errorf("等待任务完成超时")
 
 		case <-ticker.C:
-			completed := atomic.LoadInt32(&completedCount)
+			completed := atomic.LoadInt32(&concurrentState.completedCount)
 			if completed >= int32(taskCount) {
 				totalTime := time.Since(startTime)
 
@@ -284,19 +351,6 @@ func runConcurrentScenario(ctx context.Context, worker *task.Worker) error {
 // runStepsScenario 步骤化任务流程演示
 func runStepsScenario(ctx context.Context, worker *task.Worker) error {
 	printSection("步骤化任务流程演示")
-
-	// 执行顺序记录
-	var executionOrder []int
-	var mu sync.Mutex
-
-	// 注册执行器
-	worker.RegisterExecutor("step_task", func() task.TaskExecutor {
-		return &StepTaskExecutor{
-			executionOrder: &executionOrder,
-			mu:             &mu,
-		}
-	})
-	fmt.Println("✓ 已注册执行器: step_task\n")
 
 	// 创建步骤化任务
 	orderID := 1001
@@ -362,11 +416,11 @@ func runStepsScenario(ctx context.Context, worker *task.Worker) error {
 	fmt.Println("\n========================================")
 	fmt.Println("执行顺序验证")
 	fmt.Println("========================================")
-	fmt.Printf("实际执行顺序: %v\n", executionOrder)
+	fmt.Printf("实际执行顺序: %v\n", stepsState.executionOrder)
 
 	isOrdered := true
-	for i := 0; i < len(executionOrder)-1; i++ {
-		if executionOrder[i] > executionOrder[i+1] {
+	for i := 0; i < len(stepsState.executionOrder)-1; i++ {
+		if stepsState.executionOrder[i] > stepsState.executionOrder[i+1] {
 			isOrdered = false
 			break
 		}
@@ -385,30 +439,10 @@ func runStepsScenario(ctx context.Context, worker *task.Worker) error {
 func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error {
 	printSection("混合并发任务演示")
 
-	// 共享统计
-	stats := NewTaskStats()
-
-	// 注册不同并发数的执行器
-	fmt.Println("注册执行器:")
-
-	worker.RegisterExecutor("fast_task", func() task.TaskExecutor {
-		return &FastTaskExecutor{stats: stats}
-	}, task.WithConcurrency(10))
+	fmt.Println("已注册的执行器:")
 	fmt.Println("  ✓ fast_task - 并发数: 10 (快速任务，高并发)")
-
-	worker.RegisterExecutor("slow_task", func() task.TaskExecutor {
-		return &SlowTaskExecutor{stats: stats}
-	}, task.WithConcurrency(2))
 	fmt.Println("  ✓ slow_task - 并发数: 2 (慢速任务，低并发)")
-
-	worker.RegisterExecutor("api_task", func() task.TaskExecutor {
-		return &ApiTaskExecutor{stats: stats}
-	}, task.WithConcurrency(5))
 	fmt.Println("  ✓ api_task - 并发数: 5 (API调用，中等并发)")
-
-	worker.RegisterExecutor("default_task", func() task.TaskExecutor {
-		return &DefaultTaskExecutor{stats: stats}
-	})
 	fmt.Println("  ✓ default_task - 并发数: 3 (使用全局默认值)")
 	fmt.Println()
 
@@ -528,10 +562,10 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				fast := atomic.LoadInt32(&stats.fastCompleted)
-				slow := atomic.LoadInt32(&stats.slowCompleted)
-				api := atomic.LoadInt32(&stats.apiCompleted)
-				def := atomic.LoadInt32(&stats.defaultCompleted)
+				fast := atomic.LoadInt32(&mixedConcurrencyStats.fastCompleted)
+				slow := atomic.LoadInt32(&mixedConcurrencyStats.slowCompleted)
+				api := atomic.LoadInt32(&mixedConcurrencyStats.apiCompleted)
+				def := atomic.LoadInt32(&mixedConcurrencyStats.defaultCompleted)
 				total := fast + slow + api + def
 
 				if total >= totalTasks {
@@ -555,10 +589,10 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 			return fmt.Errorf("等待任务完成超时")
 
 		case <-ticker.C:
-			fast := atomic.LoadInt32(&stats.fastCompleted)
-			slow := atomic.LoadInt32(&stats.slowCompleted)
-			api := atomic.LoadInt32(&stats.apiCompleted)
-			def := atomic.LoadInt32(&stats.defaultCompleted)
+			fast := atomic.LoadInt32(&mixedConcurrencyStats.fastCompleted)
+			slow := atomic.LoadInt32(&mixedConcurrencyStats.slowCompleted)
+			api := atomic.LoadInt32(&mixedConcurrencyStats.apiCompleted)
+			def := atomic.LoadInt32(&mixedConcurrencyStats.defaultCompleted)
 			total := fast + slow + api + def
 
 			if total >= totalTasks {
@@ -596,7 +630,8 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 // waitForTaskCompletion 等待单个任务完成
 func waitForTaskCompletion(ctx context.Context, worker *task.Worker, taskID uint, timeout time.Duration) error {
 	fmt.Println("等待任务完成...")
-	fmt.Println("========================================\n")
+	fmt.Println("========================================")
+	fmt.Println()
 
 	timeoutCh := time.After(timeout)
 	ticker := time.NewTicker(1 * time.Second)

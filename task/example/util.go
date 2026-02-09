@@ -31,12 +31,15 @@ func setupDB() (*gorm.DB, error) {
 	// MySQL DSN 格式: user:pass@tcp(host:port)/dbname?charset=utf8mb4&parseTime=True&loc=Local
 	dsn := "root:123456@tcp(localhost:3306)/demo?charset=utf8mb4&parseTime=True&loc=Local"
 
+	fmt.Print("  连接 MySQL...")
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		CreateBatchSize: 200,
 	})
 	if err != nil {
+		fmt.Println(" 失败")
 		return nil, fmt.Errorf("failed to connect database: %w", err)
 	}
+	fmt.Println(" 成功")
 
 	return db, nil
 }
@@ -50,10 +53,13 @@ func setupRedis() (*redis.Client, error) {
 	})
 
 	// 测试连接
+	fmt.Print("  连接 Redis...")
 	ctx := context.Background()
 	if err := client.Ping(ctx).Err(); err != nil {
+		fmt.Println(" 失败")
 		return nil, fmt.Errorf("failed to connect redis: %w", err)
 	}
+	fmt.Println(" 成功")
 
 	return client, nil
 }
