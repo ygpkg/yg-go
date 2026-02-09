@@ -11,7 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ygpkg/yg-go/task"
+	"github.com/ygpkg/yg-go/task/manager"
+	"github.com/ygpkg/yg-go/task/model"
+	"github.com/ygpkg/yg-go/task/worker"
 )
 
 // ===== 场景共享状态 =====
@@ -31,98 +33,92 @@ type StepsScenarioState struct {
 }
 
 var (
-	concurrentState         *ConcurrentScenarioState
-	stepsState              *StepsScenarioState
-	mixedConcurrencyStats   *TaskStats
-	retryAttemptCount       int32
+	concurrentState       *ConcurrentScenarioState
+	stepsState            *StepsScenarioState
+	mixedConcurrencyStats *TaskStats
+	retryAttemptCount     int32
 )
 
 // ===== 执行器注册函数 =====
 
 // registerBasicExecutors 注册基本示例的执行器
-func registerBasicExecutors(worker *task.Worker) {
-	worker.RegisterExecutor("demo_task", func() task.TaskExecutor {
-		return &DemoTaskExecutor{}
+func registerBasicExecutors(w *worker.Worker) {
+	w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error) {
+		return NewDemoTaskExecutor(payload)
 	})
 }
 
 // registerRetryExecutors 注册重试示例的执行器
-func registerRetryExecutors(worker *task.Worker) {
+func registerRetryExecutors(w *worker.Worker) {
 	// 重置共享计数器
 	atomic.StoreInt32(&retryAttemptCount, 0)
-	
-	worker.RegisterExecutor("retry_task", func() task.TaskExecutor {
-		return &RetryTaskExecutor{
-			attemptCount: &retryAttemptCount,
-		}
+
+	w.RegisterExecutor("retry_task", func(payload string) (worker.TaskExecutor, error) {
+		return NewRetryTaskExecutor(payload, &retryAttemptCount)
 	})
 }
 
 // registerTimeoutExecutors 注册超时示例的执行器
-func registerTimeoutExecutors(worker *task.Worker) {
-	worker.RegisterExecutor("timeout_task", func() task.TaskExecutor {
-		return &TimeoutTaskExecutor{}
+func registerTimeoutExecutors(w *worker.Worker) {
+	w.RegisterExecutor("timeout_task", func(payload string) (worker.TaskExecutor, error) {
+		return NewTimeoutTaskExecutor(payload)
 	})
 }
 
 // registerConcurrentExecutors 注册并发示例的执行器
-func registerConcurrentExecutors(worker *task.Worker) {
+func registerConcurrentExecutors(w *worker.Worker) {
 	// 初始化共享状态
 	concurrentState = &ConcurrentScenarioState{
 		startTimes: make(map[int]time.Time),
 	}
 
-	worker.RegisterExecutor("concurrent_task", func() task.TaskExecutor {
-		return &ConcurrentTaskExecutor{
-			executingCount: &concurrentState.executingCount,
-			completedCount: &concurrentState.completedCount,
-			mu:             &concurrentState.mu,
-			startTimes:     &concurrentState.startTimes,
-		}
+	w.RegisterExecutor("concurrent_task", func(payload string) (worker.TaskExecutor, error) {
+		return NewConcurrentTaskExecutor(payload,
+			&concurrentState.executingCount,
+			&concurrentState.completedCount,
+			&concurrentState.mu,
+			&concurrentState.startTimes)
 	})
 }
 
 // registerStepsExecutors 注册步骤示例的执行器
-func registerStepsExecutors(worker *task.Worker) {
+func registerStepsExecutors(w *worker.Worker) {
 	// 初始化共享状态
 	stepsState = &StepsScenarioState{
 		executionOrder: make([]int, 0),
 	}
 
-	worker.RegisterExecutor("step_task", func() task.TaskExecutor {
-		return &StepTaskExecutor{
-			executionOrder: &stepsState.executionOrder,
-			mu:             &stepsState.mu,
-		}
+	w.RegisterExecutor("step_task", func(payload string) (worker.TaskExecutor, error) {
+		return NewStepTaskExecutor(payload, &stepsState.executionOrder, &stepsState.mu)
 	})
 }
 
 // registerMixedConcurrencyExecutors 注册混合并发示例的执行器
-func registerMixedConcurrencyExecutors(worker *task.Worker) {
+func registerMixedConcurrencyExecutors(w *worker.Worker) {
 	// 初始化共享统计
 	mixedConcurrencyStats = NewTaskStats()
 
-	worker.RegisterExecutor("fast_task", func() task.TaskExecutor {
-		return &FastTaskExecutor{stats: mixedConcurrencyStats}
-	}, task.WithConcurrency(10))
+	w.RegisterExecutor("fast_task", func(payload string) (worker.TaskExecutor, error) {
+		return NewFastTaskExecutor(payload, mixedConcurrencyStats)
+	}, worker.WithConcurrency(10))
 
-	worker.RegisterExecutor("slow_task", func() task.TaskExecutor {
-		return &SlowTaskExecutor{stats: mixedConcurrencyStats}
-	}, task.WithConcurrency(2))
+	w.RegisterExecutor("slow_task", func(payload string) (worker.TaskExecutor, error) {
+		return NewSlowTaskExecutor(payload, mixedConcurrencyStats)
+	}, worker.WithConcurrency(2))
 
-	worker.RegisterExecutor("api_task", func() task.TaskExecutor {
-		return &ApiTaskExecutor{stats: mixedConcurrencyStats}
-	}, task.WithConcurrency(5))
+	w.RegisterExecutor("api_task", func(payload string) (worker.TaskExecutor, error) {
+		return NewApiTaskExecutor(payload, mixedConcurrencyStats)
+	}, worker.WithConcurrency(5))
 
-	worker.RegisterExecutor("default_task", func() task.TaskExecutor {
-		return &DefaultTaskExecutor{stats: mixedConcurrencyStats}
+	w.RegisterExecutor("default_task", func(payload string) (worker.TaskExecutor, error) {
+		return NewDefaultTaskExecutor(payload, mixedConcurrencyStats)
 	})
 }
 
 // ===== 场景执行函数 =====
 
 // runBasicScenario 基本任务创建和执行
-func runBasicScenario(ctx context.Context, worker *task.Worker) error {
+func runBasicScenario(ctx context.Context, mgr *manager.Manager, w *worker.Worker) error {
 	printSection("基本任务创建和执行")
 
 	// 创建任务
@@ -137,7 +133,7 @@ func runBasicScenario(ctx context.Context, worker *task.Worker) error {
 		return fmt.Errorf("序列化参数失败: %w", err)
 	}
 
-	taskEntity := &task.TaskEntity{
+	taskEntity := &model.TaskEntity{
 		TaskType:    "demo_task",
 		SubjectType: "demo",
 		SubjectID:   1,
@@ -149,17 +145,17 @@ func runBasicScenario(ctx context.Context, worker *task.Worker) error {
 		Uin:         1001,
 	}
 
-	if err := worker.CreateTasks(ctx, []*task.TaskEntity{taskEntity}); err != nil {
+	if err := mgr.CreateTasks(ctx, []*model.TaskEntity{taskEntity}); err != nil {
 		return fmt.Errorf("创建任务失败: %w", err)
 	}
 	fmt.Printf("✓ 任务已创建，ID: %d\n\n", taskEntity.ID)
 
 	// 等待任务完成
-	return waitForTaskCompletion(ctx, worker, taskEntity.ID, 30*time.Second)
+	return waitForTaskCompletion(ctx, mgr, taskEntity.ID, 30*time.Second)
 }
 
 // runRetryScenario 任务重试机制演示
-func runRetryScenario(ctx context.Context, worker *task.Worker) error {
+func runRetryScenario(ctx context.Context, mgr *manager.Manager, w *worker.Worker) error {
 	printSection("任务重试机制演示")
 
 	// 创建任务
@@ -178,7 +174,7 @@ func runRetryScenario(ctx context.Context, worker *task.Worker) error {
 		return fmt.Errorf("序列化参数失败: %w", err)
 	}
 
-	taskEntity := &task.TaskEntity{
+	taskEntity := &model.TaskEntity{
 		TaskType:    "retry_task",
 		SubjectType: "retry_demo",
 		SubjectID:   1,
@@ -190,17 +186,17 @@ func runRetryScenario(ctx context.Context, worker *task.Worker) error {
 		Uin:         1001,
 	}
 
-	if err := worker.CreateTasks(ctx, []*task.TaskEntity{taskEntity}); err != nil {
+	if err := mgr.CreateTasks(ctx, []*model.TaskEntity{taskEntity}); err != nil {
 		return fmt.Errorf("创建任务失败: %w", err)
 	}
 	fmt.Printf("✓ 任务已创建，ID: %d\n\n", taskEntity.ID)
 
 	// 等待任务完成（需要更长时间）
-	return waitForTaskCompletion(ctx, worker, taskEntity.ID, 60*time.Second)
+	return waitForTaskCompletion(ctx, mgr, taskEntity.ID, 60*time.Second)
 }
 
 // runTimeoutScenario 任务超时处理演示
-func runTimeoutScenario(ctx context.Context, worker *task.Worker) error {
+func runTimeoutScenario(ctx context.Context, mgr *manager.Manager, w *worker.Worker) error {
 	printSection("任务超时处理演示")
 
 	// 创建两个任务：一个超时，一个不超时
@@ -209,7 +205,7 @@ func runTimeoutScenario(ctx context.Context, worker *task.Worker) error {
 	fmt.Println("  任务 2: 执行 8 秒，超时 5 秒（会超时，不检查上下文）")
 	fmt.Println()
 
-	tasks := []*task.TaskEntity{
+	tasks := []*model.TaskEntity{
 		{
 			TaskType:    "timeout_task",
 			SubjectType: "timeout_demo",
@@ -242,25 +238,25 @@ func runTimeoutScenario(ctx context.Context, worker *task.Worker) error {
 		},
 	}
 
-	if err := worker.CreateTasks(ctx, tasks); err != nil {
+	if err := mgr.CreateTasks(ctx, tasks); err != nil {
 		return fmt.Errorf("创建任务失败: %w", err)
 	}
 	fmt.Printf("✓ 已创建 %d 个任务\n\n", len(tasks))
 
 	// 等待所有任务完成
 	taskIDs := []uint{tasks[0].ID, tasks[1].ID}
-	return waitForMultipleTasksCompletion(ctx, worker, taskIDs, 60*time.Second)
+	return waitForMultipleTasksCompletion(ctx, mgr, taskIDs, 60*time.Second)
 }
 
 // runConcurrentScenario 并发任务处理演示
-func runConcurrentScenario(ctx context.Context, worker *task.Worker) error {
+func runConcurrentScenario(ctx context.Context, mgr *manager.Manager, w *worker.Worker) error {
 	printSection("并发任务处理演示")
 
 	// 批量创建任务
 	taskCount := 20
 	fmt.Printf("创建 %d 个并发任务（每个耗时 500ms）...\n", taskCount)
 
-	var tasks []*task.TaskEntity
+	var tasks []*model.TaskEntity
 	for i := 1; i <= taskCount; i++ {
 		payload := ConcurrentPayload{
 			Index:    i,
@@ -270,7 +266,7 @@ func runConcurrentScenario(ctx context.Context, worker *task.Worker) error {
 
 		payloadJSON, _ := json.Marshal(payload)
 
-		tasks = append(tasks, &task.TaskEntity{
+		tasks = append(tasks, &model.TaskEntity{
 			TaskType:    "concurrent_task",
 			SubjectType: "concurrent_demo",
 			SubjectID:   uint(i),
@@ -284,7 +280,7 @@ func runConcurrentScenario(ctx context.Context, worker *task.Worker) error {
 	}
 
 	startTime := time.Now()
-	if err := worker.CreateTasks(ctx, tasks); err != nil {
+	if err := mgr.CreateTasks(ctx, tasks); err != nil {
 		return fmt.Errorf("批量创建任务失败: %w", err)
 	}
 	fmt.Printf("✓ 已创建 %d 个任务\n\n", len(tasks))
@@ -349,7 +345,7 @@ func runConcurrentScenario(ctx context.Context, worker *task.Worker) error {
 }
 
 // runStepsScenario 步骤化任务流程演示
-func runStepsScenario(ctx context.Context, worker *task.Worker) error {
+func runStepsScenario(ctx context.Context, mgr *manager.Manager, w *worker.Worker) error {
 	printSection("步骤化任务流程演示")
 
 	// 创建步骤化任务
@@ -372,17 +368,19 @@ func runStepsScenario(ctx context.Context, worker *task.Worker) error {
 		{3, "发货", "生成物流单并发货"},
 	}
 
-	var tasks []*task.TaskEntity
+	var tasks []*model.TaskEntity
 	for _, s := range steps {
 		payload := StepPayload{
 			StepName:    s.name,
 			OrderID:     orderID,
 			Description: s.description,
+			Step:        s.step,
+			AppGroup:    appGroup,
 		}
 
 		payloadJSON, _ := json.Marshal(payload)
 
-		tasks = append(tasks, &task.TaskEntity{
+		tasks = append(tasks, &model.TaskEntity{
 			TaskType:    "step_task",
 			SubjectType: "order",
 			SubjectID:   uint(orderID),
@@ -397,7 +395,7 @@ func runStepsScenario(ctx context.Context, worker *task.Worker) error {
 		})
 	}
 
-	if err := worker.CreateTasks(ctx, tasks); err != nil {
+	if err := mgr.CreateTasks(ctx, tasks); err != nil {
 		return fmt.Errorf("创建任务失败: %w", err)
 	}
 	fmt.Printf("✓ 已创建 %d 个步骤任务\n\n", len(tasks))
@@ -408,7 +406,7 @@ func runStepsScenario(ctx context.Context, worker *task.Worker) error {
 		taskIDs[i] = t.ID
 	}
 
-	if err := waitForMultipleTasksCompletion(ctx, worker, taskIDs, 60*time.Second); err != nil {
+	if err := waitForMultipleTasksCompletion(ctx, mgr, taskIDs, 60*time.Second); err != nil {
 		return err
 	}
 
@@ -436,7 +434,7 @@ func runStepsScenario(ctx context.Context, worker *task.Worker) error {
 }
 
 // runMixedConcurrencyScenario 混合并发任务演示
-func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error {
+func runMixedConcurrencyScenario(ctx context.Context, mgr *manager.Manager, w *worker.Worker) error {
 	printSection("混合并发任务演示")
 
 	fmt.Println("已注册的执行器:")
@@ -448,7 +446,7 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 
 	// 创建混合任务
 	fmt.Println("创建混合任务:")
-	var allTasks []*task.TaskEntity
+	var allTasks []*model.TaskEntity
 
 	// 创建 10 个快速任务（100ms）
 	fmt.Println("  - 10 个快速任务（每个 100ms）")
@@ -459,7 +457,7 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 			Duration: 100,
 		}
 		payloadJSON, _ := json.Marshal(payload)
-		allTasks = append(allTasks, &task.TaskEntity{
+		allTasks = append(allTasks, &model.TaskEntity{
 			TaskType:    "fast_task",
 			SubjectType: "fast_demo",
 			SubjectID:   uint(i),
@@ -481,7 +479,7 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 			Duration: 2000,
 		}
 		payloadJSON, _ := json.Marshal(payload)
-		allTasks = append(allTasks, &task.TaskEntity{
+		allTasks = append(allTasks, &model.TaskEntity{
 			TaskType:    "slow_task",
 			SubjectType: "slow_demo",
 			SubjectID:   uint(i),
@@ -503,7 +501,7 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 			Duration: 500,
 		}
 		payloadJSON, _ := json.Marshal(payload)
-		allTasks = append(allTasks, &task.TaskEntity{
+		allTasks = append(allTasks, &model.TaskEntity{
 			TaskType:    "api_task",
 			SubjectType: "api_demo",
 			SubjectID:   uint(i),
@@ -525,7 +523,7 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 			Duration: 300,
 		}
 		payloadJSON, _ := json.Marshal(payload)
-		allTasks = append(allTasks, &task.TaskEntity{
+		allTasks = append(allTasks, &model.TaskEntity{
 			TaskType:    "default_task",
 			SubjectType: "default_demo",
 			SubjectID:   uint(i),
@@ -540,7 +538,7 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 
 	// 批量创建任务
 	startTime := time.Now()
-	if err := worker.CreateTasks(ctx, allTasks); err != nil {
+	if err := mgr.CreateTasks(ctx, allTasks); err != nil {
 		return fmt.Errorf("批量创建任务失败: %w", err)
 	}
 	fmt.Printf("\n✓ 已创建 %d 个任务\n", len(allTasks))
@@ -613,7 +611,7 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 				fmt.Println("混合并发要点说明")
 				fmt.Println("========================================")
 				fmt.Println("1. 不同任务类型可以配置不同的并发数")
-				fmt.Println("2. 使用 task.WithConcurrency() 选项指定并发数")
+				fmt.Println("2. 使用 w.WithConcurrency() 选项指定并发数")
 				fmt.Println("3. 不传选项时使用全局默认值（向后兼容）")
 				fmt.Println("4. 快速任务高并发可提升吞吐量")
 				fmt.Println("5. 慢速任务低并发避免资源耗尽")
@@ -628,7 +626,7 @@ func runMixedConcurrencyScenario(ctx context.Context, worker *task.Worker) error
 // ===== 辅助函数 =====
 
 // waitForTaskCompletion 等待单个任务完成
-func waitForTaskCompletion(ctx context.Context, worker *task.Worker, taskID uint, timeout time.Duration) error {
+func waitForTaskCompletion(ctx context.Context, mgr *manager.Manager, taskID uint, timeout time.Duration) error {
 	fmt.Println("等待任务完成...")
 	fmt.Println("========================================")
 	fmt.Println()
@@ -643,7 +641,7 @@ func waitForTaskCompletion(ctx context.Context, worker *task.Worker, taskID uint
 			return fmt.Errorf("等待任务完成超时")
 
 		case <-ticker.C:
-			result, err := worker.GetTask(ctx, taskID)
+			result, err := mgr.GetTask(ctx, taskID)
 			if err != nil {
 				return fmt.Errorf("获取任务状态失败: %w", err)
 			}
@@ -673,7 +671,7 @@ func waitForTaskCompletion(ctx context.Context, worker *task.Worker, taskID uint
 }
 
 // waitForMultipleTasksCompletion 等待多个任务完成
-func waitForMultipleTasksCompletion(ctx context.Context, worker *task.Worker, taskIDs []uint, timeout time.Duration) error {
+func waitForMultipleTasksCompletion(ctx context.Context, mgr *manager.Manager, taskIDs []uint, timeout time.Duration) error {
 	fmt.Println("等待所有任务完成...")
 
 	timeoutCh := time.After(timeout)
@@ -694,7 +692,7 @@ func waitForMultipleTasksCompletion(ctx context.Context, worker *task.Worker, ta
 					continue
 				}
 
-				result, err := worker.GetTask(ctx, taskID)
+				result, err := mgr.GetTask(ctx, taskID)
 				if err != nil {
 					return fmt.Errorf("获取任务 %d 状态失败: %w", taskID, err)
 				}

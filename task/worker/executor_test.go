@@ -1,7 +1,8 @@
-package task
+package worker
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"gorm.io/gorm"
@@ -9,11 +10,20 @@ import (
 
 // mockExecutor 模拟执行器
 type mockExecutor struct {
-	BaseExecutor
+	payload         string
 	executeCalled   bool
 	executeError    error
 	onSuccessCalled bool
 	onFailureCalled bool
+}
+
+func newMockExecutor(payload string) (*mockExecutor, error) {
+	if payload == "error" {
+		return nil, fmt.Errorf("failed to create executor")
+	}
+	return &mockExecutor{
+		payload: payload,
+	}, nil
 }
 
 func (m *mockExecutor) Execute(ctx context.Context) error {
@@ -31,30 +41,11 @@ func (m *mockExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
 	return nil
 }
 
-func TestBaseExecutor_Setup(t *testing.T) {
-	executor := &BaseExecutor{}
-	task := &TaskEntity{
-		Model: gorm.Model{
-			ID: 1,
-		},
-		TaskType: "test",
-	}
-
-	err := executor.OnStart(context.Background(), task)
-	if err != nil {
-		t.Errorf("OnStart() error = %v", err)
-	}
-
-	if executor.Task != task {
-		t.Error("Expected task to be set")
-	}
-}
-
 func TestExecutorRegistry_Register(t *testing.T) {
 	registry := NewExecutorRegistry()
 
-	factory := func() TaskExecutor {
-		return &mockExecutor{}
+	factory := func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
 	}
 
 	registry.Register("test_task", factory)
@@ -66,13 +57,18 @@ func TestExecutorRegistry_Register(t *testing.T) {
 	}
 
 	// 验证工厂函数可以创建执行器
-	executor := retrievedFactory()
+	executor, err := retrievedFactory("test_payload")
+	if err != nil {
+		t.Errorf("Expected factory to create executor without error, got: %v", err)
+	}
 	if executor == nil {
 		t.Error("Expected factory to create executor")
 	}
 
-	if _, ok := executor.(*mockExecutor); !ok {
+	if mock, ok := executor.(*mockExecutor); !ok {
 		t.Error("Expected executor to be mockExecutor")
+	} else if mock.payload != "test_payload" {
+		t.Errorf("Expected payload to be 'test_payload', got %s", mock.payload)
 	}
 }
 
@@ -88,8 +84,8 @@ func TestExecutorRegistry_GetNotFound(t *testing.T) {
 func TestExecutorRegistry_GetAll(t *testing.T) {
 	registry := NewExecutorRegistry()
 
-	factory := func() TaskExecutor {
-		return &mockExecutor{}
+	factory := func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
 	}
 
 	registry.Register("task1", factory)
@@ -109,6 +105,23 @@ func TestExecutorRegistry_GetAll(t *testing.T) {
 
 	if !typeMap["task1"] || !typeMap["task2"] || !typeMap["task3"] {
 		t.Error("Expected all task types to be present")
+	}
+}
+
+func TestExecutorFactory_CreateError(t *testing.T) {
+	registry := NewExecutorRegistry()
+
+	factory := func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
+	}
+
+	registry.Register("test_task", factory)
+
+	// 测试创建失败的情况
+	retrievedFactory, _ := registry.Get("test_task")
+	_, err := retrievedFactory("error")
+	if err == nil {
+		t.Error("Expected error when creating executor with 'error' payload")
 	}
 }
 

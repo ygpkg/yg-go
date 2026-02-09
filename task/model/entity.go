@@ -1,4 +1,4 @@
-package task
+package model
 
 import (
 	"time"
@@ -47,7 +47,7 @@ type TaskEntity struct {
 	Redo int `gorm:"type:int;not null;default:0" json:"redo" comment:"当前重试次数"`
 	// MaxRedo 最大重试次数，当 Redo >= MaxRedo 时不再重试
 	MaxRedo int `gorm:"type:int;not null;default:3" json:"max_redo" comment:"最大重试次数"`
-	// xTimeout 任务执行超时时间（单位：纳秒），存储为 int64
+	// Timeout 任务执行超时时间（单位：纳秒），存储为 int64
 	Timeout time.Duration `gorm:"type:bigint;not null" json:"timeout" comment:"任务超时时间"`
 	// Payload 任务参数，通常为 JSON 格式的业务数据
 	Payload string `gorm:"type:text" json:"payload" comment:"任务参数"`
@@ -75,6 +75,40 @@ const TableNameCoreTask = "core_task"
 func (TaskEntity) TableName() string {
 	return TableNameCoreTask
 }
+
+// ===== 实现 worker.Task 接口的 Getter 方法 =====
+
+// GetID 获取任务 ID
+func (t *TaskEntity) GetID() uint {
+	return t.ID
+}
+
+// GetTaskType 获取任务类型
+func (t *TaskEntity) GetTaskType() string {
+	return t.TaskType
+}
+
+// GetPayload 获取任务参数
+func (t *TaskEntity) GetPayload() string {
+	return t.Payload
+}
+
+// GetTimeout 获取任务超时时间
+func (t *TaskEntity) GetTimeout() time.Duration {
+	return t.Timeout
+}
+
+// GetAppGroup 获取应用分组
+func (t *TaskEntity) GetAppGroup() string {
+	return t.AppGroup
+}
+
+// GetSubjectID 获取主体 ID
+func (t *TaskEntity) GetSubjectID() uint {
+	return t.SubjectID
+}
+
+// ===== 任务状态判断方法 =====
 
 // IsPending 是否为待处理状态
 func (t *TaskEntity) IsPending() bool {

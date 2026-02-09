@@ -1,4 +1,4 @@
-package task
+package manager
 
 import (
 	"context"
@@ -8,48 +8,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/logs"
-	"gorm.io/gorm"
 )
-
-// QueueConfig 队列配置
-type QueueConfig struct {
-	// KeyPrefix Redis 键前缀
-	KeyPrefix string
-	// BlockTime 阻塞读取时间
-	BlockTime time.Duration
-	// MaxRetries 最大重试次数（预留字段）
-	MaxRetries int
-	// RedisClient Redis 客户端
-	RedisClient *redis.Client
-	// DB 数据库连接（预留字段，供未来扩展使用）
-	DB *gorm.DB
-}
-
-// DefaultQueueConfig 返回默认队列配置
-func DefaultQueueConfig() *QueueConfig {
-	return &QueueConfig{
-		KeyPrefix:  "task:",
-		BlockTime:  5 * time.Second,
-		MaxRetries: 3,
-	}
-}
-
-// Validate 验证配置
-func (c *QueueConfig) Validate() error {
-	if c.KeyPrefix == "" {
-		return fmt.Errorf("queue config: key prefix cannot be empty")
-	}
-	if c.RedisClient == nil {
-		return fmt.Errorf("queue config: redis client is required")
-	}
-	if c.BlockTime <= 0 {
-		c.BlockTime = 5 * time.Second // 使用默认值
-	}
-	if c.MaxRetries < 0 {
-		c.MaxRetries = 3 // 使用默认值
-	}
-	return nil
-}
 
 // Queue Redis Stream 队列
 type Queue struct {
@@ -73,12 +32,12 @@ func NewQueue(config *QueueConfig) *Queue {
 
 // streamKey 获取 stream 的 key
 func (q *Queue) streamKey(taskType string) string {
-	return fmt.Sprintf("%s_task_queue:%s", q.config.KeyPrefix, taskType)
+	return fmt.Sprintf("%stask_queue:%s", q.config.KeyPrefix, taskType)
 }
 
 // groupKey 获取 consumer group 的 key
 func (q *Queue) groupKey(taskType string) string {
-	return fmt.Sprintf("%s_task_group:%s", q.config.KeyPrefix, taskType)
+	return fmt.Sprintf("%stask_group:%s", q.config.KeyPrefix, taskType)
 }
 
 // Push 将任务推入队列

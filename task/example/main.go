@@ -6,7 +6,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/ygpkg/yg-go/task"
+	"github.com/ygpkg/yg-go/task/health"
+	"github.com/ygpkg/yg-go/task/manager"
+	"github.com/ygpkg/yg-go/task/worker"
 )
 
 func main() {
@@ -30,77 +32,113 @@ func main() {
 	fmt.Println("✓ 数据库和 Redis 连接成功")
 
 	// 初始化 Task 包
-	if err := task.Init(db); err != nil {
+	if err := manager.Init(db); err != nil {
 		fmt.Printf("✗ 初始化 Task 包失败: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("✓ Task 包初始化完成")
 	fmt.Println()
 
-	// 3. 根据选择创建对应配置的 Worker
-	config := createWorkerConfig(choice)
-	worker, err := task.NewWorker(config, db, redisClient)
+	ctx := context.Background()
+
+	// 3. 创建任务管理器
+	managerConfig := createManagerConfig(choice)
+	taskMgr, err := manager.NewManager(managerConfig, db, redisClient)
+	if err != nil {
+		fmt.Printf("✗ 创建任务管理器失败: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("✓ 任务管理器创建成功")
+
+	// 4. 创建 Worker
+	workerConfig := createWorkerConfig(choice)
+	w, err := worker.NewWorker(workerConfig, taskMgr, db)
 	if err != nil {
 		fmt.Printf("✗ 创建 Worker 失败: %v\n", err)
 		os.Exit(1)
 	}
+	fmt.Println("✓ Worker 创建成功")
 
-	ctx := context.Background()
+	// 5. 创建健康检查器（独立运行）
+	healthConfig := &health.CheckerConfig{
+		KeyPrefix:   "task:example:",
+		RedisClient: redisClient,
+		Manager:     taskMgr,
+		CheckPeriod: 30 * time.Second,
+	}
+	healthChecker, err := health.NewChecker(healthConfig)
+	if err != nil {
+		fmt.Printf("✗ 创建健康检查器失败: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("✓ 健康检查器创建成功")
 
-	// 4. 根据场景注册执行器（必须在 Worker.Start() 之前）
+	// 6. 根据场景注册执行器（必须在 Worker.Start() 之前）
 	switch choice {
 	case 1:
-		registerBasicExecutors(worker)
+		registerBasicExecutors(w)
 	case 2:
-		registerRetryExecutors(worker)
+		registerRetryExecutors(w)
 	case 3:
-		registerTimeoutExecutors(worker)
+		registerTimeoutExecutors(w)
 	case 4:
-		registerConcurrentExecutors(worker)
+		registerConcurrentExecutors(w)
 	case 5:
-		registerStepsExecutors(worker)
+		registerStepsExecutors(w)
 	case 6:
-		registerMixedConcurrencyExecutors(worker)
+		registerMixedConcurrencyExecutors(w)
 	default:
 		fmt.Println("无效的选项")
 		return
 	}
 
-	// 5. 启动 Worker
-	if err := worker.Start(ctx); err != nil {
+	// 7. 启动健康检查器
+	if err := healthChecker.Start(ctx); err != nil {
+		fmt.Printf("✗ 启动健康检查器失败: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("✓ 健康检查器已启动")
+
+	// 8. 启动 Worker
+	if err := w.Start(ctx); err != nil {
 		fmt.Printf("✗ 启动 Worker 失败: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("✓ Worker 已启动")
 	fmt.Println()
 
-	// 延迟停止 Worker
+	// 延迟停止服务
 	defer func() {
 		fmt.Println("\n========================================")
-		fmt.Println("停止 Worker")
+		fmt.Println("停止服务")
 		fmt.Println("========================================")
-		if err := worker.Stop(ctx); err != nil {
+		if err := w.Stop(ctx); err != nil {
 			fmt.Printf("✗ 停止 Worker 失败: %v\n", err)
 		} else {
 			fmt.Println("✓ Worker 已停止")
 		}
+		if err := healthChecker.Stop(ctx); err != nil {
+			fmt.Printf("✗ 停止健康检查器失败: %v\n", err)
+		} else {
+			fmt.Println("✓ 健康检查器已停止")
+		}
 	}()
 
-	// 6. 运行对应场景
+	// 9. 运行对应场景
 	var scenarioErr error
 	switch choice {
 	case 1:
-		scenarioErr = runBasicScenario(ctx, worker)
+		scenarioErr = runBasicScenario(ctx, taskMgr, w)
 	case 2:
-		scenarioErr = runRetryScenario(ctx, worker)
+		scenarioErr = runRetryScenario(ctx, taskMgr, w)
 	case 3:
-		scenarioErr = runTimeoutScenario(ctx, worker)
+		scenarioErr = runTimeoutScenario(ctx, taskMgr, w)
 	case 4:
-		scenarioErr = runConcurrentScenario(ctx, worker)
+		scenarioErr = runConcurrentScenario(ctx, taskMgr, w)
 	case 5:
-		scenarioErr = runStepsScenario(ctx, worker)
+		scenarioErr = runStepsScenario(ctx, taskMgr, w)
 	case 6:
-		scenarioErr = runMixedConcurrencyScenario(ctx, worker)
+		scenarioErr = runMixedConcurrencyScenario(ctx, taskMgr, w)
 	default:
 		fmt.Println("无效的选项")
 		return
@@ -151,16 +189,20 @@ func showMenuAndGetChoice() int {
 	return choice
 }
 
+// createManagerConfig 根据场景创建 Manager 配置
+func createManagerConfig(scenario int) *manager.ManagerConfig {
+	return &manager.ManagerConfig{
+		KeyPrefix:      "task:example:",
+		QueueBlockTime: 5 * time.Second,
+	}
+}
+
 // createWorkerConfig 根据场景创建 Worker 配置
-func createWorkerConfig(scenario int) *task.TaskConfig {
-	baseConfig := &task.TaskConfig{
-		Timeout:           10 * time.Minute,
-		MaxRedo:           3,
-		MaxConcurrency:    5,
-		QueueBlockTime:    5 * time.Second,
-		RedisKeyPrefix:    "task:example:",
-		EnableHealthCheck: true,
-		HealthCheckPeriod: 30 * time.Second,
+func createWorkerConfig(scenario int) *worker.WorkerConfig {
+	baseConfig := &worker.WorkerConfig{
+		Timeout:        10 * time.Minute,
+		MaxRedo:        3,
+		MaxConcurrency: 5,
 	}
 
 	switch scenario {

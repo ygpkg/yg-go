@@ -1,4 +1,4 @@
-package task
+package manager
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/task/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -14,27 +15,27 @@ import (
 // TaskRepository 数据访问对象
 type TaskRepository struct {
 	db      *gorm.DB
-	taskDao *TaskDao
+	taskDao *model.TaskDao
 }
 
 // NewTaskRepository 创建 TaskRepository
 func NewTaskRepository(db *gorm.DB) *TaskRepository {
 	return &TaskRepository{
 		db:      db,
-		taskDao: NewTaskDao(db),
+		taskDao: model.NewTaskDao(db),
 	}
 }
 
 // GetOnePendingTask 获取一个待处理的任务并标记为 Running
 // 使用数据库锁确保并发安全
-func (repo *TaskRepository) GetOnePendingTask(ctx context.Context, taskType, workerID string) (*TaskEntity, error) {
-	var taskEntity TaskEntity
+func (repo *TaskRepository) GetOnePendingTask(ctx context.Context, taskType, workerID string) (*model.TaskEntity, error) {
+	var taskEntity model.TaskEntity
 
 	// 使用事务执行查询和更新
 	err := repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.
 			Where("task_type = ?", taskType).
-			Where("task_status IN ?", []TaskStatus{TaskStatusPending, TaskStatusFailed}).
+			Where("task_status IN ?", []model.TaskStatus{model.TaskStatusPending, model.TaskStatusFailed}).
 			Where("redo < max_redo").
 			Where(`
 				NOT EXISTS (
@@ -45,7 +46,7 @@ func (repo *TaskRepository) GetOnePendingTask(ctx context.Context, taskType, wor
 					  AND t2.deleted_at IS NULL
 					  AND t2.task_status NOT IN ?
 				)
-			`, []TaskStatus{TaskStatusCanceled, TaskStatusSuccess}).
+			`, []model.TaskStatus{model.TaskStatusCanceled, model.TaskStatusSuccess}).
 			Order("priority DESC, updated_at ASC").
 			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 			Find(&taskEntity).Error
@@ -74,20 +75,20 @@ func (repo *TaskRepository) GetOnePendingTask(ctx context.Context, taskType, wor
 }
 
 // GetTaskByID 根据 ID 获取任务
-func (repo *TaskRepository) GetTaskByID(ctx context.Context, id uint) (*TaskEntity, error) {
+func (repo *TaskRepository) GetTaskByID(ctx context.Context, id uint) (*model.TaskEntity, error) {
 	taskEntity, err := repo.taskDao.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get task: %w", err)
 	}
 	if taskEntity.ID == 0 {
-		return nil, ErrTaskNotFound
+		return nil, model.ErrTaskNotFound
 	}
 	return taskEntity, nil
 }
 
 // GetTaskByIDAndWorkerID 根据 ID 和 WorkerID 获取任务
-func (repo *TaskRepository) GetTaskByIDAndWorkerID(ctx context.Context, id uint, workerID string) (*TaskEntity, error) {
-	taskEntity, err := repo.taskDao.GetByCond(ctx, &TaskCond{
+func (repo *TaskRepository) GetTaskByIDAndWorkerID(ctx context.Context, id uint, workerID string) (*model.TaskEntity, error) {
+	taskEntity, err := repo.taskDao.GetByCond(ctx, &model.TaskCond{
 		ID:       id,
 		WorkerID: workerID,
 	})
@@ -95,33 +96,33 @@ func (repo *TaskRepository) GetTaskByIDAndWorkerID(ctx context.Context, id uint,
 		return nil, fmt.Errorf("failed to get task: %w", err)
 	}
 	if taskEntity.ID == 0 {
-		return nil, ErrTaskNotFound
+		return nil, model.ErrTaskNotFound
 	}
 	return taskEntity, nil
 }
 
 // SaveTask 保存任务
-func (repo *TaskRepository) SaveTask(ctx context.Context, taskEntity *TaskEntity) error {
+func (repo *TaskRepository) SaveTask(ctx context.Context, taskEntity *model.TaskEntity) error {
 	// 使用 UpdateByID 方法更新任务
 	return repo.taskDao.UpdateByID(ctx, taskEntity.ID, taskEntity)
 }
 
 // CreateTask 创建任务
-func (repo *TaskRepository) CreateTask(ctx context.Context, taskEntity *TaskEntity) error {
+func (repo *TaskRepository) CreateTask(ctx context.Context, taskEntity *model.TaskEntity) error {
 	if err := taskEntity.Validate(); err != nil {
 		return err
 	}
 
 	// 设置默认状态
 	if taskEntity.TaskStatus == "" {
-		taskEntity.TaskStatus = TaskStatusPending
+		taskEntity.TaskStatus = model.TaskStatusPending
 	}
 
 	return repo.taskDao.Insert(ctx, taskEntity)
 }
 
 // CreateTasks 批量创建任务
-func (repo *TaskRepository) CreateTasks(ctx context.Context, tasks []*TaskEntity) error {
+func (repo *TaskRepository) CreateTasks(ctx context.Context, tasks []*model.TaskEntity) error {
 	if len(tasks) == 0 {
 		return nil
 	}
@@ -134,7 +135,7 @@ func (repo *TaskRepository) CreateTasks(ctx context.Context, tasks []*TaskEntity
 
 		// 设置默认状态
 		if taskEntity.TaskStatus == "" {
-			taskEntity.TaskStatus = TaskStatusPending
+			taskEntity.TaskStatus = model.TaskStatusPending
 		}
 	}
 
@@ -150,7 +151,7 @@ func (repo *TaskRepository) CancelTask(ctx context.Context, taskID uint, reason 
 	}
 
 	// 只能取消未开始或失败的任务
-	if !taskEntity.IsPending() && taskEntity.TaskStatus != TaskStatusFailed {
+	if !taskEntity.IsPending() && taskEntity.TaskStatus != model.TaskStatusFailed {
 		return fmt.Errorf("cannot cancel task in status: %s", taskEntity.TaskStatus)
 	}
 
@@ -166,9 +167,9 @@ func (repo *TaskRepository) DeleteTask(ctx context.Context, id uint) error {
 // GetPendingTaskCount 获取待处理任务数量
 func (repo *TaskRepository) GetPendingTaskCount(ctx context.Context, taskType string) (int64, error) {
 	var count int64
-	err := repo.db.WithContext(ctx).Model(&TaskEntity{}).
+	err := repo.db.WithContext(ctx).Model(&model.TaskEntity{}).
 		Where("task_type = ?", taskType).
-		Where("task_status IN ?", []TaskStatus{TaskStatusPending, TaskStatusFailed}).
+		Where("task_status IN ?", []model.TaskStatus{model.TaskStatusPending, model.TaskStatusFailed}).
 		Where("redo < max_redo").
 		Where(`
 			NOT EXISTS (
@@ -179,20 +180,19 @@ func (repo *TaskRepository) GetPendingTaskCount(ctx context.Context, taskType st
 				  AND t2.deleted_at IS NULL
 				  AND t2.task_status NOT IN ?
 			)
-		`, []TaskStatus{TaskStatusCanceled, TaskStatusSuccess}).
+		`, []model.TaskStatus{model.TaskStatusCanceled, model.TaskStatusSuccess}).
 		Count(&count).Error
 	return count, err
 }
 
 // CheckAndTimeoutTasks 检查并标记超时任务
-// 只处理心跳丢失且超时的任务（Worker 崩溃场景）
-// healthChecker 用于检查 Worker 心跳状态，如果为 nil 则使用缓冲时间判断
-func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context, healthChecker *HealthChecker) error {
+// 使用缓冲时间判断，如果任务已超时超过心跳周期*2，说明 Worker 可能已崩溃
+func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context) error {
 	now := time.Now()
 
 	// 查找所有运行中的任务
-	tasks, err := repo.taskDao.GetListByCond(ctx, &TaskCond{
-		TaskStatus: TaskStatusRunning,
+	tasks, err := repo.taskDao.GetListByCond(ctx, &model.TaskCond{
+		TaskStatus: model.TaskStatusRunning,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to query running tasks: %w", err)
@@ -210,39 +210,25 @@ func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context, healthChec
 			continue // 未超时
 		}
 
-		// 检查 Worker 心跳是否正常
-		// 如果心跳正常，说明任务仍在执行中，由执行层处理超时
-		if healthChecker != nil {
-			isWorkerAlive, err := healthChecker.IsWorkerAlive(ctx, taskEntity.TaskType, taskEntity.WorkerID)
-			if err != nil {
-				logs.WarnContextf(ctx, "[task] failed to check worker status: %v", err)
-				continue
-			}
-
-			if isWorkerAlive {
-				// Worker 心跳正常，由执行层处理超时
-				continue
-			}
-		} else {
-			// 没有 healthChecker，使用缓冲时间判断（2倍心跳周期）
-			// 如果任务已超时超过心跳周期*2，说明 Worker 可能已崩溃
-			bufferTime := timeoutTime.Add(HeartbeatTimeout * 2 * time.Second)
-			if !now.After(bufferTime) {
-				continue
-			}
+		// 使用缓冲时间判断（2倍心跳周期）
+		// 如果任务已超时超过心跳周期*2，说明 Worker 可能已崩溃
+		const HeartbeatTimeout = 30
+		bufferTime := timeoutTime.Add(HeartbeatTimeout * 2 * time.Second)
+		if !now.After(bufferTime) {
+			continue
 		}
 
-		// Worker 心跳丢失或超过缓冲时间，标记任务超时
+		// 超过缓冲时间，标记任务超时
 		timeoutIDs = append(timeoutIDs, taskEntity.ID)
 	}
 
 	if len(timeoutIDs) > 0 {
 		// 批量更新状态为 timeout
-		err = repo.db.WithContext(ctx).Model(&TaskEntity{}).
+		err = repo.db.WithContext(ctx).Model(&model.TaskEntity{}).
 			Where("id IN ?", timeoutIDs).
-			Where("task_status = ?", TaskStatusRunning).
+			Where("task_status = ?", model.TaskStatusRunning).
 			Updates(map[string]interface{}{
-				"task_status": TaskStatusTimeout,
+				"task_status": model.TaskStatusTimeout,
 				"err_msg":     "task execution timeout (worker heartbeat lost)",
 				"redo":        gorm.Expr("redo + 1"),
 				"end_at":      now,
@@ -262,10 +248,10 @@ func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context, healthChec
 // 将所有运行中的任务标记为失败（用于启动时恢复）
 func (repo *TaskRepository) InitTaskDBStatus(ctx context.Context) error {
 	// 由于需要批量更新并使用 gorm.Expr，这里保留原始实现
-	err := repo.db.WithContext(ctx).Model(&TaskEntity{}).
-		Where("task_status = ?", TaskStatusRunning).
+	err := repo.db.WithContext(ctx).Model(&model.TaskEntity{}).
+		Where("task_status = ?", model.TaskStatusRunning).
 		Updates(map[string]interface{}{
-			"task_status": TaskStatusFailed,
+			"task_status": model.TaskStatusFailed,
 			"err_msg":     "task interrupted by restart",
 			"redo":        gorm.Expr("redo + 1"),
 		}).Error
@@ -277,9 +263,9 @@ func (repo *TaskRepository) InitTaskDBStatus(ctx context.Context) error {
 
 // GetNextStepTasks 获取下一个步骤的任务
 // 返回第一个未全部完成的 step 中的所有任务
-func (repo *TaskRepository) GetNextStepTasks(ctx context.Context, subjectID uint, appGroup string) ([]*TaskEntity, error) {
+func (repo *TaskRepository) GetNextStepTasks(ctx context.Context, subjectID uint, appGroup string) ([]*model.TaskEntity, error) {
 	// 使用 db 直接查询，因为需要复杂的 WHERE 条件
-	var allTasks []TaskEntity
+	var allTasks []model.TaskEntity
 	err := repo.db.WithContext(ctx).
 		Where("subject_id = ? AND app_group = ?", subjectID, appGroup).
 		Order("step ASC").
@@ -289,7 +275,7 @@ func (repo *TaskRepository) GetNextStepTasks(ctx context.Context, subjectID uint
 	}
 
 	// 按 step 分组
-	stepTaskMap := make(map[int][]*TaskEntity)
+	stepTaskMap := make(map[int][]*model.TaskEntity)
 	stepSet := map[int]struct{}{}
 	for i := range allTasks {
 		taskEntity := &allTasks[i]
@@ -315,9 +301,9 @@ func (repo *TaskRepository) GetNextStepTasks(ctx context.Context, subjectID uint
 			}
 		}
 		if !allCompleted {
-			var result []*TaskEntity
+			var result []*model.TaskEntity
 			for _, taskEntity := range tasks {
-				if taskEntity.IsPending() || taskEntity.TaskStatus == TaskStatusFailed || taskEntity.IsRunning() {
+				if taskEntity.IsPending() || taskEntity.TaskStatus == model.TaskStatusFailed || taskEntity.IsRunning() {
 					result = append(result, taskEntity)
 				}
 			}

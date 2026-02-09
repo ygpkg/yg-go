@@ -1,4 +1,4 @@
-package task
+package worker
 
 import (
 	"context"
@@ -9,11 +9,14 @@ import (
 
 // TaskExecutor 任务执行器接口
 type TaskExecutor interface {
-	// OnStart 构建任务执行器，在任务执行前调用，用于根据任务实体初始化执行器
-	OnStart(ctx context.Context, task *TaskEntity) error
-
 	// Execute 执行任务，包含任务的核心业务逻辑
 	Execute(ctx context.Context) error
+
+	// GetResult 获取执行结果
+	GetResult() interface{}
+
+	// SetResult 设置执行结果
+	SetResult(result interface{})
 
 	// OnSuccess 成功后回调，在任务执行成功后调用，可用于清理资源、更新状态等
 	// tx 为数据库事务，如果返回错误，事务会回滚
@@ -25,7 +28,8 @@ type TaskExecutor interface {
 }
 
 // ExecutorFactory 执行器工厂函数
-type ExecutorFactory func() TaskExecutor
+// 接受payload参数，由业务层在注册时决定如何解析
+type ExecutorFactory func(payload string) (TaskExecutor, error)
 
 // ExecutorRegistry 执行器注册表
 // 用于管理任务类型和执行器工厂的映射关系
@@ -65,32 +69,4 @@ func (r *ExecutorRegistry) GetAll() []string {
 		types = append(types, t)
 	}
 	return types
-}
-
-// BaseExecutor 基础执行器
-// 提供默认的 OnSuccess 和 OnFailure 实现
-// 用户可以嵌入此结构体来简化实现
-type BaseExecutor struct {
-	Task *TaskEntity
-}
-
-// OnStart 默认 OnStart 实现
-func (e *BaseExecutor) OnStart(ctx context.Context, task *TaskEntity) error {
-	e.Task = task
-	return nil
-}
-
-// Execute 需要用户实现
-func (e *BaseExecutor) Execute(ctx context.Context) error {
-	panic("Execute method must be implemented")
-}
-
-// OnSuccess 默认成功回调（空实现）
-func (e *BaseExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
-	return nil
-}
-
-// OnFailure 默认失败回调（空实现）
-func (e *BaseExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
-	return nil
 }
