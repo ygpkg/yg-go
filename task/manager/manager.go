@@ -14,6 +14,27 @@ import (
 	"gorm.io/gorm"
 )
 
+var (
+	stdManager *Manager
+	once       sync.Once
+)
+// InitManager 初始化全局任务管理器
+func InitManager(config *ManagerConfig, db *gorm.DB, redisClient *redis.Client) error {
+	var err error
+	once.Do(func() {
+		stdManager, err = NewManager(config, db, redisClient)
+	})
+	return err
+}
+
+// GetManager 获取全局任务管理器，如果未初始化则 panic
+func GetManager() *Manager {
+	if stdManager == nil {
+		panic(fmt.Errorf("task manager is nil"))
+	}
+	return stdManager
+}
+
 // Manager 任务管理器实现
 type Manager struct {
 	config *ManagerConfig

@@ -13,6 +13,27 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
+var (
+	stdChecker *Checker
+	once       sync.Once
+)
+
+func InitChecker(config *CheckerConfig) error {
+	var err error
+	once.Do(func() {
+		stdChecker, err = NewChecker(config)
+	})
+	return err
+}
+
+// GetChecker 获取全局健康检查器，如果未初始化则 panic
+func GetChecker() *Checker {
+	if stdChecker == nil {
+		panic(fmt.Errorf("health checker is nil"))
+	}
+	return stdChecker
+}
+
 // Checker 健康检查器
 type Checker struct {
 	config *CheckerConfig
