@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/logs"
@@ -17,6 +19,13 @@ type Manager struct {
 	config *ManagerConfig
 	queue  *Queue
 	repo   *TaskRepository
+
+	// 队列同步相关
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
+	started bool
+	mu      sync.RWMutex
 }
 
 // NewManager 创建任务管理器
@@ -194,12 +203,10 @@ func (m *Manager) GetNextTask(ctx context.Context, taskType, workerID string) (w
 }
 
 // SaveTaskResult 保存任务执行结果并处理任务流转 - 实现 WorkManager 接口
-// 这个方法会替换原来的 SaveTaskResult 方法
 func (m *Manager) SaveTaskResult(ctx context.Context, info worker.TaskInfo, result interface{}, execErr error, onCallback func(context.Context) error) error {
 	var taskEntity *model.TaskEntity
-	var saveErr error
 
-	// 在事务中保存任务结果
+	// 在事务中保存任务结果并处理流转
 	txErr := m.repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 1. 获取完整任务实体
 		var err error
@@ -222,13 +229,9 @@ func (m *Manager) SaveTaskResult(ctx context.Context, info worker.TaskInfo, resu
 			return fmt.Errorf("failed to save task: %w", err)
 		}
 
-		// 4. 执行回调
-		if onCallback != nil {
-			// 将 tx 注入 context，供 worker 使用（虽然 worker 包不依赖 gorm，但业务代码可能需要）
-			ctxWithTx := WithTx(ctx, tx)
-			if err := onCallback(ctxWithTx); err != nil {
-				return fmt.Errorf("callback failed: %w", err)
-			}
+		// 4. 在事务内处理任务流转（同步）
+		if err := m.handleTaskFlowInTx(ctx, taskEntity); err != nil {
+			return fmt.Errorf("failed to handle task flow: %w", err)
 		}
 
 		return nil
@@ -238,70 +241,78 @@ func (m *Manager) SaveTaskResult(ctx context.Context, info worker.TaskInfo, resu
 		return txErr
 	}
 
-	// 5. 事务提交后处理任务流转（异步，不阻塞）
-	go m.handleTaskFlow(context.Background(), taskEntity)
+	// 5. 事务提交后执行回调（回调不在事务内，业务代码自行管理）
+	if onCallback != nil {
+		if err := onCallback(ctx); err != nil {
+			logs.ErrorContextf(ctx, "[task] callback failed: %v", err)
+			// 不返回错误，因为任务状态已保存
+		}
+	}
 
-	return saveErr
+	return nil
 }
 
-// handleTaskFlow 处理任务流转（从 worker 迁移过来）
-func (m *Manager) handleTaskFlow(ctx context.Context, task *model.TaskEntity) {
+// handleTaskFlowInTx 在事务内处理任务流转
+func (m *Manager) handleTaskFlowInTx(ctx context.Context, task *model.TaskEntity) error {
 	// 失败重试
 	if task.CanRetry() {
 		if err := m.queue.Push(ctx, task.TaskType); err != nil {
-			logs.ErrorContextf(ctx, "[task] failed to push retry task to queue: %v", err)
+			return fmt.Errorf("failed to push retry task: %w", err)
 		}
-		return
+		return nil
 	}
 
 	// 成功则触发下一个任务
 	if task.IsSuccess() {
 		if task.AppGroup != "" {
-			m.triggerNextStepTask(ctx, task)
+			return m.triggerNextStepTaskInTx(ctx, task)
 		} else {
-			m.triggerNextNormalTask(ctx, task.TaskType)
+			return m.triggerNextNormalTaskInTx(ctx, task.TaskType)
 		}
 	}
+
+	return nil
 }
 
-// triggerNextStepTask 触发下一步骤任务
-func (m *Manager) triggerNextStepTask(ctx context.Context, completedTask *model.TaskEntity) {
+// triggerNextStepTaskInTx 在事务内触发下一步骤任务
+func (m *Manager) triggerNextStepTaskInTx(ctx context.Context, completedTask *model.TaskEntity) error {
 	nextTaskTypes, err := m.GetNextStepPendingTaskTypes(ctx, completedTask.SubjectID, completedTask.AppGroup)
 	if err != nil {
-		logs.ErrorContextf(ctx, "[task] failed to get next step task types: %v", err)
-		return
+		return fmt.Errorf("failed to get next step task types: %w", err)
 	}
 
 	if len(nextTaskTypes) == 0 {
 		logs.DebugContextf(ctx, "[task] no next step tasks for subject %d, appGroup %s",
 			completedTask.SubjectID, completedTask.AppGroup)
-		return
+		return nil
 	}
 
 	// 为每个任务类型推送一条消息
 	for _, taskType := range nextTaskTypes {
 		if err := m.queue.Push(ctx, taskType); err != nil {
-			logs.ErrorContextf(ctx, "[task] failed to push next step task to queue: %v", err)
-		} else {
-			logs.InfoContextf(ctx, "[task] triggered next step task, type: %s, subject: %d, appGroup: %s",
-				taskType, completedTask.SubjectID, completedTask.AppGroup)
+			return fmt.Errorf("failed to push next step task: %w", err)
 		}
+		logs.InfoContextf(ctx, "[task] triggered next step task, type: %s, subject: %d, appGroup: %s",
+			taskType, completedTask.SubjectID, completedTask.AppGroup)
 	}
+
+	return nil
 }
 
-// triggerNextNormalTask 触发下一个普通任务
-func (m *Manager) triggerNextNormalTask(ctx context.Context, taskType string) {
+// triggerNextNormalTaskInTx 在事务内触发下一个普通任务
+func (m *Manager) triggerNextNormalTaskInTx(ctx context.Context, taskType string) error {
 	count, err := m.repo.GetPendingTaskCount(ctx, taskType)
 	if err != nil {
-		logs.ErrorContextf(ctx, "[task] failed to get pending task count: %v", err)
-		return
+		return fmt.Errorf("failed to get pending task count: %w", err)
 	}
 
 	if count > 0 {
 		if err := m.queue.Push(ctx, taskType); err != nil {
-			logs.ErrorContextf(ctx, "[task] failed to push next normal task to queue: %v", err)
+			return fmt.Errorf("failed to push next normal task: %w", err)
 		}
 	}
+
+	return nil
 }
 
 // toJSON 将对象转换为 JSON 字符串
@@ -314,4 +325,130 @@ func toJSON(v interface{}) string {
 		return fmt.Sprintf("%v", v)
 	}
 	return string(data)
+}
+
+// Start 启动队列同步服务
+func (m *Manager) Start(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.started {
+		return fmt.Errorf("queue syncer already started")
+	}
+
+	m.ctx, m.cancel = context.WithCancel(ctx)
+
+	// 启动队列同步协程
+	m.startRoutine("queue-syncer", m.queueSyncRoutine)
+
+	m.started = true
+	logs.InfoContextf(ctx, "[task] queue syncer started")
+	return nil
+}
+
+// Stop 停止队列同步服务
+func (m *Manager) Stop(ctx context.Context) error {
+	m.mu.Lock()
+	if !m.started {
+		m.mu.Unlock()
+		return fmt.Errorf("queue syncer not started")
+	}
+	m.mu.Unlock()
+
+	logs.InfoContextf(ctx, "[task] stopping queue syncer...")
+
+	// 取消上下文，通知所有协程退出
+	m.cancel()
+
+	// 等待所有协程退出（带超时）
+	done := make(chan struct{})
+	go func() {
+		m.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		logs.InfoContextf(ctx, "[task] queue syncer goroutines stopped")
+	case <-time.After(30 * time.Second):
+		logs.WarnContextf(ctx, "[task] queue syncer stop timeout after 30s")
+	}
+
+	m.mu.Lock()
+	m.started = false
+	m.mu.Unlock()
+
+	logs.InfoContextf(ctx, "[task] queue syncer stopped")
+	return nil
+}
+
+// startRoutine 启动协程的统一封装
+func (m *Manager) startRoutine(name string, fn func()) {
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		defer func() {
+			if r := recover(); r != nil {
+				logs.ErrorContextf(m.ctx, "[task] queue syncer routine %s panic: %v", name, r)
+			}
+		}()
+		fn()
+	}()
+}
+
+// queueSyncRoutine 队列同步协程
+func (m *Manager) queueSyncRoutine() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case <-ticker.C:
+			if err := m.SyncQueueCount(m.ctx); err != nil {
+				logs.ErrorContextf(m.ctx, "[task] failed to sync queue count: %v", err)
+			}
+		}
+	}
+}
+
+// SyncQueueCount 同步队列数量
+// 检查队列中的消息数量，如果有待处理任务则补充消息
+func (m *Manager) SyncQueueCount(ctx context.Context) error {
+	types, err := m.queue.GetAllTaskTypes(ctx)
+	if err != nil {
+		logs.ErrorContextf(ctx, "[task] failed to get task types: %v", err)
+		return err
+	}
+
+	for _, taskType := range types {
+		if err := m.syncTaskTypeQueue(ctx, taskType); err != nil {
+			logs.ErrorContextf(ctx, "[task] failed to sync queue for task type %s: %v", taskType, err)
+		}
+	}
+
+	return nil
+}
+
+// syncTaskTypeQueue 同步特定任务类型的队列
+func (m *Manager) syncTaskTypeQueue(ctx context.Context, taskType string) error {
+	// 获取数据库中的任务数量，然后推送消息
+	taskCount, err := m.repo.GetPendingTaskCount(ctx, taskType)
+	if err != nil {
+		return fmt.Errorf("failed to get task count: %w", err)
+	}
+
+	// 如果有待处理任务，至少确保队列中有一条消息
+	if taskCount > 0 {
+		// 简单策略：如果有待处理任务，就推送一条消息
+		// 队列中的消息数量由 Worker 消费后自动触发下一条
+		if err := m.queue.Push(ctx, taskType); err != nil {
+			logs.ErrorContextf(ctx, "[task] failed to push task: %v", err)
+		} else {
+			logs.DebugContextf(ctx, "[task] synced queue for taskType: %s, pending tasks: %d", taskType, taskCount)
+		}
+	}
+
+	return nil
 }

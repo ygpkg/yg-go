@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 )
 
@@ -164,5 +165,121 @@ func TestMockExecutor_Callbacks(t *testing.T) {
 	}
 	if !executor.onFailureCalled {
 		t.Error("Expected OnFailure to be called")
+	}
+}
+
+// TestExecutorRegistry_RegisterWithConcurrency 测试注册执行器并设置并发数
+func TestExecutorRegistry_RegisterWithConcurrency(t *testing.T) {
+	registry := NewExecutorRegistry()
+
+	factory := func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
+	}
+
+	registry.RegisterWithConcurrency("test_task", factory, 10)
+
+	// 验证注册成功
+	retrievedFactory, ok := registry.Get("test_task")
+	if !ok {
+		t.Error("Expected factory to be registered")
+	}
+
+	// 验证工厂函数可以创建执行器
+	executor, err := retrievedFactory("test_payload")
+	if err != nil {
+		t.Errorf("Expected factory to create executor without error, got: %v", err)
+	}
+	if executor == nil {
+		t.Error("Expected factory to create executor")
+	}
+
+	// 验证并发数
+	concurrency := registry.GetConcurrency("test_task", 5)
+	if concurrency != 10 {
+		t.Errorf("Expected concurrency to be 10, got %d", concurrency)
+	}
+}
+
+// TestExecutorRegistry_GetConcurrency_Default 测试获取默认并发数
+func TestExecutorRegistry_GetConcurrency_Default(t *testing.T) {
+	registry := NewExecutorRegistry()
+
+	factory := func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
+	}
+
+	// 只注册，不设置并发数
+	registry.Register("test_task", factory)
+
+	// 应该返回默认值
+	concurrency := registry.GetConcurrency("test_task", 5)
+	if concurrency != 5 {
+		t.Errorf("Expected default concurrency to be 5, got %d", concurrency)
+	}
+
+	// 不存在的任务类型也应该返回默认值
+	concurrency = registry.GetConcurrency("nonexistent", 3)
+	if concurrency != 3 {
+		t.Errorf("Expected default concurrency to be 3, got %d", concurrency)
+	}
+}
+
+// TestExecutorRegistry_Concurrency 测试并发注册和获取
+func TestExecutorRegistry_Concurrency(t *testing.T) {
+	registry := NewExecutorRegistry()
+
+	factory := func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
+	}
+
+	const numGoroutines = 100
+	var wg sync.WaitGroup
+
+	// 并发注册
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			taskType := fmt.Sprintf("task_%d", idx)
+			registry.RegisterWithConcurrency(taskType, factory, idx)
+		}(i)
+	}
+	wg.Wait()
+
+	// 并发读取
+	errors := make(chan error, numGoroutines)
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			taskType := fmt.Sprintf("task_%d", idx)
+
+			// 验证可以获取工厂
+			if _, ok := registry.Get(taskType); !ok {
+				errors <- fmt.Errorf("task_%d not found", idx)
+				return
+			}
+
+			// 验证并发数正确
+			concurrency := registry.GetConcurrency(taskType, 10)
+			if concurrency != idx {
+				errors <- fmt.Errorf("expected concurrency %d, got %d", idx, concurrency)
+				return
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	close(errors)
+
+	// 检查是否有错误
+	for err := range errors {
+		t.Error(err)
+	}
+
+	// 验证所有任务类型都已注册
+	types := registry.GetAll()
+	if len(types) != numGoroutines {
+		t.Errorf("Expected %d task types, got %d", numGoroutines, len(types))
 	}
 }

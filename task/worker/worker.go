@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/task/model"
 )
 
 // WorkManager worker 需要的管理器接口（最小化依赖）
@@ -20,6 +21,21 @@ type WorkManager interface {
 
 	// InitTaskDBStatus 初始化任务状态
 	InitTaskDBStatus(ctx context.Context) error
+}
+
+// TaskManager health checker 需要的管理器接口
+type TaskManager interface {
+	// GetTask 获取任务信息
+	GetTask(ctx context.Context, taskID uint) (*model.TaskEntity, error)
+
+	// SaveTask 保存任务
+	SaveTask(ctx context.Context, task interface{}) error
+
+	// PushToQueue 推送任务到队列
+	PushToQueue(ctx context.Context, taskType string) error
+
+	// GetPendingTaskCount 获取待处理任务数量
+	GetPendingTaskCount(ctx context.Context, taskType string) (int64, error)
 }
 
 // TaskInfo 任务基本信息（纯数据结构）
@@ -51,10 +67,9 @@ func WithConcurrency(n int) ExecutorOption {
 
 // Worker 分布式 Worker 实现
 type Worker struct {
-	config         *WorkerConfig
-	manager        WorkManager
-	registry       *ExecutorRegistry
-	concurrencyMap map[string]int // 任务类型 -> 并发数映射
+	config   *WorkerConfig
+	manager  WorkManager
+	registry *ExecutorRegistry
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -75,19 +90,15 @@ func NewWorker(config *WorkerConfig, mgr WorkManager) (*Worker, error) {
 	}
 
 	return &Worker{
-		config:         config,
-		manager:        mgr,
-		registry:       NewExecutorRegistry(),
-		concurrencyMap: make(map[string]int),
+		config:   config,
+		manager:  mgr,
+		registry: NewExecutorRegistry(),
 	}, nil
 }
 
 // RegisterExecutor 注册任务执行器
 // 可通过 WithConcurrency 选项设置该任务类型的最大并发数，不设置时使用全局默认并发数
 func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory, opts ...ExecutorOption) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
 	// 默认选项配置
 	options := &executorOptions{
 		maxConcurrency: w.config.MaxConcurrency, // 默认使用全局配置
@@ -98,11 +109,8 @@ func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory, opts
 		opt(options)
 	}
 
-	// 注册执行器
-	w.registry.Register(taskType, factory)
-
-	// 设置并发数
-	w.concurrencyMap[taskType] = options.maxConcurrency
+	// 注册执行器（使用 registry 的锁，不需要 Worker 的全局锁）
+	w.registry.RegisterWithConcurrency(taskType, factory, options.maxConcurrency)
 }
 
 // Start 启动 Worker
@@ -114,21 +122,13 @@ func (w *Worker) Start(ctx context.Context) error {
 		return ErrWorkerAlreadyStarted
 	}
 
-	// 初始化数据库任务状态
-	if err := w.manager.InitTaskDBStatus(ctx); err != nil {
-		return fmt.Errorf("failed to init task status: %w", err)
-	}
-
 	w.ctx, w.cancel = context.WithCancel(ctx)
 
 	// 为每个任务类型启动工作协程（支持不同并发数）
 	taskTypes := w.registry.GetAll()
 	for _, taskType := range taskTypes {
-		// 直接访问 concurrencyMap，避免死锁（已持有写锁）
-		concurrency, ok := w.concurrencyMap[taskType]
-		if !ok {
-			concurrency = w.config.MaxConcurrency
-		}
+		// 从 registry 获取并发数（不需要持有 Worker 的锁）
+		concurrency := w.registry.GetConcurrency(taskType, w.config.MaxConcurrency)
 		taskTypeCopy := taskType // 避免闭包捕获问题
 		for i := 0; i < concurrency; i++ {
 			w.startRoutine(fmt.Sprintf("worker-%s-%d", taskType, i), func() {

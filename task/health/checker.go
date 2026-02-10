@@ -119,9 +119,6 @@ func (h *Checker) Start(ctx context.Context) error {
 	// 启动健康检查协程
 	h.startRoutine("health-checker", h.healthCheckRoutine)
 
-	// 启动队列同步协程
-	h.startRoutine("queue-syncer", h.queueSyncRoutine)
-
 	h.started = true
 	logs.InfoContextf(ctx, "[task] health checker started")
 	return nil
@@ -189,23 +186,6 @@ func (h *Checker) healthCheckRoutine() {
 		case <-ticker.C:
 			if err := h.CheckWorkerHealth(h.ctx); err != nil {
 				logs.ErrorContextf(h.ctx, "[task] failed to check worker health: %v", err)
-			}
-		}
-	}
-}
-
-// queueSyncRoutine 队列同步协程
-func (h *Checker) queueSyncRoutine() {
-	ticker := time.NewTicker(time.Minute)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-h.ctx.Done():
-			return
-		case <-ticker.C:
-			if err := h.SyncQueueCount(h.ctx); err != nil {
-				logs.ErrorContextf(h.ctx, "[task] failed to sync queue count: %v", err)
 			}
 		}
 	}
@@ -332,46 +312,6 @@ func (h *Checker) checkTaskTypeWorkers(ctx context.Context, taskType string, now
 					}
 				}
 			}
-		}
-	}
-
-	return nil
-}
-
-// SyncQueueCount 同步队列数量
-// 检查队列中的消息数量，如果小于待处理任务数，则补充消息
-func (h *Checker) SyncQueueCount(ctx context.Context) error {
-	types, err := h.getAllTaskTypes(ctx)
-	if err != nil {
-		logs.ErrorContextf(ctx, "[task] failed to get task types: %v", err)
-		return err
-	}
-
-	for _, taskType := range types {
-		if err := h.syncTaskTypeQueue(ctx, taskType); err != nil {
-			logs.ErrorContextf(ctx, "[task] failed to sync queue for task type %s: %v", taskType, err)
-		}
-	}
-
-	return nil
-}
-
-// syncTaskTypeQueue 同步特定任务类型的队列
-func (h *Checker) syncTaskTypeQueue(ctx context.Context, taskType string) error {
-	// 获取数据库中的任务数量，然后推送消息
-	taskCount, err := h.config.Manager.GetPendingTaskCount(ctx, taskType)
-	if err != nil {
-		return fmt.Errorf("failed to get task count: %w", err)
-	}
-
-	// 如果有待处理任务，至少确保队列中有一条消息
-	if taskCount > 0 {
-		// 简单策略：如果有待处理任务，就推送一条消息
-		// 队列中的消息数量由 Worker 消费后自动触发下一条
-		if err := h.config.Manager.PushToQueue(ctx, taskType); err != nil {
-			logs.ErrorContextf(ctx, "[task] failed to push task: %v", err)
-		} else {
-			logs.DebugContextf(ctx, "[task] synced queue for taskType: %s, pending tasks: %d", taskType, taskCount)
 		}
 	}
 
