@@ -55,11 +55,11 @@ task/
 ```
 业务层             →  manager.Manager（任务管理）
 业务层             →  worker.Worker（任务执行）
-worker.Worker      →  manager.Manager（内部使用，拉取和保存任务）
+worker.Worker      →  worker.WorkManager 接口（由 manager.Manager 实现）
 health.Checker     →  manager.Manager（内部使用）
 manager.Manager    →  使用 Queue 和 Repository
 manager, health    →  model（数据模型）
-worker             →  不依赖 model（与业务解耦）
+worker             →  不依赖 model 和 gorm（与业务解耦）
 ```
 
 ### 核心组件
@@ -72,6 +72,7 @@ worker             →  不依赖 model（与业务解耦）
 - **队列操作**: 推送和消费队列消息
 - **任务查询**: 获取待处理任务、统计任务数量等
 - **状态管理**: 初始化任务状态、检查超时任务
+- **事务管理**: 在任务结果保存时自动注入事务到 Context，支持回调业务的一致性
 
 #### 2. Worker（任务执行器）
 
@@ -81,7 +82,8 @@ worker             →  不依赖 model（与业务解耦）
 - 调用执行器工厂创建执行器并执行任务
 - 处理任务结果（成功/失败/超时）
 - 触发下一个任务
-- **不直接操作** DB 和 Redis，通过 Manager 调用
+- **不依赖** GORM 和数据模型，实现业务与底层存储解耦
+- **不直接操作** DB 和 Redis，通过 WorkManager 接口调用
 
 #### 3. HealthChecker（健康检查器）
 

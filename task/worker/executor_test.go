@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-
-	"gorm.io/gorm"
 )
 
 // mockExecutor 模拟执行器
@@ -15,6 +13,7 @@ type mockExecutor struct {
 	executeError    error
 	onSuccessCalled bool
 	onFailureCalled bool
+	result          interface{}
 }
 
 func newMockExecutor(payload string) (*mockExecutor, error) {
@@ -31,12 +30,20 @@ func (m *mockExecutor) Execute(ctx context.Context) error {
 	return m.executeError
 }
 
-func (m *mockExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
+func (m *mockExecutor) GetResult() interface{} {
+	return m.result
+}
+
+func (m *mockExecutor) SetResult(result interface{}) {
+	m.result = result
+}
+
+func (m *mockExecutor) OnSuccess(ctx context.Context) error {
 	m.onSuccessCalled = true
 	return nil
 }
 
-func (m *mockExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
+func (m *mockExecutor) OnFailure(ctx context.Context) error {
 	m.onFailureCalled = true
 	return nil
 }
@@ -142,7 +149,7 @@ func TestMockExecutor_Callbacks(t *testing.T) {
 	executor := &mockExecutor{}
 
 	// 测试 OnSuccess
-	err := executor.OnSuccess(context.Background(), nil)
+	err := executor.OnSuccess(context.Background())
 	if err != nil {
 		t.Errorf("OnSuccess() error = %v", err)
 	}
@@ -151,7 +158,7 @@ func TestMockExecutor_Callbacks(t *testing.T) {
 	}
 
 	// 测试 OnFailure
-	err = executor.OnFailure(context.Background(), nil)
+	err = executor.OnFailure(context.Background())
 	if err != nil {
 		t.Errorf("OnFailure() error = %v", err)
 	}

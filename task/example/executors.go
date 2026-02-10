@@ -7,8 +7,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"gorm.io/gorm"
 )
 
 // ===== Payload 结构定义 =====
@@ -167,13 +165,13 @@ func (e *DemoTaskExecutor) SetResult(result interface{}) {
 }
 
 // OnSuccess 成功回调
-func (e *DemoTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
+func (e *DemoTaskExecutor) OnSuccess(ctx context.Context) error {
 	fmt.Printf("✓ OnSuccess: 任务执行成功\n")
 	return nil
 }
 
 // OnFailure 失败回调
-func (e *DemoTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
+func (e *DemoTaskExecutor) OnFailure(ctx context.Context) error {
 	fmt.Printf("✗ OnFailure: 任务执行失败\n")
 	return nil
 }
@@ -245,14 +243,14 @@ func (e *RetryTaskExecutor) SetResult(result interface{}) {
 }
 
 // OnSuccess 成功回调
-func (e *RetryTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
+func (e *RetryTaskExecutor) OnSuccess(ctx context.Context) error {
 	fmt.Printf("\n✓ OnSuccess: 任务最终成功\n")
 	fmt.Printf("  总尝试次数: %d\n", e.currentAttempt)
 	return nil
 }
 
 // OnFailure 失败回调
-func (e *RetryTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
+func (e *RetryTaskExecutor) OnFailure(ctx context.Context) error {
 	fmt.Printf("\n✗ OnFailure: 任务执行失败\n")
 	fmt.Printf("  → 任务将重试\n")
 	return nil
@@ -355,13 +353,13 @@ func (e *TimeoutTaskExecutor) executeWithoutContextCheck(duration time.Duration)
 }
 
 // OnSuccess 成功回调
-func (e *TimeoutTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
+func (e *TimeoutTaskExecutor) OnSuccess(ctx context.Context) error {
 	fmt.Printf("\n✓ OnSuccess: 任务成功完成\n")
 	return nil
 }
 
 // OnFailure 失败回调
-func (e *TimeoutTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
+func (e *TimeoutTaskExecutor) OnFailure(ctx context.Context) error {
 	fmt.Printf("\n✗ OnFailure: 任务失败\n")
 	return nil
 }
@@ -435,7 +433,7 @@ func (e *ConcurrentTaskExecutor) SetResult(result interface{}) {
 }
 
 // OnSuccess 成功回调
-func (e *ConcurrentTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
+func (e *ConcurrentTaskExecutor) OnSuccess(ctx context.Context) error {
 	completed := atomic.AddInt32(e.completedCount, 1)
 	elapsed := time.Since(e.startTime)
 
@@ -446,7 +444,7 @@ func (e *ConcurrentTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) err
 }
 
 // OnFailure 失败回调
-func (e *ConcurrentTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
+func (e *ConcurrentTaskExecutor) OnFailure(ctx context.Context) error {
 	fmt.Printf("[任务 %d] ✗ 失败\n", e.payload.Index)
 	return nil
 }
@@ -515,13 +513,13 @@ func (e *StepTaskExecutor) SetResult(result interface{}) {
 }
 
 // OnSuccess 成功回调
-func (e *StepTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
+func (e *StepTaskExecutor) OnSuccess(ctx context.Context) error {
 	fmt.Printf("✓ 步骤 %d (%s) 成功\n", e.payload.Step, e.payload.StepName)
 	return nil
 }
 
 // OnFailure 失败回调
-func (e *StepTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
+func (e *StepTaskExecutor) OnFailure(ctx context.Context) error {
 	fmt.Printf("✗ 步骤 %d (%s) 失败\n", e.payload.Step, e.payload.StepName)
 	return nil
 }
@@ -570,7 +568,7 @@ func (e *FastTaskExecutor) SetResult(result interface{}) {
 	e.result = result
 }
 
-func (e *FastTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
+func (e *FastTaskExecutor) OnSuccess(ctx context.Context) error {
 	completed := atomic.AddInt32(&e.stats.fastCompleted, 1)
 	elapsed := e.stats.GetElapsed("fast", e.payload.Index)
 	fmt.Printf("  [快速任务 %d] ✓ 完成 (耗时: %v, 已完成: %d)\n",
@@ -578,7 +576,7 @@ func (e *FastTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
 	return nil
 }
 
-func (e *FastTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
+func (e *FastTaskExecutor) OnFailure(ctx context.Context) error {
 	fmt.Printf("  [快速任务 %d] ✗ 失败\n", e.payload.Index)
 	return nil
 }
@@ -625,7 +623,7 @@ func (e *SlowTaskExecutor) SetResult(result interface{}) {
 	e.result = result
 }
 
-func (e *SlowTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
+func (e *SlowTaskExecutor) OnSuccess(ctx context.Context) error {
 	completed := atomic.AddInt32(&e.stats.slowCompleted, 1)
 	elapsed := e.stats.GetElapsed("slow", e.payload.Index)
 	fmt.Printf("  [慢速任务 %d] ✓ 完成 (耗时: %v, 已完成: %d)\n",
@@ -633,7 +631,7 @@ func (e *SlowTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
 	return nil
 }
 
-func (e *SlowTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
+func (e *SlowTaskExecutor) OnFailure(ctx context.Context) error {
 	fmt.Printf("  [慢速任务 %d] ✗ 失败\n", e.payload.Index)
 	return nil
 }
@@ -681,7 +679,7 @@ func (e *ApiTaskExecutor) SetResult(result interface{}) {
 	e.result = result
 }
 
-func (e *ApiTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
+func (e *ApiTaskExecutor) OnSuccess(ctx context.Context) error {
 	completed := atomic.AddInt32(&e.stats.apiCompleted, 1)
 	elapsed := e.stats.GetElapsed("api", e.payload.Index)
 	fmt.Printf("  [API任务 %d] ✓ 完成 (耗时: %v, 已完成: %d)\n",
@@ -689,7 +687,7 @@ func (e *ApiTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
 	return nil
 }
 
-func (e *ApiTaskExecutor) OnFailure(ctx context.Context, tx *gorm.DB) error {
+func (e *ApiTaskExecutor) OnFailure(ctx context.Context) error {
 	fmt.Printf("  [API任务 %d] ✗ 失败\n", e.payload.Index)
 	return nil
 }
@@ -720,10 +718,23 @@ func (e *DefaultTaskExecutor) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (e *DefaultTaskExecutor) OnSuccess(ctx context.Context, tx *gorm.DB) error {
+func (e *DefaultTaskExecutor) GetResult() interface{} {
+	return e.result
+}
+
+func (e *DefaultTaskExecutor) SetResult(result interface{}) {
+	e.result = result
+}
+
+func (e *DefaultTaskExecutor) OnSuccess(ctx context.Context) error {
 	completed := atomic.AddInt32(&e.stats.defaultCompleted, 1)
 	elapsed := e.stats.GetElapsed("default", e.payload.Index)
 	fmt.Printf("  [默认任务 %d] ✓ 完成 (耗时: %v, 已完成: %d)\n",
 		e.payload.Index, elapsed.Round(time.Millisecond), completed)
+	return nil
+}
+
+func (e *DefaultTaskExecutor) OnFailure(ctx context.Context) error {
+	fmt.Printf("  [默认任务 %d] ✗ 失败\n", e.payload.Index)
 	return nil
 }

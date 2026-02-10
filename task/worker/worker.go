@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ygpkg/yg-go/logs"
-	"gorm.io/gorm"
 )
 
 // WorkManager worker 需要的管理器接口（最小化依赖）
@@ -17,7 +16,7 @@ type WorkManager interface {
 	GetNextTask(ctx context.Context, taskType string, workerID string) (TaskInfo, error)
 
 	// SaveTaskResult 保存任务执行结果
-	SaveTaskResult(ctx context.Context, info TaskInfo, result interface{}, err error, onCallback func(context.Context, *gorm.DB) error) error
+	SaveTaskResult(ctx context.Context, info TaskInfo, result interface{}, err error, onCallback func(context.Context) error) error
 
 	// InitTaskDBStatus 初始化任务状态
 	InitTaskDBStatus(ctx context.Context) error
@@ -265,7 +264,7 @@ func (w *Worker) executeTask(ctx context.Context, info TaskInfo) {
 	result := executor.GetResult()
 
 	// 确定回调函数
-	var callback func(context.Context, *gorm.DB) error
+	var callback func(context.Context) error
 	if execErr == nil && execCtx.Err() != context.DeadlineExceeded {
 		callback = executor.OnSuccess
 		logs.InfoContextf(ctx, "[task] task success")

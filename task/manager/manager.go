@@ -195,7 +195,7 @@ func (m *Manager) GetNextTask(ctx context.Context, taskType, workerID string) (w
 
 // SaveTaskResult 保存任务执行结果并处理任务流转 - 实现 WorkManager 接口
 // 这个方法会替换原来的 SaveTaskResult 方法
-func (m *Manager) SaveTaskResult(ctx context.Context, info worker.TaskInfo, result interface{}, execErr error, onCallback func(context.Context, *gorm.DB) error) error {
+func (m *Manager) SaveTaskResult(ctx context.Context, info worker.TaskInfo, result interface{}, execErr error, onCallback func(context.Context) error) error {
 	var taskEntity *model.TaskEntity
 	var saveErr error
 
@@ -224,7 +224,9 @@ func (m *Manager) SaveTaskResult(ctx context.Context, info worker.TaskInfo, resu
 
 		// 4. 执行回调
 		if onCallback != nil {
-			if err := onCallback(ctx, tx); err != nil {
+			// 将 tx 注入 context，供 worker 使用（虽然 worker 包不依赖 gorm，但业务代码可能需要）
+			ctxWithTx := WithTx(ctx, tx)
+			if err := onCallback(ctxWithTx); err != nil {
 				return fmt.Errorf("callback failed: %w", err)
 			}
 		}

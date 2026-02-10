@@ -3,8 +3,6 @@ package worker
 import (
 	"context"
 	"sync"
-
-	"gorm.io/gorm"
 )
 
 // TaskExecutor 任务执行器接口
@@ -19,12 +17,12 @@ type TaskExecutor interface {
 	SetResult(result interface{})
 
 	// OnSuccess 成功后回调，在任务执行成功后调用，可用于清理资源、更新状态等
-	// tx 为数据库事务，如果返回错误，事务会回滚
-	OnSuccess(ctx context.Context, tx *gorm.DB) error
+	// 如需数据库事务，请从 ctx 中获取
+	OnSuccess(ctx context.Context) error
 
 	// OnFailure 失败后回调，在任务执行失败后调用，可用于清理资源、记录日志等
-	// tx 为数据库事务，如果返回错误，事务会回滚
-	OnFailure(ctx context.Context, tx *gorm.DB) error
+	// 如需数据库事务，请从 ctx 中获取
+	OnFailure(ctx context.Context) error
 }
 
 // ExecutorFactory 执行器工厂函数

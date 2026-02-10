@@ -52,7 +52,7 @@ func main() {
 
 	// 4. 创建 Worker
 	workerConfig := createWorkerConfig(choice)
-	w, err := worker.NewWorker(workerConfig, taskMgr, db)
+	w, err := worker.NewWorker(workerConfig, taskMgr)
 	if err != nil {
 		fmt.Printf("✗ 创建 Worker 失败: %v\n", err)
 		os.Exit(1)
