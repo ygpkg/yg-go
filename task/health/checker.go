@@ -277,40 +277,34 @@ func (h *Checker) checkTaskTypeWorkers(ctx context.Context, taskType string, now
 		if now-timestamp > HeartbeatTimeout {
 			logs.InfoContextf(ctx, "[task] worker expired: %s, taskType: %s, last heartbeat: %d", workerID, taskType, timestamp)
 
-			// 删除过期的 Worker
-			h.DeleteHeartbeat(ctx, taskType, workerID)
-
-			// 标记任务为失败
+			// 解析 TaskID
 			taskID, err := strconv.ParseUint(parts[1], 10, 64)
 			if err != nil {
 				logs.ErrorContextf(ctx, "[task] failed to parse task id: %v, worker: %s", err, workerID)
+				// 解析失败也认为是无效心跳，可以删除
+				h.DeleteHeartbeat(ctx, taskType, workerID)
 				continue
 			}
 
-			if taskID == 0 {
-				continue
-			}
+			// 如果配置了回调，则执行回调
+			if h.config.OnWorkerDead != nil {
+				info := DeadWorkerInfo{
+					WorkerID:      workerID,
+					TaskType:      taskType,
+					TaskID:        uint(taskID),
+					LastHeartbeat: timestamp,
+				}
 
-			// 获取任务并标记为失败
-			taskEntity, err := h.config.Manager.GetTask(ctx, uint(taskID))
-			if err != nil {
-				logs.WarnContextf(ctx, "[task] failed to get task: %v, taskID: %d, workerID: %s", err, taskID, workerID)
-				continue
-			}
-
-			if taskEntity.IsRunning() && taskEntity.WorkerID == workerID {
-				taskEntity.MarkAsFailed("worker heartbeat timeout")
-				if err := h.config.Manager.SaveTask(ctx, taskEntity); err != nil {
-					logs.ErrorContextf(ctx, "[task] failed to save task: %v", err)
+				if err := h.config.OnWorkerDead(ctx, info); err != nil {
+					logs.ErrorContextf(ctx, "[task] worker dead callback failed: %v, worker: %s", err, workerID)
+					// 回调失败，暂时保留心跳，下次重试
 					continue
 				}
+			}
 
-				// 重新推入队列（如果还可以重试）
-				if taskEntity.CanRetry() {
-					if err := h.config.Manager.PushToQueue(ctx, taskEntity.TaskType); err != nil {
-						logs.ErrorContextf(ctx, "[task] failed to repush task: %v", err)
-					}
-				}
+			// 删除过期的 Worker
+			if err := h.DeleteHeartbeat(ctx, taskType, workerID); err != nil {
+				logs.ErrorContextf(ctx, "[task] failed to delete heartbeat: %v, worker: %s", err, workerID)
 			}
 		}
 	}

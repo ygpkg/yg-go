@@ -262,13 +262,17 @@ func main() {
     })
 
     // 4. 创建健康检查器（独立运行）
-    healthConfig := &health.CheckerConfig{
-        KeyPrefix:   "task:",
-        RedisClient: redisClient,
-        Manager:     taskMgr,
-        CheckPeriod: 30 * time.Second,
-    }
-    healthChecker, err := health.NewChecker(healthConfig)
+	healthConfig := &health.CheckerConfig{
+		KeyPrefix:   "task:",
+		RedisClient: redisClient,
+		CheckPeriod: 30 * time.Second,
+		// 可选：注册 Worker 死亡回调
+		OnWorkerDead: func(ctx context.Context, info health.DeadWorkerInfo) error {
+			// 处理死亡 Worker 的任务，例如标记为失败或重试
+			return nil
+		},
+	}
+	healthChecker, err := health.NewChecker(healthConfig)
     if err != nil {
         panic(err)
     }

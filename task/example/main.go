@@ -42,6 +42,9 @@ func main() {
 	ctx := context.Background()
 
 	// 3. 创建任务管理器
+	// 注意：这里的 taskMgr 是直接连接数据库和 Redis 的实现。
+	// 在实际生产环境中，如果 Worker 是单独部署的，这里的 taskMgr 可能会替换为
+	// 通过 HTTP 或 RPC 调用中心化任务管理服务的实现。
 	managerConfig := createManagerConfig(choice)
 	taskMgr, err := manager.NewManager(managerConfig, db, redisClient)
 	if err != nil {
@@ -63,8 +66,11 @@ func main() {
 	healthConfig := &health.CheckerConfig{
 		KeyPrefix:   "task:example:",
 		RedisClient: redisClient,
-		Manager:     taskMgr,
 		CheckPeriod: 30 * time.Second,
+		// 定义发现 Worker 死亡时的处理逻辑
+		OnWorkerDead: func(ctx context.Context, info health.DeadWorkerInfo) error {
+			return handleWorkerDead(ctx, info, taskMgr)
+		},
 	}
 	healthChecker, err := health.NewChecker(healthConfig)
 	if err != nil {
@@ -229,4 +235,32 @@ func createWorkerConfig(scenario int) *worker.WorkerConfig {
 	}
 
 	return baseConfig
+}
+
+// handleWorkerDead 处理 Worker 死亡事件
+func handleWorkerDead(ctx context.Context, info health.DeadWorkerInfo, taskMgr *manager.Manager) error {
+	fmt.Printf("! 发现死亡 Worker: %s, 任务ID: %d\n", info.WorkerID, info.TaskID)
+
+	// 获取任务并标记为失败
+	taskEntity, err := taskMgr.GetTask(ctx, info.TaskID)
+	if err != nil {
+		return fmt.Errorf("failed to get task: %w", err)
+	}
+
+	if taskEntity.IsRunning() && taskEntity.WorkerID == info.WorkerID {
+		taskEntity.MarkAsFailed("worker heartbeat timeout")
+		if err := taskMgr.SaveTask(ctx, taskEntity); err != nil {
+			return fmt.Errorf("failed to save task: %w", err)
+		}
+
+		// 重新推入队列（如果还可以重试）
+		if taskEntity.CanRetry() {
+			if err := taskMgr.PushToQueue(ctx, taskEntity.TaskType); err != nil {
+				fmt.Printf("✗ 任务重试失败: %v\n", err)
+			} else {
+				fmt.Printf("✓ 任务已重新入队重试\n")
+			}
+		}
+	}
+	return nil
 }
