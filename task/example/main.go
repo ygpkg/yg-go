@@ -32,7 +32,7 @@ func main() {
 	fmt.Println("✓ 数据库和 Redis 连接成功")
 
 	// 初始化 Task 包
-	if err := manager.Init(db); err != nil {
+	if err := manager.InitDB(db); err != nil {
 		fmt.Printf("✗ 初始化 Task 包失败: %v\n", err)
 		os.Exit(1)
 	}
