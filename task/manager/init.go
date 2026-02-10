@@ -6,8 +6,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Init 初始化处理
-func Init(db *gorm.DB) error {
+// InitDB 初始化处理
+func InitDB(db *gorm.DB) error {
 	if err := dbtools.InitModel(db, &model.TaskEntity{}); err != nil {
 		return err
 	}
