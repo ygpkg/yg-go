@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ygpkg/yg-go/logs"
-	"github.com/ygpkg/yg-go/task/model"
 )
 
 // WorkManager worker 需要的管理器接口（最小化依赖）
@@ -21,21 +20,6 @@ type WorkManager interface {
 
 	// InitTaskDBStatus 初始化任务状态
 	InitTaskDBStatus(ctx context.Context) error
-}
-
-// TaskManager health checker 需要的管理器接口
-type TaskManager interface {
-	// GetTask 获取任务信息
-	GetTask(ctx context.Context, taskID uint) (*model.TaskEntity, error)
-
-	// SaveTask 保存任务
-	SaveTask(ctx context.Context, task interface{}) error
-
-	// PushToQueue 推送任务到队列
-	PushToQueue(ctx context.Context, taskType string) error
-
-	// GetPendingTaskCount 获取待处理任务数量
-	GetPendingTaskCount(ctx context.Context, taskType string) (int64, error)
 }
 
 // TaskInfo 任务基本信息（纯数据结构）
