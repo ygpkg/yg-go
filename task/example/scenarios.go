@@ -121,6 +121,9 @@ func registerMixedConcurrencyExecutors(w *worker.Worker) {
 func runBasicScenario(ctx context.Context, mgr *manager.Manager, w *worker.Worker) error {
 	printSection("基本任务创建和执行")
 
+	fmt.Println("[DEBUG] Worker 已启动，准备创建任务...")
+	time.Sleep(500 * time.Millisecond)
+
 	// 创建任务
 	fmt.Println("创建任务...")
 	payload := DemoPayload{
@@ -145,10 +148,13 @@ func runBasicScenario(ctx context.Context, mgr *manager.Manager, w *worker.Worke
 		Uin:         1001,
 	}
 
+	fmt.Printf("[DEBUG] 准备调用 CreateTasks，任务类型: %s\n", taskEntity.TaskType)
 	if err := mgr.CreateTasks(ctx, []*model.TaskEntity{taskEntity}); err != nil {
+		fmt.Printf("[DEBUG] CreateTasks 调用失败: %v\n", err)
 		return fmt.Errorf("创建任务失败: %w", err)
 	}
-	fmt.Printf("✓ 任务已创建，ID: %d\n\n", taskEntity.ID)
+	fmt.Printf("✓ 任务已创建，ID: %d\n", taskEntity.ID)
+	fmt.Printf("[DEBUG] 任务入队成功，等待 Worker 获取并执行...\n\n")
 
 	// 等待任务完成
 	return waitForTaskCompletion(ctx, mgr, taskEntity.ID, 30*time.Second)
@@ -629,6 +635,7 @@ func runMixedConcurrencyScenario(ctx context.Context, mgr *manager.Manager, w *w
 func waitForTaskCompletion(ctx context.Context, mgr *manager.Manager, taskID uint, timeout time.Duration) error {
 	fmt.Println("等待任务完成...")
 	fmt.Println("========================================")
+	fmt.Println("[DEBUG] 开始轮询任务状态...")
 	fmt.Println()
 
 	timeoutCh := time.After(timeout)
@@ -638,13 +645,19 @@ func waitForTaskCompletion(ctx context.Context, mgr *manager.Manager, taskID uin
 	for {
 		select {
 		case <-timeoutCh:
+			fmt.Println("[DEBUG] 等待任务完成超时！")
 			return fmt.Errorf("等待任务完成超时")
 
 		case <-ticker.C:
+			fmt.Printf("[DEBUG] 查询任务 %d 状态...\n", taskID)
 			result, err := mgr.GetTask(ctx, taskID)
 			if err != nil {
+				fmt.Printf("[DEBUG] GetTask 调用失败: %v\n", err)
 				return fmt.Errorf("获取任务状态失败: %w", err)
 			}
+
+			fmt.Printf("[DEBUG] 任务状态: %s, WorkerID: %s, Redo: %d/%d\n",
+				result.TaskStatus, result.WorkerID, result.Redo, result.MaxRedo)
 
 			if result.IsFinished() {
 				fmt.Println("\n========================================")
@@ -655,6 +668,7 @@ func waitForTaskCompletion(ctx context.Context, mgr *manager.Manager, taskID uin
 				fmt.Printf("任务状态: %s\n", result.TaskStatus)
 				fmt.Printf("重试次数: %d/%d\n", result.Redo, result.MaxRedo)
 				fmt.Printf("执行耗时: %d 秒\n", result.Cost)
+				fmt.Printf("执行 Worker: %s\n", result.WorkerID)
 
 				if result.IsSuccess() {
 					fmt.Println("\n✓ 任务执行成功！")
@@ -662,6 +676,7 @@ func waitForTaskCompletion(ctx context.Context, mgr *manager.Manager, taskID uin
 					fmt.Printf("\n✗ 任务执行失败: %s\n", result.ErrMsg)
 				}
 
+				fmt.Println("[DEBUG] 任务已完成，等待用户退出...")
 				return waitForExit()
 			}
 

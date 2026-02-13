@@ -142,16 +142,16 @@ go run .
 **示例代码**：
 ```go
 // 为不同任务类型配置独立并发数（使用 WithConcurrency 选项）
-worker.RegisterExecutor("fast_task", func() task.TaskExecutor {
+worker.RegisterExecutor("fast_task", func(payload string) worker.TaskExecutor {
     return &FastTaskExecutor{}
-}, task.WithConcurrency(10)) // 快速任务高并发
+}, worker.WithConcurrency(10)) // 快速任务高并发
 
-worker.RegisterExecutor("slow_task", func() task.TaskExecutor {
+worker.RegisterExecutor("slow_task", func(payload string) worker.TaskExecutor {
     return &SlowTaskExecutor{}
-}, task.WithConcurrency(2)) // 慢速任务低并发
+}, worker.WithConcurrency(2)) // 慢速任务低并发
 
 // 使用全局默认并发数（不传选项）
-worker.RegisterExecutor("default_task", func() task.TaskExecutor {
+worker.RegisterExecutor("default_task", func(payload string) worker.TaskExecutor {
     return &DefaultTaskExecutor{}
 })
 ```

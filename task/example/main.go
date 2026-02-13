@@ -11,6 +11,37 @@ import (
 	"github.com/ygpkg/yg-go/task/worker"
 )
 
+// WorkManagerAdapter 适配器实现 worker.WorkManager 接口
+type WorkManagerAdapter struct {
+	mgr *manager.Manager
+}
+
+func (a *WorkManagerAdapter) GetNextTask(ctx context.Context, taskType, workerID string) (worker.TaskInfo, error) {
+	taskEntity, err := a.mgr.GetNextTask(ctx, taskType, workerID)
+	if err != nil {
+		return worker.TaskInfo{}, err
+	}
+
+	return worker.TaskInfo{
+		TaskID:    taskEntity.ID,
+		TaskType:  taskEntity.TaskType,
+		Payload:   taskEntity.Payload,
+		Timeout:   taskEntity.Timeout,
+		AppGroup:  taskEntity.AppGroup,
+		SubjectID: taskEntity.SubjectID,
+		Redo:      taskEntity.Redo,
+		MaxRedo:   taskEntity.MaxRedo,
+	}, nil
+}
+
+func (a *WorkManagerAdapter) SaveTaskResult(ctx context.Context, info worker.TaskInfo, result string, execErr error, onCallback func(context.Context) error) error {
+	return a.mgr.SaveTaskResult(ctx, info.TaskID, result, execErr, onCallback)
+}
+
+func (a *WorkManagerAdapter) InitTaskDBStatus(ctx context.Context) error {
+	return a.mgr.InitTaskDBStatus(ctx)
+}
+
 func main() {
 	printBanner()
 
@@ -53,16 +84,19 @@ func main() {
 	}
 	fmt.Println("✓ 任务管理器创建成功")
 
-	// 4. 创建 Worker
+	// 4. 创建 Worker 适配器
+	workMgr := &WorkManagerAdapter{mgr: taskMgr}
+
+	// 5. 创建 Worker
 	workerConfig := createWorkerConfig(choice)
-	w, err := worker.NewWorker(workerConfig, taskMgr)
+	w, err := worker.NewWorker(workerConfig, workMgr)
 	if err != nil {
 		fmt.Printf("✗ 创建 Worker 失败: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("✓ Worker 创建成功")
 
-	// 5. 创建健康检查器（独立运行）
+	// 6. 创建健康检查器（独立运行）
 	healthConfig := &health.CheckerConfig{
 		KeyPrefix:   "task:example:",
 		RedisClient: redisClient,
@@ -241,17 +275,14 @@ func createWorkerConfig(scenario int) *worker.WorkerConfig {
 func handleWorkerDead(ctx context.Context, info health.DeadWorkerInfo, taskMgr *manager.Manager) error {
 	fmt.Printf("! 发现死亡 Worker: %s, 任务ID: %d\n", info.WorkerID, info.TaskID)
 
-	// 构造 TaskInfo
-	taskInfo := worker.TaskInfo{
-		TaskID:    info.TaskID,
-		TaskType:  info.TaskType,
-		SubjectID: 0, // 从 info 中无法获取
-		Redo:      0,
-		MaxRedo:   0,
+	// 使用 SaveTaskResult 方法将任务标记为失败，由框架内部处理重试逻辑
+	errMark := fmt.Errorf("worker heartbeat timeout")
+	callback := func(ctx context.Context) error {
+		fmt.Printf("✓ 死亡 Worker 任务 %d 已通过回调处理\n", info.TaskID)
+		return nil
 	}
 
-	errMark := fmt.Errorf("worker heartbeat timeout")
-	if err := taskMgr.SaveTaskResult(ctx, taskInfo, "", errMark, nil); err != nil {
+	if err := taskMgr.SaveTaskResult(ctx, info.TaskID, "", errMark, callback); err != nil {
 		return fmt.Errorf("failed to save task result: %w", err)
 	}
 
