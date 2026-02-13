@@ -120,7 +120,6 @@ func (s *TaskStats) GetElapsed(taskType string, index int) time.Duration {
 // DemoTaskExecutor 演示任务执行器
 type DemoTaskExecutor struct {
 	payload DemoPayload
-	result  interface{}
 }
 
 // NewDemoTaskExecutor 创建DemoTaskExecutor
@@ -129,7 +128,7 @@ func NewDemoTaskExecutor(payloadJSON string) (*DemoTaskExecutor, error) {
 	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
 		return nil, fmt.Errorf("failed to parse payload: %w", err)
 	}
-	
+
 	fmt.Printf("✓ 任务已初始化，参数: %+v\n", payload)
 	return &DemoTaskExecutor{payload: payload}, nil
 }
@@ -143,25 +142,22 @@ func (e *DemoTaskExecutor) Execute(ctx context.Context) error {
 	// 模拟任务处理
 	time.Sleep(2 * time.Second)
 
-	// 设置执行结果
-	e.result = map[string]interface{}{
-		"message": e.payload.Message,
-		"user_id": e.payload.UserID,
-		"status":  "completed",
-	}
-
 	fmt.Printf("✓ Execute: 任务执行完成\n")
 	return nil
 }
 
 // GetResult 获取执行结果
-func (e *DemoTaskExecutor) GetResult() interface{} {
-	return e.result
+func (e *DemoTaskExecutor) GetResult() string {
+	data, _ := json.Marshal(map[string]interface{}{
+		"message": e.payload.Message,
+		"user_id": e.payload.UserID,
+		"status":  "completed",
+	})
+	return string(data)
 }
 
 // SetResult 设置执行结果
-func (e *DemoTaskExecutor) SetResult(result interface{}) {
-	e.result = result
+func (e *DemoTaskExecutor) SetResult(result string) {
 }
 
 // OnSuccess 成功回调
@@ -183,7 +179,6 @@ type RetryTaskExecutor struct {
 	payload        RetryPayload
 	attemptCount   *int32
 	currentAttempt int32
-	result         interface{}
 }
 
 // NewRetryTaskExecutor 创建RetryTaskExecutor
@@ -222,24 +217,21 @@ func (e *RetryTaskExecutor) Execute(ctx context.Context) error {
 		return fmt.Errorf("%s", errMsg)
 	}
 
-	// 设置执行结果
-	e.result = map[string]interface{}{
-		"attempts": e.currentAttempt,
-		"status":   "success",
-	}
-
 	fmt.Printf("✓ 任务执行成功 (尝试 %d 次后成功)\n", e.currentAttempt)
 	return nil
 }
 
 // GetResult 获取执行结果
-func (e *RetryTaskExecutor) GetResult() interface{} {
-	return e.result
+func (e *RetryTaskExecutor) GetResult() string {
+	data, _ := json.Marshal(map[string]interface{}{
+		"attempts": e.currentAttempt,
+		"status":   "success",
+	})
+	return string(data)
 }
 
 // SetResult 设置执行结果
-func (e *RetryTaskExecutor) SetResult(result interface{}) {
-	e.result = result
+func (e *RetryTaskExecutor) SetResult(result string) {
 }
 
 // OnSuccess 成功回调
@@ -261,7 +253,6 @@ func (e *RetryTaskExecutor) OnFailure(ctx context.Context) error {
 // TimeoutTaskExecutor 演示超时处理的任务执行器
 type TimeoutTaskExecutor struct {
 	payload TimeoutPayload
-	result  interface{}
 }
 
 // NewTimeoutTaskExecutor 创建TimeoutTaskExecutor
@@ -293,24 +284,20 @@ func (e *TimeoutTaskExecutor) Execute(ctx context.Context) error {
 		err = e.executeWithoutContextCheck(duration)
 	}
 
-	if err == nil {
-		e.result = map[string]interface{}{
-			"duration": e.payload.Duration,
-			"status":   "completed",
-		}
-	}
-
 	return err
 }
 
 // GetResult 获取执行结果
-func (e *TimeoutTaskExecutor) GetResult() interface{} {
-	return e.result
+func (e *TimeoutTaskExecutor) GetResult() string {
+	data, _ := json.Marshal(map[string]interface{}{
+		"duration": e.payload.Duration,
+		"status":   "completed",
+	})
+	return string(data)
 }
 
 // SetResult 设置执行结果
-func (e *TimeoutTaskExecutor) SetResult(result interface{}) {
-	e.result = result
+func (e *TimeoutTaskExecutor) SetResult(result string) {
 }
 
 // executeWithContextCheck 执行任务并检查上下文取消
@@ -374,7 +361,6 @@ type ConcurrentTaskExecutor struct {
 	mu             *sync.Mutex
 	startTimes     *map[int]time.Time
 	startTime      time.Time
-	result         interface{}
 }
 
 // NewConcurrentTaskExecutor 创建ConcurrentTaskExecutor
@@ -410,26 +396,23 @@ func (e *ConcurrentTaskExecutor) Execute(ctx context.Context) error {
 
 	atomic.AddInt32(e.executingCount, -1)
 
-	// 设置执行结果
-	e.result = map[string]interface{}{
-		"index":    e.payload.Index,
-		"duration": e.payload.Duration,
-		"status":   "completed",
-	}
-
 	fmt.Printf("[任务 %d] 执行完成 (耗时: %dms)\n", e.payload.Index, e.payload.Duration)
 
 	return nil
 }
 
 // GetResult 获取执行结果
-func (e *ConcurrentTaskExecutor) GetResult() interface{} {
-	return e.result
+func (e *ConcurrentTaskExecutor) GetResult() string {
+	data, _ := json.Marshal(map[string]interface{}{
+		"index":    e.payload.Index,
+		"duration": e.payload.Duration,
+		"status":   "completed",
+	})
+	return string(data)
 }
 
 // SetResult 设置执行结果
-func (e *ConcurrentTaskExecutor) SetResult(result interface{}) {
-	e.result = result
+func (e *ConcurrentTaskExecutor) SetResult(result string) {
 }
 
 // OnSuccess 成功回调
@@ -456,7 +439,6 @@ type StepTaskExecutor struct {
 	payload        StepPayload
 	executionOrder *[]int
 	mu             *sync.Mutex
-	result         interface{}
 }
 
 // NewStepTaskExecutor 创建StepTaskExecutor
@@ -490,26 +472,23 @@ func (e *StepTaskExecutor) Execute(ctx context.Context) error {
 
 	time.Sleep(2 * time.Second)
 
-	// 设置执行结果
-	e.result = map[string]interface{}{
-		"step":      e.payload.Step,
-		"step_name": e.payload.StepName,
-		"order_id":  e.payload.OrderID,
-		"status":    "completed",
-	}
-
 	fmt.Printf("✓ 步骤 %d 执行完成\n", e.payload.Step)
 	return nil
 }
 
 // GetResult 获取执行结果
-func (e *StepTaskExecutor) GetResult() interface{} {
-	return e.result
+func (e *StepTaskExecutor) GetResult() string {
+	data, _ := json.Marshal(map[string]interface{}{
+		"step":      e.payload.Step,
+		"step_name": e.payload.StepName,
+		"order_id":  e.payload.OrderID,
+		"status":    "completed",
+	})
+	return string(data)
 }
 
 // SetResult 设置执行结果
-func (e *StepTaskExecutor) SetResult(result interface{}) {
-	e.result = result
+func (e *StepTaskExecutor) SetResult(result string) {
 }
 
 // OnSuccess 成功回调
@@ -530,7 +509,6 @@ func (e *StepTaskExecutor) OnFailure(ctx context.Context) error {
 type FastTaskExecutor struct {
 	payload FastTaskPayload
 	stats   *TaskStats
-	result  interface{}
 }
 
 func NewFastTaskExecutor(payloadJSON string, stats *TaskStats) (*FastTaskExecutor, error) {
@@ -550,22 +528,19 @@ func (e *FastTaskExecutor) Execute(ctx context.Context) error {
 
 	atomic.AddInt32(&e.stats.fastExecuting, -1)
 
-	// 设置执行结果
-	e.result = map[string]interface{}{
-		"index":    e.payload.Index,
-		"duration": e.payload.Duration,
-		"type":     "fast",
-	}
-
 	return nil
 }
 
-func (e *FastTaskExecutor) GetResult() interface{} {
-	return e.result
+func (e *FastTaskExecutor) GetResult() string {
+	data, _ := json.Marshal(map[string]interface{}{
+		"index":    e.payload.Index,
+		"duration": e.payload.Duration,
+		"type":     "fast",
+	})
+	return string(data)
 }
 
-func (e *FastTaskExecutor) SetResult(result interface{}) {
-	e.result = result
+func (e *FastTaskExecutor) SetResult(result string) {
 }
 
 func (e *FastTaskExecutor) OnSuccess(ctx context.Context) error {
@@ -585,7 +560,6 @@ func (e *FastTaskExecutor) OnFailure(ctx context.Context) error {
 type SlowTaskExecutor struct {
 	payload SlowTaskPayload
 	stats   *TaskStats
-	result  interface{}
 }
 
 func NewSlowTaskExecutor(payloadJSON string, stats *TaskStats) (*SlowTaskExecutor, error) {
@@ -605,22 +579,19 @@ func (e *SlowTaskExecutor) Execute(ctx context.Context) error {
 
 	atomic.AddInt32(&e.stats.slowExecuting, -1)
 
-	// 设置执行结果
-	e.result = map[string]interface{}{
-		"index":    e.payload.Index,
-		"duration": e.payload.Duration,
-		"type":     "slow",
-	}
-
 	return nil
 }
 
-func (e *SlowTaskExecutor) GetResult() interface{} {
-	return e.result
+func (e *SlowTaskExecutor) GetResult() string {
+	data, _ := json.Marshal(map[string]interface{}{
+		"index":    e.payload.Index,
+		"duration": e.payload.Duration,
+		"type":     "slow",
+	})
+	return string(data)
 }
 
-func (e *SlowTaskExecutor) SetResult(result interface{}) {
-	e.result = result
+func (e *SlowTaskExecutor) SetResult(result string) {
 }
 
 func (e *SlowTaskExecutor) OnSuccess(ctx context.Context) error {
@@ -640,7 +611,6 @@ func (e *SlowTaskExecutor) OnFailure(ctx context.Context) error {
 type ApiTaskExecutor struct {
 	payload ApiTaskPayload
 	stats   *TaskStats
-	result  interface{}
 }
 
 func NewApiTaskExecutor(payloadJSON string, stats *TaskStats) (*ApiTaskExecutor, error) {
@@ -660,23 +630,20 @@ func (e *ApiTaskExecutor) Execute(ctx context.Context) error {
 
 	atomic.AddInt32(&e.stats.apiExecuting, -1)
 
-	// 设置执行结果
-	e.result = map[string]interface{}{
+	return nil
+}
+
+func (e *ApiTaskExecutor) GetResult() string {
+	data, _ := json.Marshal(map[string]interface{}{
 		"index":    e.payload.Index,
 		"endpoint": e.payload.Endpoint,
 		"duration": e.payload.Duration,
 		"type":     "api",
-	}
-
-	return nil
+	})
+	return string(data)
 }
 
-func (e *ApiTaskExecutor) GetResult() interface{} {
-	return e.result
-}
-
-func (e *ApiTaskExecutor) SetResult(result interface{}) {
-	e.result = result
+func (e *ApiTaskExecutor) SetResult(result string) {
 }
 
 func (e *ApiTaskExecutor) OnSuccess(ctx context.Context) error {
@@ -696,7 +663,6 @@ func (e *ApiTaskExecutor) OnFailure(ctx context.Context) error {
 type DefaultTaskExecutor struct {
 	payload DefaultTaskPayload
 	stats   *TaskStats
-	result  interface{}
 }
 
 func NewDefaultTaskExecutor(payloadJSON string, stats *TaskStats) (*DefaultTaskExecutor, error) {
@@ -718,12 +684,17 @@ func (e *DefaultTaskExecutor) Execute(ctx context.Context) error {
 	return nil
 }
 
-func (e *DefaultTaskExecutor) GetResult() interface{} {
-	return e.result
+func (e *DefaultTaskExecutor) GetResult() string {
+	data, _ := json.Marshal(map[string]interface{}{
+		"index":    e.payload.Index,
+		"message":  e.payload.Message,
+		"duration": e.payload.Duration,
+		"type":     "default",
+	})
+	return string(data)
 }
 
-func (e *DefaultTaskExecutor) SetResult(result interface{}) {
-	e.result = result
+func (e *DefaultTaskExecutor) SetResult(result string) {
 }
 
 func (e *DefaultTaskExecutor) OnSuccess(ctx context.Context) error {

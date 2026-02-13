@@ -241,26 +241,21 @@ func createWorkerConfig(scenario int) *worker.WorkerConfig {
 func handleWorkerDead(ctx context.Context, info health.DeadWorkerInfo, taskMgr *manager.Manager) error {
 	fmt.Printf("! 发现死亡 Worker: %s, 任务ID: %d\n", info.WorkerID, info.TaskID)
 
-	// 获取任务并标记为失败
-	taskEntity, err := taskMgr.GetTask(ctx, info.TaskID)
-	if err != nil {
-		return fmt.Errorf("failed to get task: %w", err)
+	// 构造 TaskInfo
+	taskInfo := worker.TaskInfo{
+		TaskID:    info.TaskID,
+		TaskType:  info.TaskType,
+		SubjectID: 0, // 从 info 中无法获取
+		Redo:      0,
+		MaxRedo:   0,
 	}
 
-	if taskEntity.IsRunning() && taskEntity.WorkerID == info.WorkerID {
-		taskEntity.MarkAsFailed("worker heartbeat timeout")
-		if err := taskMgr.SaveTask(ctx, taskEntity); err != nil {
-			return fmt.Errorf("failed to save task: %w", err)
-		}
-
-		// 重新推入队列（如果还可以重试）
-		if taskEntity.CanRetry() {
-			if err := taskMgr.PushToQueue(ctx, taskEntity.TaskType); err != nil {
-				fmt.Printf("✗ 任务重试失败: %v\n", err)
-			} else {
-				fmt.Printf("✓ 任务已重新入队重试\n")
-			}
-		}
+	errMark := fmt.Errorf("worker heartbeat timeout")
+	if err := taskMgr.SaveTaskResult(ctx, taskInfo, "", errMark, nil); err != nil {
+		return fmt.Errorf("failed to save task result: %w", err)
 	}
+
+	fmt.Printf("✓ 任务已标记为失败\n")
+	fmt.Printf("✓ 任务重新入队逻辑已在 SaveTaskResult 内部处理\n")
 	return nil
 }

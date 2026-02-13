@@ -10,7 +10,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/logs"
 	"github.com/ygpkg/yg-go/task/model"
-	"github.com/ygpkg/yg-go/task/worker"
 	"gorm.io/gorm"
 )
 
@@ -18,6 +17,7 @@ var (
 	stdManager *Manager
 	once       sync.Once
 )
+
 // InitManager 初始化全局任务管理器
 func InitManager(config *ManagerConfig, db *gorm.DB, redisClient *redis.Client) error {
 	var err error
@@ -197,51 +197,43 @@ func (m *Manager) GetNextStepPendingTaskTypes(ctx context.Context, subjectID uin
 }
 
 // GetNextTask 获取下一个待执行任务（阻塞式）- 实现 WorkManager 接口
-func (m *Manager) GetNextTask(ctx context.Context, taskType, workerID string) (worker.TaskInfo, error) {
+func (m *Manager) GetNextTask(ctx context.Context, taskType, workerID string) (*model.TaskEntity, error) {
 	// 1. 从队列中取出消息（阻塞）
 	_, err := m.queue.Pop(ctx, taskType, workerID)
 	if err != nil {
-		return worker.TaskInfo{}, err
+		return nil, err
 	}
 
 	// 2. 从数据库获取任务并锁定
 	taskEntity, err := m.repo.GetOnePendingTask(ctx, taskType, workerID)
 	if err != nil || taskEntity == nil {
-		return worker.TaskInfo{}, err
+		return nil, err
 	}
 
 	// 3. 转换为 TaskInfo
-	return worker.TaskInfo{
-		ID:        taskEntity.ID,
-		TaskType:  taskEntity.TaskType,
-		Payload:   taskEntity.Payload,
-		Timeout:   taskEntity.Timeout,
-		AppGroup:  taskEntity.AppGroup,
-		SubjectID: taskEntity.SubjectID,
-		Redo:      taskEntity.Redo,
-		MaxRedo:   taskEntity.MaxRedo,
-	}, nil
+	return taskEntity, nil
 }
 
 // SaveTaskResult 保存任务执行结果并处理任务流转 - 实现 WorkManager 接口
-func (m *Manager) SaveTaskResult(ctx context.Context, info worker.TaskInfo, result interface{}, execErr error, onCallback func(context.Context) error) error {
+func (m *Manager) SaveTaskResult(ctx context.Context, taskID uint, result string, execErr error, onCallback func(context.Context) error) error {
 	var taskEntity *model.TaskEntity
 
 	// 在事务中保存任务结果并处理流转
 	txErr := m.repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		// 1. 获取完整任务实体
 		var err error
-		taskEntity, err = m.repo.GetTaskByID(ctx, info.ID)
+		taskEntity, err = m.repo.GetTaskByID(ctx, taskID)
 		if err != nil {
 			return fmt.Errorf("failed to get task: %w", err)
 		}
 
 		// 2. 更新任务状态
-		if execErr == nil {
+		switch execErr {
+		case nil:
 			taskEntity.MarkAsSuccess(toJSON(result))
-		} else if execErr == context.DeadlineExceeded {
+		case context.DeadlineExceeded:
 			taskEntity.MarkAsTimeout()
-		} else {
+		default:
 			taskEntity.MarkAsFailed(execErr.Error())
 		}
 

@@ -14,7 +14,7 @@ type mockExecutor struct {
 	executeError    error
 	onSuccessCalled bool
 	onFailureCalled bool
-	result          interface{}
+	result          string
 }
 
 func newMockExecutor(payload string) (*mockExecutor, error) {
@@ -31,11 +31,11 @@ func (m *mockExecutor) Execute(ctx context.Context) error {
 	return m.executeError
 }
 
-func (m *mockExecutor) GetResult() interface{} {
+func (m *mockExecutor) GetResult() string {
 	return m.result
 }
 
-func (m *mockExecutor) SetResult(result interface{}) {
+func (m *mockExecutor) SetResult(result string) {
 	m.result = result
 }
 

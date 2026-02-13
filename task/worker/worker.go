@@ -16,7 +16,7 @@ type WorkManager interface {
 	GetNextTask(ctx context.Context, taskType string, workerID string) (TaskInfo, error)
 
 	// SaveTaskResult 保存任务执行结果
-	SaveTaskResult(ctx context.Context, info TaskInfo, result interface{}, err error, onCallback func(context.Context) error) error
+	SaveTaskResult(ctx context.Context, info TaskInfo, result string, err error, onCallback func(context.Context) error) error
 
 	// InitTaskDBStatus 初始化任务状态
 	InitTaskDBStatus(ctx context.Context) error
@@ -24,7 +24,7 @@ type WorkManager interface {
 
 // TaskInfo 任务基本信息（纯数据结构）
 type TaskInfo struct {
-	ID        uint
+	TaskID    uint
 	TaskType  string
 	Payload   string
 	Timeout   time.Duration
@@ -202,7 +202,7 @@ func (w *Worker) processOneTask(taskType string) {
 		return
 	}
 
-	if taskInfo.ID == 0 {
+	if taskInfo.TaskID == 0 {
 		// 没有任务，继续循环
 		return
 	}
@@ -214,18 +214,18 @@ func (w *Worker) processOneTask(taskType string) {
 // executeTask 执行任务
 func (w *Worker) executeTask(ctx context.Context, info TaskInfo) {
 	// 防御性检查：确保任务对象有效
-	if info.ID == 0 {
+	if info.TaskID == 0 {
 		logs.ErrorContextf(ctx, "[task] invalid task info: ID is 0")
 		return
 	}
 
-	ctx = logs.WithContextFields(ctx, "task_id", info.ID)
+	ctx = logs.WithContextFields(ctx, "task_id", info.TaskID)
 
 	// 获取执行器
 	factory, ok := w.registry.Get(info.TaskType)
 	if !ok {
-		logs.ErrorContextf(ctx, "[task] executor not found for task type: %s, task_id: %d", info.TaskType, info.ID)
-		w.manager.SaveTaskResult(ctx, info, nil, fmt.Errorf("executor not found"), nil)
+		logs.ErrorContextf(ctx, "[task] executor not found for task type: %s, task_id: %d", info.TaskType, info.TaskID)
+		w.manager.SaveTaskResult(ctx, info, "", fmt.Errorf("executor not found"), nil)
 		return
 	}
 
@@ -233,7 +233,7 @@ func (w *Worker) executeTask(ctx context.Context, info TaskInfo) {
 	executor, err := factory(info.Payload)
 	if err != nil {
 		logs.ErrorContextf(ctx, "[task] failed to create executor: %v", err)
-		w.manager.SaveTaskResult(ctx, info, nil, fmt.Errorf("create executor failed: %w", err), nil)
+		w.manager.SaveTaskResult(ctx, info, "", fmt.Errorf("create executor failed: %w", err), nil)
 		return
 	}
 

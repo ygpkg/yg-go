@@ -11,10 +11,10 @@ type TaskExecutor interface {
 	Execute(ctx context.Context) error
 
 	// GetResult 获取执行结果
-	GetResult() interface{}
+	GetResult() string
 
 	// SetResult 设置执行结果
-	SetResult(result interface{})
+	SetResult(result string)
 
 	// OnSuccess 成功后回调，在任务执行成功后调用，可用于清理资源、更新状态等
 	// 注意：回调在任务状态保存后执行，如需数据库事务请自行创建
