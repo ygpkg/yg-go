@@ -16,7 +16,7 @@ type WorkManager interface {
 	GetNextTask(ctx context.Context, taskType string, workerID string) (TaskInfo, error)
 
 	// SaveTaskResult 保存任务执行结果
-	SaveTaskResult(ctx context.Context, info TaskInfo, result string, err error, onCallback func(context.Context) error) error
+	SaveTaskResult(ctx context.Context, workerID string, info TaskInfo, result string, err error, onCallback func(context.Context) error) error
 
 	// InitTaskDBStatus 初始化任务状态
 	InitTaskDBStatus(ctx context.Context) error
@@ -225,7 +225,7 @@ func (w *Worker) executeTask(ctx context.Context, info TaskInfo) {
 	factory, ok := w.registry.Get(info.TaskType)
 	if !ok {
 		logs.ErrorContextf(ctx, "[task] executor not found for task type: %s, task_id: %d", info.TaskType, info.TaskID)
-		w.manager.SaveTaskResult(ctx, info, "", fmt.Errorf("executor not found"), nil)
+		w.manager.SaveTaskResult(ctx, w.config.WorkerID, info, "", fmt.Errorf("executor not found"), nil)
 		return
 	}
 
@@ -233,7 +233,7 @@ func (w *Worker) executeTask(ctx context.Context, info TaskInfo) {
 	executor, err := factory(info.Payload)
 	if err != nil {
 		logs.ErrorContextf(ctx, "[task] failed to create executor: %v", err)
-		w.manager.SaveTaskResult(ctx, info, "", fmt.Errorf("create executor failed: %w", err), nil)
+		w.manager.SaveTaskResult(ctx, w.config.WorkerID, info, "", fmt.Errorf("create executor failed: %w", err), nil)
 		return
 	}
 
@@ -263,7 +263,7 @@ func (w *Worker) executeTask(ctx context.Context, info TaskInfo) {
 	}
 
 	// 保存结果（manager 内部处理流转）
-	if err := w.manager.SaveTaskResult(ctx, info, result, execErr, callback); err != nil {
+	if err := w.manager.SaveTaskResult(ctx, w.config.WorkerID, info, result, execErr, callback); err != nil {
 		logs.ErrorContextf(ctx, "[task] failed to save task result: %v", err)
 	}
 }

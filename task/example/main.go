@@ -34,7 +34,7 @@ func (a *WorkManagerAdapter) GetNextTask(ctx context.Context, taskType, workerID
 	}, nil
 }
 
-func (a *WorkManagerAdapter) SaveTaskResult(ctx context.Context, info worker.TaskInfo, result string, execErr error, onCallback func(context.Context) error) error {
+func (a *WorkManagerAdapter) SaveTaskResult(ctx context.Context, workerID string, info worker.TaskInfo, result string, execErr error, onCallback func(context.Context) error) error {
 	return a.mgr.SaveTaskResult(ctx, info.TaskID, result, execErr, onCallback)
 }
 
