@@ -77,20 +77,6 @@ func NewManager(config *ManagerConfig, db *gorm.DB, redisClient *redis.Client) (
 	}, nil
 }
 
-// CreateTask 创建任务
-func (m *Manager) CreateTask(ctx context.Context, taskEntity *model.TaskEntity) error {
-	if err := m.repo.CreateTask(ctx, taskEntity); err != nil {
-		return fmt.Errorf("failed to create task: %w", err)
-	}
-
-	// 推入队列
-	if err := m.queue.Push(ctx, taskEntity.TaskType); err != nil {
-		return fmt.Errorf("failed to push task to queue: %w", err)
-	}
-
-	return nil
-}
-
 // CreateTasks 批量创建任务
 func (m *Manager) CreateTasks(ctx context.Context, tasks []*model.TaskEntity) error {
 	if len(tasks) == 0 {
@@ -101,10 +87,14 @@ func (m *Manager) CreateTasks(ctx context.Context, tasks []*model.TaskEntity) er
 		return fmt.Errorf("failed to batch create tasks: %w", err)
 	}
 
-	// 推入第一个任务到队列
-	firstTask := tasks[0]
-	if err := m.queue.Push(ctx, firstTask.TaskType); err != nil {
-		return fmt.Errorf("failed to push first task to queue: %w", err)
+	// 推入第一步的所有任务到队列
+	firstStep := tasks[0].Step
+	for _, task := range tasks {
+		if task.Step == firstStep {
+			if err := m.queue.Push(ctx, task.TaskType); err != nil {
+				return fmt.Errorf("failed to push task %s to queue: %w", task.TaskType, err)
+			}
+		}
 	}
 
 	return nil
