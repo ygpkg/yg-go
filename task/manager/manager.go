@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -82,6 +83,11 @@ func (m *Manager) CreateTasks(ctx context.Context, tasks []*model.TaskEntity) er
 	if len(tasks) == 0 {
 		return nil
 	}
+
+	// 按 step 排序
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i].Step < tasks[j].Step
+	})
 
 	if err := m.repo.CreateTasks(ctx, tasks); err != nil {
 		return fmt.Errorf("failed to batch create tasks: %w", err)
