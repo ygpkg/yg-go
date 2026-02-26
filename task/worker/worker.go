@@ -237,24 +237,20 @@ func (w *Worker) executeTask(ctx context.Context, info TaskInfo) {
 		return
 	}
 
-	// 创建执行上下文（带超时）
-	execCtx, execCancel := context.WithTimeout(ctx, info.Timeout)
-	defer execCancel()
-
 	// 执行任务
-	execErr := w.doExecute(execCtx, executor)
+	execErr := w.doExecute(ctx, executor)
 
 	// 获取执行结果
 	result := executor.GetResult()
 
 	// 确定回调函数
 	var callback func(context.Context) error
-	if execErr == nil && execCtx.Err() != context.DeadlineExceeded {
+	if execErr == nil && ctx.Err() != context.DeadlineExceeded {
 		callback = executor.OnSuccess
 		logs.InfoContextf(ctx, "[task] task success")
 	} else {
 		callback = executor.OnFailure
-		if execCtx.Err() == context.DeadlineExceeded {
+		if ctx.Err() == context.DeadlineExceeded {
 			execErr = context.DeadlineExceeded
 			logs.WarnContextf(ctx, "[task] task timeout")
 		} else {
