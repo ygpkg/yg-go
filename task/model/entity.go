@@ -50,7 +50,7 @@ type TaskEntity struct {
 	// Timeout 任务执行超时时间（单位：纳秒），存储为 int64
 	Timeout time.Duration `gorm:"type:bigint;not null" json:"timeout" comment:"任务超时时间"`
 	// Payload 任务参数，通常为 JSON 格式的业务数据
-	Payload string `gorm:"type:text" json:"payload" comment:"任务参数"`
+	Payload string `gorm:"type:longtext" json:"payload" comment:"任务参数"`
 	// Result 任务执行结果，通常为 JSON 格式的返回数据
 	Result string `gorm:"type:text" json:"result" comment:"任务执行结果"`
 	// ErrMsg 错误信息，任务失败、超时、取消时记录原因
