@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sync"
-	"sync/atomic"
 	"time"
+
+	"github.com/ygpkg/yg-go/task/health"
 )
 
 // ===== Payload 结构定义 =====
@@ -17,105 +17,7 @@ type DemoPayload struct {
 	UserID  int    `json:"user_id"`
 }
 
-// RetryPayload 重试任务的参数结构
-type RetryPayload struct {
-	Message    string `json:"message"`
-	FailTimes  int    `json:"fail_times"`  // 前几次失败
-	FailReason string `json:"fail_reason"` // 失败原因
-}
-
-// TimeoutPayload 超时任务的参数结构
-type TimeoutPayload struct {
-	Message      string `json:"message"`
-	Duration     int    `json:"duration"`      // 任务执行时长（秒）
-	CheckContext bool   `json:"check_context"` // 是否检查上下文取消
-}
-
-// ConcurrentPayload 并发任务的参数结构
-type ConcurrentPayload struct {
-	Index    int    `json:"index"`
-	Message  string `json:"message"`
-	Duration int    `json:"duration"` // 任务执行时长（毫秒）
-}
-
-// StepPayload 步骤任务的参数结构
-type StepPayload struct {
-	StepName    string `json:"step_name"`
-	OrderID     int    `json:"order_id"`
-	Description string `json:"description"`
-	Step        int    `json:"step"`
-	AppGroup    string `json:"app_group"`
-}
-
-// FastTaskPayload 快速任务参数
-type FastTaskPayload struct {
-	Index    int    `json:"index"`
-	Message  string `json:"message"`
-	Duration int    `json:"duration"` // 执行时长（毫秒）
-}
-
-// SlowTaskPayload 慢速任务参数
-type SlowTaskPayload struct {
-	Index    int    `json:"index"`
-	Message  string `json:"message"`
-	Duration int    `json:"duration"` // 执行时长（毫秒）
-}
-
-// ApiTaskPayload API 调用任务参数
-type ApiTaskPayload struct {
-	Index    int    `json:"index"`
-	Endpoint string `json:"endpoint"`
-	Duration int    `json:"duration"` // 执行时长（毫秒）
-}
-
-// DefaultTaskPayload 默认任务参数
-type DefaultTaskPayload struct {
-	Index    int    `json:"index"`
-	Message  string `json:"message"`
-	Duration int    `json:"duration"` // 执行时长（毫秒）
-}
-
-// ===== 共享统计结构 =====
-
-// TaskStats 任务统计信息
-type TaskStats struct {
-	fastExecuting    int32
-	fastCompleted    int32
-	slowExecuting    int32
-	slowCompleted    int32
-	apiExecuting     int32
-	apiCompleted     int32
-	defaultExecuting int32
-	defaultCompleted int32
-	mu               sync.Mutex
-	startTimes       map[string]time.Time
-}
-
-// NewTaskStats 创建任务统计实例
-func NewTaskStats() *TaskStats {
-	return &TaskStats{
-		startTimes: make(map[string]time.Time),
-	}
-}
-
-// RecordStart 记录任务开始时间
-func (s *TaskStats) RecordStart(taskType string, index int) {
-	key := fmt.Sprintf("%s-%d", taskType, index)
-	s.mu.Lock()
-	s.startTimes[key] = time.Now()
-	s.mu.Unlock()
-}
-
-// GetElapsed 获取任务执行时长
-func (s *TaskStats) GetElapsed(taskType string, index int) time.Duration {
-	key := fmt.Sprintf("%s-%d", taskType, index)
-	s.mu.Lock()
-	startTime := s.startTimes[key]
-	s.mu.Unlock()
-	return time.Since(startTime)
-}
-
-// ===== 1. DemoTaskExecutor - 基本示例执行器 =====
+// ===== DemoTaskExecutor - 基本示例执行器 =====
 
 // DemoTaskExecutor 演示任务执行器
 type DemoTaskExecutor struct {
@@ -139,7 +41,6 @@ func (e *DemoTaskExecutor) Execute(ctx context.Context) error {
 	fmt.Printf("  处理消息: %s\n", e.payload.Message)
 	fmt.Printf("  用户 ID: %d\n", e.payload.UserID)
 
-	// 模拟任务处理
 	time.Sleep(2 * time.Second)
 
 	fmt.Printf("✓ Execute: 任务执行完成\n")
@@ -172,126 +73,42 @@ func (e *DemoTaskExecutor) OnFailure(ctx context.Context) error {
 	return nil
 }
 
-// ===== 2. RetryTaskExecutor - 重试机制执行器 =====
+// ===== TimeoutTaskExecutor - 超时任务执行器 =====
 
-// RetryTaskExecutor 演示重试机制的任务执行器
-type RetryTaskExecutor struct {
-	payload        RetryPayload
-	attemptCount   *int32
-	currentAttempt int32
-}
-
-// NewRetryTaskExecutor 创建RetryTaskExecutor
-func NewRetryTaskExecutor(payloadJSON string, attemptCount *int32) (*RetryTaskExecutor, error) {
-	var payload RetryPayload
-	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
-		return nil, fmt.Errorf("failed to parse payload: %w", err)
-	}
-
-	currentAttempt := atomic.AddInt32(attemptCount, 1)
-
-	fmt.Printf("\n════════════════════════════════════════\n")
-	fmt.Printf("准备执行任务 (第 %d 次尝试)\n", currentAttempt)
-	fmt.Printf("════════════════════════════════════════\n")
-	fmt.Printf("配置的失败次数: %d\n", payload.FailTimes)
-
-	return &RetryTaskExecutor{
-		payload:        payload,
-		attemptCount:   attemptCount,
-		currentAttempt: currentAttempt,
-	}, nil
-}
-
-// Execute 执行任务
-func (e *RetryTaskExecutor) Execute(ctx context.Context) error {
-	fmt.Printf("\n→ 开始执行任务...\n")
-
-	time.Sleep(1 * time.Second)
-
-	if int(e.currentAttempt) <= e.payload.FailTimes {
-		errMsg := fmt.Sprintf("%s (尝试 %d/%d)",
-			e.payload.FailReason,
-			e.currentAttempt,
-			e.payload.FailTimes)
-		fmt.Printf("✗ 任务执行失败: %s\n", errMsg)
-		return fmt.Errorf("%s", errMsg)
-	}
-
-	fmt.Printf("✓ 任务执行成功 (尝试 %d 次后成功)\n", e.currentAttempt)
-	return nil
-}
-
-// GetResult 获取执行结果
-func (e *RetryTaskExecutor) GetResult() string {
-	data, _ := json.Marshal(map[string]interface{}{
-		"attempts": e.currentAttempt,
-		"status":   "success",
-	})
-	return string(data)
-}
-
-// SetResult 设置执行结果
-func (e *RetryTaskExecutor) SetResult(result string) {
-}
-
-// OnSuccess 成功回调
-func (e *RetryTaskExecutor) OnSuccess(ctx context.Context) error {
-	fmt.Printf("\n✓ OnSuccess: 任务最终成功\n")
-	fmt.Printf("  总尝试次数: %d\n", e.currentAttempt)
-	return nil
-}
-
-// OnFailure 失败回调
-func (e *RetryTaskExecutor) OnFailure(ctx context.Context) error {
-	fmt.Printf("\n✗ OnFailure: 任务执行失败\n")
-	fmt.Printf("  → 任务将重试\n")
-	return nil
-}
-
-// ===== 3. TimeoutTaskExecutor - 超时处理执行器 =====
-
-// TimeoutTaskExecutor 演示超时处理的任务执行器
+// TimeoutTaskExecutor 超时任务执行器
 type TimeoutTaskExecutor struct {
-	payload TimeoutPayload
+	payload DemoPayload
 }
 
-// NewTimeoutTaskExecutor 创建TimeoutTaskExecutor
+// NewTimeoutTaskExecutor 创建 TimeoutTaskExecutor
 func NewTimeoutTaskExecutor(payloadJSON string) (*TimeoutTaskExecutor, error) {
-	var payload TimeoutPayload
+	var payload DemoPayload
 	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
 		return nil, fmt.Errorf("failed to parse payload: %w", err)
 	}
 
-	fmt.Printf("\n════════════════════════════════════════\n")
-	fmt.Printf("准备执行任务\n")
-	fmt.Printf("════════════════════════════════════════\n")
-	fmt.Printf("任务执行时长: %d 秒\n", payload.Duration)
-	fmt.Printf("检查上下文取消: %v\n", payload.CheckContext)
-
+	fmt.Printf("✓ 超时任务已初始化，参数: %+v\n", payload)
 	return &TimeoutTaskExecutor{payload: payload}, nil
 }
 
-// Execute 执行任务
+// Execute 执行超时任务
 func (e *TimeoutTaskExecutor) Execute(ctx context.Context) error {
-	fmt.Printf("\n→ 开始执行任务...\n")
+	fmt.Printf("→ Execute: 开始执行超时任务（预计超时）\n")
+	fmt.Printf("  处理消息: %s\n", e.payload.Message)
+	fmt.Printf("  用户 ID: %d\n", e.payload.UserID)
 
-	duration := time.Duration(e.payload.Duration) * time.Second
+	time.Sleep(70 * time.Second)
 
-	var err error
-	if e.payload.CheckContext {
-		err = e.executeWithContextCheck(ctx, duration)
-	} else {
-		err = e.executeWithoutContextCheck(duration)
-	}
-
-	return err
+	fmt.Printf("✓ Execute: 超时任务执行完成\n")
+	return nil
 }
 
 // GetResult 获取执行结果
 func (e *TimeoutTaskExecutor) GetResult() string {
 	data, _ := json.Marshal(map[string]interface{}{
-		"duration": e.payload.Duration,
-		"status":   "completed",
+		"message": e.payload.Message,
+		"user_id": e.payload.UserID,
+		"status":  "timeout_demo",
 	})
 	return string(data)
 }
@@ -300,412 +117,169 @@ func (e *TimeoutTaskExecutor) GetResult() string {
 func (e *TimeoutTaskExecutor) SetResult(result string) {
 }
 
-// executeWithContextCheck 执行任务并检查上下文取消
-func (e *TimeoutTaskExecutor) executeWithContextCheck(ctx context.Context, duration time.Duration) error {
-	fmt.Println("  使用上下文检查模式")
-
-	deadline := time.Now().Add(duration)
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	processed := 0
-	total := int(duration.Seconds())
-
-	for time.Now().Before(deadline) {
-		select {
-		case <-ctx.Done():
-			fmt.Printf("\n✗ 检测到上下文取消: %v\n", ctx.Err())
-			fmt.Printf("  已处理: %d/%d 项\n", processed, total)
-			return ctx.Err()
-
-		case <-ticker.C:
-			processed++
-			fmt.Printf("  处理进度: %d/%d\n", processed, total)
-		}
-	}
-
-	fmt.Printf("\n✓ 任务执行完成 (共处理 %d 项)\n", processed)
-	return nil
-}
-
-// executeWithoutContextCheck 执行任务但不检查上下文
-func (e *TimeoutTaskExecutor) executeWithoutContextCheck(duration time.Duration) error {
-	fmt.Println("  使用非上下文检查模式（不推荐）")
-	fmt.Printf("  → 睡眠 %d 秒...\n", e.payload.Duration)
-
-	time.Sleep(duration)
-
-	fmt.Printf("\n✓ 任务执行完成\n")
-	return nil
-}
-
 // OnSuccess 成功回调
 func (e *TimeoutTaskExecutor) OnSuccess(ctx context.Context) error {
-	fmt.Printf("\n✓ OnSuccess: 任务成功完成\n")
+	fmt.Printf("✓ OnSuccess: 超时任务执行成功\n")
 	return nil
 }
 
 // OnFailure 失败回调
 func (e *TimeoutTaskExecutor) OnFailure(ctx context.Context) error {
-	fmt.Printf("\n✗ OnFailure: 任务失败\n")
+	fmt.Printf("✗ OnFailure: 超时任务执行失败\n")
 	return nil
 }
 
-// ===== 4. ConcurrentTaskExecutor - 并发任务执行器 =====
+// ===== FailTaskExecutor - 失败任务执行器 =====
 
-// ConcurrentTaskExecutor 演示并发处理的任务执行器
-type ConcurrentTaskExecutor struct {
-	payload        ConcurrentPayload
-	executingCount *int32
-	completedCount *int32
-	mu             *sync.Mutex
-	startTimes     *map[int]time.Time
-	startTime      time.Time
+// FailTaskExecutor 失败任务执行器
+type FailTaskExecutor struct {
+	payload DemoPayload
 }
 
-// NewConcurrentTaskExecutor 创建ConcurrentTaskExecutor
-func NewConcurrentTaskExecutor(payloadJSON string, executingCount, completedCount *int32, mu *sync.Mutex, startTimes *map[int]time.Time) (*ConcurrentTaskExecutor, error) {
-	var payload ConcurrentPayload
+// NewFailTaskExecutor 创建 FailTaskExecutor
+func NewFailTaskExecutor(payloadJSON string) (*FailTaskExecutor, error) {
+	var payload DemoPayload
 	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
 		return nil, fmt.Errorf("failed to parse payload: %w", err)
 	}
 
-	startTime := time.Now()
-	mu.Lock()
-	(*startTimes)[payload.Index] = startTime
-	mu.Unlock()
-
-	return &ConcurrentTaskExecutor{
-		payload:        payload,
-		executingCount: executingCount,
-		completedCount: completedCount,
-		mu:             mu,
-		startTimes:     startTimes,
-		startTime:      startTime,
-	}, nil
+	fmt.Printf("✓ 失败任务已初始化，参数: %+v\n", payload)
+	return &FailTaskExecutor{payload: payload}, nil
 }
 
-// Execute 执行任务
-func (e *ConcurrentTaskExecutor) Execute(ctx context.Context) error {
-	current := atomic.AddInt32(e.executingCount, 1)
+// Execute 执行失败任务
+func (e *FailTaskExecutor) Execute(ctx context.Context) error {
+	fmt.Printf("→ Execute: 开始执行失败任务\n")
+	fmt.Printf("  处理消息: %s\n", e.payload.Message)
+	fmt.Printf("  用户 ID: %d\n", e.payload.UserID)
 
-	fmt.Printf("[任务 %d] 开始执行 (并发数: %d)\n", e.payload.Index, current)
+	time.Sleep(1 * time.Second)
 
-	duration := time.Duration(e.payload.Duration) * time.Millisecond
-	time.Sleep(duration)
-
-	atomic.AddInt32(e.executingCount, -1)
-
-	fmt.Printf("[任务 %d] 执行完成 (耗时: %dms)\n", e.payload.Index, e.payload.Duration)
-
-	return nil
+	return fmt.Errorf("模拟任务执行失败")
 }
 
 // GetResult 获取执行结果
-func (e *ConcurrentTaskExecutor) GetResult() string {
+func (e *FailTaskExecutor) GetResult() string {
 	data, _ := json.Marshal(map[string]interface{}{
-		"index":    e.payload.Index,
-		"duration": e.payload.Duration,
-		"status":   "completed",
+		"message": e.payload.Message,
+		"user_id": e.payload.UserID,
+		"status":  "failed",
 	})
 	return string(data)
 }
 
 // SetResult 设置执行结果
-func (e *ConcurrentTaskExecutor) SetResult(result string) {
+func (e *FailTaskExecutor) SetResult(result string) {
 }
 
 // OnSuccess 成功回调
-func (e *ConcurrentTaskExecutor) OnSuccess(ctx context.Context) error {
-	completed := atomic.AddInt32(e.completedCount, 1)
-	elapsed := time.Since(e.startTime)
-
-	fmt.Printf("[任务 %d] ✓ 成功 (总耗时: %v, 已完成: %d)\n",
-		e.payload.Index, elapsed.Round(time.Millisecond), completed)
-
+func (e *FailTaskExecutor) OnSuccess(ctx context.Context) error {
+	fmt.Printf("✓ OnSuccess: 失败任务执行成功\n")
 	return nil
 }
 
 // OnFailure 失败回调
-func (e *ConcurrentTaskExecutor) OnFailure(ctx context.Context) error {
-	fmt.Printf("[任务 %d] ✗ 失败\n", e.payload.Index)
+func (e *FailTaskExecutor) OnFailure(ctx context.Context) error {
+	fmt.Printf("✗ OnFailure: 失败任务执行失败\n")
 	return nil
 }
 
-// ===== 5. StepTaskExecutor - 步骤化任务执行器 =====
+// ===== HealthTaskExecutor - 健康检查任务执行器 =====
 
-// StepTaskExecutor 步骤任务执行器
-type StepTaskExecutor struct {
-	payload        StepPayload
-	executionOrder *[]int
-	mu             *sync.Mutex
+// HealthTaskExecutor 健康检查任务执行器
+type HealthTaskExecutor struct {
+	payload       DemoPayload
+	healthChecker *health.Checker
+	taskType      string
+	workerID      string
+	taskID        uint
+	stopHeartbeat chan struct{}
 }
 
-// NewStepTaskExecutor 创建StepTaskExecutor
-func NewStepTaskExecutor(payloadJSON string, executionOrder *[]int, mu *sync.Mutex) (*StepTaskExecutor, error) {
-	var payload StepPayload
+// NewHealthTaskExecutor 创建 HealthTaskExecutor
+func NewHealthTaskExecutor(payloadJSON string, healthChecker *health.Checker, taskType, workerID string, taskID uint) (*HealthTaskExecutor, error) {
+	var payload DemoPayload
 	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
 		return nil, fmt.Errorf("failed to parse payload: %w", err)
 	}
 
-	fmt.Printf("\n════════════════════════════════════════\n")
-	fmt.Printf("准备执行步骤 %d: %s\n", payload.Step, payload.StepName)
-	fmt.Printf("════════════════════════════════════════\n")
-	fmt.Printf("订单 ID: %d\n", payload.OrderID)
-	fmt.Printf("AppGroup: %s\n", payload.AppGroup)
-	fmt.Printf("描述: %s\n", payload.Description)
-
-	return &StepTaskExecutor{
-		payload:        payload,
-		executionOrder: executionOrder,
-		mu:             mu,
+	fmt.Printf("✓ 健康检查任务已初始化，参数: %+v\n", payload)
+	return &HealthTaskExecutor{
+		payload:       payload,
+		healthChecker: healthChecker,
+		taskType:      taskType,
+		workerID:      workerID,
+		taskID:        taskID,
+		stopHeartbeat: make(chan struct{}),
 	}, nil
 }
 
-// Execute 执行任务
-func (e *StepTaskExecutor) Execute(ctx context.Context) error {
-	fmt.Printf("\n→ 执行步骤 %d: %s\n", e.payload.Step, e.payload.StepName)
+// Execute 执行健康检查任务
+func (e *HealthTaskExecutor) Execute(ctx context.Context) error {
+	fmt.Printf("→ Execute: 开始执行健康检查任务\n")
+	fmt.Printf("  处理消息: %s\n", e.payload.Message)
+	fmt.Printf("  用户 ID: %d\n", e.payload.UserID)
 
-	e.mu.Lock()
-	*e.executionOrder = append(*e.executionOrder, e.payload.Step)
-	e.mu.Unlock()
+	e.startHeartbeat(ctx)
 
-	time.Sleep(2 * time.Second)
+	fmt.Println("→ Execute: 任务执行 10 秒...")
+	time.Sleep(10 * time.Second)
 
-	fmt.Printf("✓ 步骤 %d 执行完成\n", e.payload.Step)
+	fmt.Println("→ Execute: 停止更新心跳（模拟 Worker 崩溃）")
+	close(e.stopHeartbeat)
+
+	fmt.Println("→ Execute: 继续执行，等待健康检查器检测到超时...")
+	time.Sleep(35 * time.Second)
+
+	fmt.Printf("✓ Execute: 健康检查任务执行完成\n")
 	return nil
 }
 
 // GetResult 获取执行结果
-func (e *StepTaskExecutor) GetResult() string {
+func (e *HealthTaskExecutor) GetResult() string {
 	data, _ := json.Marshal(map[string]interface{}{
-		"step":      e.payload.Step,
-		"step_name": e.payload.StepName,
-		"order_id":  e.payload.OrderID,
-		"status":    "completed",
+		"message": e.payload.Message,
+		"user_id": e.payload.UserID,
+		"status":  "health_check_demo",
 	})
 	return string(data)
 }
 
 // SetResult 设置执行结果
-func (e *StepTaskExecutor) SetResult(result string) {
+func (e *HealthTaskExecutor) SetResult(result string) {
 }
 
 // OnSuccess 成功回调
-func (e *StepTaskExecutor) OnSuccess(ctx context.Context) error {
-	fmt.Printf("✓ 步骤 %d (%s) 成功\n", e.payload.Step, e.payload.StepName)
+func (e *HealthTaskExecutor) OnSuccess(ctx context.Context) error {
+	fmt.Printf("✓ OnSuccess: 健康检查任务执行成功\n")
 	return nil
 }
 
 // OnFailure 失败回调
-func (e *StepTaskExecutor) OnFailure(ctx context.Context) error {
-	fmt.Printf("✗ 步骤 %d (%s) 失败\n", e.payload.Step, e.payload.StepName)
+func (e *HealthTaskExecutor) OnFailure(ctx context.Context) error {
+	fmt.Printf("✗ OnFailure: 健康检查任务执行失败\n")
 	return nil
 }
 
-// ===== 6. 混合并发执行器组 =====
-
-// FastTaskExecutor 快速任务执行器（高并发）
-type FastTaskExecutor struct {
-	payload FastTaskPayload
-	stats   *TaskStats
-}
-
-func NewFastTaskExecutor(payloadJSON string, stats *TaskStats) (*FastTaskExecutor, error) {
-	var payload FastTaskPayload
-	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
-		return nil, fmt.Errorf("failed to parse payload: %w", err)
-	}
-	stats.RecordStart("fast", payload.Index)
-	return &FastTaskExecutor{payload: payload, stats: stats}, nil
-}
-
-func (e *FastTaskExecutor) Execute(ctx context.Context) error {
-	current := atomic.AddInt32(&e.stats.fastExecuting, 1)
-	fmt.Printf("  [快速任务 %d] 开始执行 (当前并发: %d)\n", e.payload.Index, current)
-
-	time.Sleep(time.Duration(e.payload.Duration) * time.Millisecond)
-
-	atomic.AddInt32(&e.stats.fastExecuting, -1)
-
-	return nil
-}
-
-func (e *FastTaskExecutor) GetResult() string {
-	data, _ := json.Marshal(map[string]interface{}{
-		"index":    e.payload.Index,
-		"duration": e.payload.Duration,
-		"type":     "fast",
-	})
-	return string(data)
-}
-
-func (e *FastTaskExecutor) SetResult(result string) {
-}
-
-func (e *FastTaskExecutor) OnSuccess(ctx context.Context) error {
-	completed := atomic.AddInt32(&e.stats.fastCompleted, 1)
-	elapsed := e.stats.GetElapsed("fast", e.payload.Index)
-	fmt.Printf("  [快速任务 %d] ✓ 完成 (耗时: %v, 已完成: %d)\n",
-		e.payload.Index, elapsed.Round(time.Millisecond), completed)
-	return nil
-}
-
-func (e *FastTaskExecutor) OnFailure(ctx context.Context) error {
-	fmt.Printf("  [快速任务 %d] ✗ 失败\n", e.payload.Index)
-	return nil
-}
-
-// SlowTaskExecutor 慢速任务执行器（低并发）
-type SlowTaskExecutor struct {
-	payload SlowTaskPayload
-	stats   *TaskStats
-}
-
-func NewSlowTaskExecutor(payloadJSON string, stats *TaskStats) (*SlowTaskExecutor, error) {
-	var payload SlowTaskPayload
-	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
-		return nil, fmt.Errorf("failed to parse payload: %w", err)
-	}
-	stats.RecordStart("slow", payload.Index)
-	return &SlowTaskExecutor{payload: payload, stats: stats}, nil
-}
-
-func (e *SlowTaskExecutor) Execute(ctx context.Context) error {
-	current := atomic.AddInt32(&e.stats.slowExecuting, 1)
-	fmt.Printf("  [慢速任务 %d] 开始执行 (当前并发: %d)\n", e.payload.Index, current)
-
-	time.Sleep(time.Duration(e.payload.Duration) * time.Millisecond)
-
-	atomic.AddInt32(&e.stats.slowExecuting, -1)
-
-	return nil
-}
-
-func (e *SlowTaskExecutor) GetResult() string {
-	data, _ := json.Marshal(map[string]interface{}{
-		"index":    e.payload.Index,
-		"duration": e.payload.Duration,
-		"type":     "slow",
-	})
-	return string(data)
-}
-
-func (e *SlowTaskExecutor) SetResult(result string) {
-}
-
-func (e *SlowTaskExecutor) OnSuccess(ctx context.Context) error {
-	completed := atomic.AddInt32(&e.stats.slowCompleted, 1)
-	elapsed := e.stats.GetElapsed("slow", e.payload.Index)
-	fmt.Printf("  [慢速任务 %d] ✓ 完成 (耗时: %v, 已完成: %d)\n",
-		e.payload.Index, elapsed.Round(time.Millisecond), completed)
-	return nil
-}
-
-func (e *SlowTaskExecutor) OnFailure(ctx context.Context) error {
-	fmt.Printf("  [慢速任务 %d] ✗ 失败\n", e.payload.Index)
-	return nil
-}
-
-// ApiTaskExecutor API 调用任务执行器（中等并发）
-type ApiTaskExecutor struct {
-	payload ApiTaskPayload
-	stats   *TaskStats
-}
-
-func NewApiTaskExecutor(payloadJSON string, stats *TaskStats) (*ApiTaskExecutor, error) {
-	var payload ApiTaskPayload
-	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
-		return nil, fmt.Errorf("failed to parse payload: %w", err)
-	}
-	stats.RecordStart("api", payload.Index)
-	return &ApiTaskExecutor{payload: payload, stats: stats}, nil
-}
-
-func (e *ApiTaskExecutor) Execute(ctx context.Context) error {
-	current := atomic.AddInt32(&e.stats.apiExecuting, 1)
-	fmt.Printf("  [API任务 %d] 开始执行 (当前并发: %d)\n", e.payload.Index, current)
-
-	time.Sleep(time.Duration(e.payload.Duration) * time.Millisecond)
-
-	atomic.AddInt32(&e.stats.apiExecuting, -1)
-
-	return nil
-}
-
-func (e *ApiTaskExecutor) GetResult() string {
-	data, _ := json.Marshal(map[string]interface{}{
-		"index":    e.payload.Index,
-		"endpoint": e.payload.Endpoint,
-		"duration": e.payload.Duration,
-		"type":     "api",
-	})
-	return string(data)
-}
-
-func (e *ApiTaskExecutor) SetResult(result string) {
-}
-
-func (e *ApiTaskExecutor) OnSuccess(ctx context.Context) error {
-	completed := atomic.AddInt32(&e.stats.apiCompleted, 1)
-	elapsed := e.stats.GetElapsed("api", e.payload.Index)
-	fmt.Printf("  [API任务 %d] ✓ 完成 (耗时: %v, 已完成: %d)\n",
-		e.payload.Index, elapsed.Round(time.Millisecond), completed)
-	return nil
-}
-
-func (e *ApiTaskExecutor) OnFailure(ctx context.Context) error {
-	fmt.Printf("  [API任务 %d] ✗ 失败\n", e.payload.Index)
-	return nil
-}
-
-// DefaultTaskExecutor 默认任务执行器（使用全局并发数）
-type DefaultTaskExecutor struct {
-	payload DefaultTaskPayload
-	stats   *TaskStats
-}
-
-func NewDefaultTaskExecutor(payloadJSON string, stats *TaskStats) (*DefaultTaskExecutor, error) {
-	var payload DefaultTaskPayload
-	if err := json.Unmarshal([]byte(payloadJSON), &payload); err != nil {
-		return nil, fmt.Errorf("failed to parse payload: %w", err)
-	}
-	stats.RecordStart("default", payload.Index)
-	return &DefaultTaskExecutor{payload: payload, stats: stats}, nil
-}
-
-func (e *DefaultTaskExecutor) Execute(ctx context.Context) error {
-	current := atomic.AddInt32(&e.stats.defaultExecuting, 1)
-	fmt.Printf("  [默认任务 %d] 开始执行 (当前并发: %d)\n", e.payload.Index, current)
-
-	time.Sleep(time.Duration(e.payload.Duration) * time.Millisecond)
-
-	atomic.AddInt32(&e.stats.defaultExecuting, -1)
-	return nil
-}
-
-func (e *DefaultTaskExecutor) GetResult() string {
-	data, _ := json.Marshal(map[string]interface{}{
-		"index":    e.payload.Index,
-		"message":  e.payload.Message,
-		"duration": e.payload.Duration,
-		"type":     "default",
-	})
-	return string(data)
-}
-
-func (e *DefaultTaskExecutor) SetResult(result string) {
-}
-
-func (e *DefaultTaskExecutor) OnSuccess(ctx context.Context) error {
-	completed := atomic.AddInt32(&e.stats.defaultCompleted, 1)
-	elapsed := e.stats.GetElapsed("default", e.payload.Index)
-	fmt.Printf("  [默认任务 %d] ✓ 完成 (耗时: %v, 已完成: %d)\n",
-		e.payload.Index, elapsed.Round(time.Millisecond), completed)
-	return nil
-}
-
-func (e *DefaultTaskExecutor) OnFailure(ctx context.Context) error {
-	fmt.Printf("  [默认任务 %d] ✗ 失败\n", e.payload.Index)
-	return nil
+// startHeartbeat 启动心跳
+func (e *HealthTaskExecutor) startHeartbeat(ctx context.Context) {
+	ticker := time.NewTicker(10 * time.Second)
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-e.stopHeartbeat:
+				fmt.Println("  [心跳] 停止更新")
+				return
+			case <-ticker.C:
+				if err := e.healthChecker.SetHeartbeat(ctx, e.taskType, e.workerID, e.taskID); err != nil {
+					fmt.Printf("  [心跳] 失败: %v\n", err)
+				} else {
+					fmt.Println("  [心跳] 已更新")
+				}
+			}
+		}
+	}()
 }
