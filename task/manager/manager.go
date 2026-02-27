@@ -348,8 +348,8 @@ func (m *Manager) Start(ctx context.Context) error {
 
 	m.ctx, m.cancel = context.WithCancel(ctx)
 
-	// 启动队列同步协程
 	m.startRoutine("queue-syncer", m.queueSyncRoutine)
+	m.startRoutine("timeout-checker", m.timeoutCheckRoutine)
 
 	m.started = true
 	logs.InfoContextf(ctx, "[task] queue syncer started")
@@ -419,6 +419,25 @@ func (m *Manager) queueSyncRoutine() {
 			if mutex.IsMaster(mutex.WithMutexKey(m.config.KeyPrefix + "_mutex")) {
 				if err := m.SyncQueueCount(m.ctx); err != nil {
 					logs.ErrorContextf(m.ctx, "[task] failed to sync queue count: %v", err)
+				}
+			}
+		}
+	}
+}
+
+// timeoutCheckRoutine 任务超时检查协程
+func (m *Manager) timeoutCheckRoutine() {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-m.ctx.Done():
+			return
+		case <-ticker.C:
+			if mutex.IsMaster(mutex.WithMutexKey(m.config.KeyPrefix + "_mutex")) {
+				if err := m.CheckAndTimeoutTasks(m.ctx); err != nil {
+					logs.ErrorContextf(m.ctx, "[task] failed to check and timeout tasks: %v", err)
 				}
 			}
 		}
