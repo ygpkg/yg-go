@@ -132,14 +132,21 @@ func main() {
 		return
 	}
 
-	// 7. 启动健康检查器
+	// 7. 启动任务管理器
+	if err := taskMgr.Start(ctx); err != nil {
+		fmt.Printf("✗ 启动任务管理器失败: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("✓ 任务管理器已启动")
+
+	// 8. 启动健康检查器
 	if err := healthChecker.Start(ctx); err != nil {
 		fmt.Printf("✗ 启动健康检查器失败: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("✓ 健康检查器已启动")
 
-	// 8. 启动 Worker
+	// 9. 启动 Worker
 	if err := w.Start(ctx); err != nil {
 		fmt.Printf("✗ 启动 Worker 失败: %v\n", err)
 		os.Exit(1)
@@ -161,6 +168,11 @@ func main() {
 			fmt.Printf("✗ 停止健康检查器失败: %v\n", err)
 		} else {
 			fmt.Println("✓ 健康检查器已停止")
+		}
+		if err := taskMgr.Stop(ctx); err != nil {
+			fmt.Printf("✗ 停止任务管理器失败: %v\n", err)
+		} else {
+			fmt.Println("✓ 任务管理器已停止")
 		}
 	}()
 
