@@ -35,7 +35,7 @@ func (repo *TaskRepository) GetOnePendingTask(ctx context.Context, taskType, wor
 	err := repo.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		err := tx.
 			Where("task_type = ?", taskType).
-			Where("task_status IN ?", []model.TaskStatus{model.TaskStatusPending, model.TaskStatusFailed}).
+			Where("task_status IN ?", []model.TaskStatus{model.TaskStatusPending, model.TaskStatusFailed, model.TaskStatusTimeout}).
 			Where("redo < max_redo").
 			Where(`
 				NOT EXISTS (
@@ -169,7 +169,7 @@ func (repo *TaskRepository) GetPendingTaskCount(ctx context.Context, taskType st
 	var count int64
 	err := repo.db.WithContext(ctx).Model(&model.TaskEntity{}).
 		Where("task_type = ?", taskType).
-		Where("task_status IN ?", []model.TaskStatus{model.TaskStatusPending, model.TaskStatusFailed}).
+		Where("task_status IN ?", []model.TaskStatus{model.TaskStatusPending, model.TaskStatusFailed, model.TaskStatusTimeout}).
 		Where("redo < max_redo").
 		Where(`
 			NOT EXISTS (
