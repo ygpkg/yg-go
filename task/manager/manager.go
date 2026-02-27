@@ -10,6 +10,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/mutex"
 	"github.com/ygpkg/yg-go/task/model"
 	"gorm.io/gorm"
 )
@@ -415,8 +416,10 @@ func (m *Manager) queueSyncRoutine() {
 		case <-m.ctx.Done():
 			return
 		case <-ticker.C:
-			if err := m.SyncQueueCount(m.ctx); err != nil {
-				logs.ErrorContextf(m.ctx, "[task] failed to sync queue count: %v", err)
+			if mutex.IsMaster(mutex.WithMutexKey(m.config.KeyPrefix + "_mutex")) {
+				if err := m.SyncQueueCount(m.ctx); err != nil {
+					logs.ErrorContextf(m.ctx, "[task] failed to sync queue count: %v", err)
+				}
 			}
 		}
 	}
