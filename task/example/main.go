@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/ygpkg/yg-go/task/health"
@@ -11,7 +13,6 @@ import (
 	"github.com/ygpkg/yg-go/task/worker"
 )
 
-// WorkManagerAdapter 适配器实现 worker.WorkManager 接口
 type WorkManagerAdapter struct {
 	mgr *manager.Manager
 }
@@ -43,7 +44,10 @@ func (a *WorkManagerAdapter) InitTaskDBStatus(ctx context.Context) error {
 }
 
 func main() {
-	printBanner()
+	fmt.Println("========================================")
+	fmt.Println("         Task 包使用示例")
+	fmt.Println("========================================")
+	fmt.Println()
 
 	ctx := context.Background()
 
@@ -79,7 +83,7 @@ func main() {
 		Timeout:        10 * time.Minute,
 		MaxRedo:        3,
 		MaxConcurrency: 3,
-		WorkerID:       "basic-worker-001",
+		WorkerID:       "worker-001",
 	}
 	w, err := worker.NewWorker(workerConfig, workMgr)
 	if err != nil {
@@ -93,7 +97,8 @@ func main() {
 		RedisClient: redisClient,
 		CheckPeriod: 30 * time.Second,
 		OnWorkerDead: func(ctx context.Context, info health.DeadWorkerInfo) error {
-			return handleWorkerDead(ctx, info, taskMgr)
+			fmt.Printf("! 发现死亡 Worker: %s, 任务ID: %d\n", info.WorkerID, info.TaskID)
+			return taskMgr.SaveTaskResult(ctx, info.TaskID, "", fmt.Errorf("worker heartbeat timeout"), nil)
 		},
 	}
 	healthChecker, err := health.NewChecker(healthConfig)
@@ -103,9 +108,9 @@ func main() {
 	}
 	fmt.Println("✓ 健康检查器创建成功")
 
-	registerBasicExecutors(w)
-
-	registerAdditionalExecutors(w, healthChecker)
+	w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error) {
+		return NewDemoTaskExecutor(payload)
+	})
 
 	if err := taskMgr.Start(ctx); err != nil {
 		fmt.Printf("✗ 启动任务管理器失败: %v\n", err)
@@ -124,72 +129,39 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("✓ Worker 已启动")
+
+	// 创建默认示例任务
+	if err := createDemoTask(ctx, taskMgr); err != nil {
+		fmt.Printf("✗ 创建示例任务失败: %v\n", err)
+	} else {
+		fmt.Println("✓ 示例任务已创建")
+	}
+
 	fmt.Println()
-
-	defer func() {
-		fmt.Println("\n========================================")
-		fmt.Println("停止服务")
-		fmt.Println("========================================")
-		if err := w.Stop(ctx); err != nil {
-			fmt.Printf("✗ 停止 Worker 失败: %v\n", err)
-		} else {
-			fmt.Println("✓ Worker 已停止")
-		}
-		if err := healthChecker.Stop(ctx); err != nil {
-			fmt.Printf("✗ 停止健康检查器失败: %v\n", err)
-		} else {
-			fmt.Println("✓ 健康检查器已停止")
-		}
-		if err := taskMgr.Stop(ctx); err != nil {
-			fmt.Printf("✗ 停止任务管理器失败: %v\n", err)
-		} else {
-			fmt.Println("✓ 任务管理器已停止")
-		}
-	}()
-
-	scenarioErr := runBasicScenario(ctx, taskMgr, w, healthChecker)
-	if scenarioErr != nil {
-		fmt.Printf("\n✗ 场景执行失败: %v\n", scenarioErr)
-		os.Exit(1)
-	}
-}
-
-// printBanner 打印横幅
-func printBanner() {
 	fmt.Println("========================================")
-	fmt.Println("         Task 包使用示例")
+	fmt.Println("服务运行中，按 Ctrl+C 退出")
 	fmt.Println("========================================")
-	fmt.Println()
-}
 
-// handleWorkerDead 处理 Worker 死亡事件
-func handleWorkerDead(ctx context.Context, info health.DeadWorkerInfo, taskMgr *manager.Manager) error {
-	fmt.Printf("! 发现死亡 Worker: %s, 任务ID: %d\n", info.WorkerID, info.TaskID)
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
 
-	errMark := fmt.Errorf("worker heartbeat timeout")
-	callback := func(ctx context.Context) error {
-		fmt.Printf("✓ 死亡 Worker 任务 %d 已通过回调处理\n", info.TaskID)
-		return nil
+	fmt.Println("\n========================================")
+	fmt.Println("停止服务")
+	fmt.Println("========================================")
+	if err := w.Stop(ctx); err != nil {
+		fmt.Printf("✗ 停止 Worker 失败: %v\n", err)
+	} else {
+		fmt.Println("✓ Worker 已停止")
 	}
-
-	if err := taskMgr.SaveTaskResult(ctx, info.TaskID, "", errMark, callback); err != nil {
-		return fmt.Errorf("failed to save task result: %w", err)
+	if err := healthChecker.Stop(ctx); err != nil {
+		fmt.Printf("✗ 停止健康检查器失败: %v\n", err)
+	} else {
+		fmt.Println("✓ 健康检查器已停止")
 	}
-
-	fmt.Printf("✓ 任务已标记为失败\n")
-	fmt.Printf("✓ 任务重新入队逻辑已在 SaveTaskResult 内部处理\n")
-	return nil
-}
-
-// registerAdditionalExecutors 注册额外的执行器
-func registerAdditionalExecutors(w *worker.Worker, healthChecker *health.Checker) {
-	w.RegisterExecutor("timeout_task", func(payload string) (worker.TaskExecutor, error) {
-		return NewTimeoutTaskExecutor(payload)
-	})
-	w.RegisterExecutor("fail_task", func(payload string) (worker.TaskExecutor, error) {
-		return NewFailTaskExecutor(payload)
-	})
-	w.RegisterExecutor("health_task", func(payload string) (worker.TaskExecutor, error) {
-		return NewHealthTaskExecutor(payload, healthChecker, "health_task", "health-worker", 0)
-	})
+	if err := taskMgr.Stop(ctx); err != nil {
+		fmt.Printf("✗ 停止任务管理器失败: %v\n", err)
+	} else {
+		fmt.Println("✓ 任务管理器已停止")
+	}
 }

@@ -187,7 +187,7 @@ func (repo *TaskRepository) GetPendingTaskCount(ctx context.Context, taskType st
 
 // CheckAndTimeoutTasks 检查并标记超时任务
 // 使用缓冲时间判断，如果任务已超时超过心跳周期*2，说明 Worker 可能已崩溃
-func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context) error {
+func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context, onTimeoutCallback func(*model.TaskEntity) error) error {
 	now := time.Now()
 
 	// 查找所有运行中的任务
@@ -198,8 +198,9 @@ func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context) error {
 		return fmt.Errorf("failed to query running tasks: %w", err)
 	}
 
-	var timeoutIDs []uint
-	for _, taskEntity := range tasks {
+	var timeoutTasks []*model.TaskEntity
+	for i := range tasks {
+		taskEntity := tasks[i]
 		if taskEntity.StartAt == nil {
 			continue
 		}
@@ -219,10 +220,15 @@ func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context) error {
 		}
 
 		// 超过缓冲时间，标记任务超时
-		timeoutIDs = append(timeoutIDs, taskEntity.ID)
+		timeoutTasks = append(timeoutTasks, &taskEntity)
 	}
 
-	if len(timeoutIDs) > 0 {
+	if len(timeoutTasks) > 0 {
+		var timeoutIDs []uint
+		for _, task := range timeoutTasks {
+			timeoutIDs = append(timeoutIDs, task.ID)
+		}
+
 		// 批量更新状态为 timeout
 		err = repo.db.WithContext(ctx).Model(&model.TaskEntity{}).
 			Where("id IN ?", timeoutIDs).
@@ -238,7 +244,21 @@ func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context) error {
 			return fmt.Errorf("failed to update timeout tasks: %w", err)
 		}
 
-		logs.InfoContextf(ctx, "[task] marked %d tasks as timeout", len(timeoutIDs))
+		logs.InfoContextf(ctx, "[task] marked %d tasks as timeout", len(timeoutTasks))
+
+		// 更新 Redo 计数后，获取最新的任务状态并执行回调
+		for _, taskID := range timeoutIDs {
+			taskEntity, err := repo.GetTaskByID(ctx, taskID)
+			if err != nil {
+				logs.ErrorContextf(ctx, "[task] failed to get task %d after timeout update: %v", taskID, err)
+				continue
+			}
+			if onTimeoutCallback != nil {
+				if err := onTimeoutCallback(taskEntity); err != nil {
+					logs.ErrorContextf(ctx, "[task] failed to execute timeout callback for task %d: %v", taskID, err)
+				}
+			}
+		}
 	}
 
 	return nil

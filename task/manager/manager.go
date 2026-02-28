@@ -159,7 +159,17 @@ func (m *Manager) InitTaskDBStatus(ctx context.Context) error {
 
 // CheckAndTimeoutTasks 检查并标记超时任务
 func (m *Manager) CheckAndTimeoutTasks(ctx context.Context) error {
-	return m.repo.CheckAndTimeoutTasks(ctx)
+	return m.repo.CheckAndTimeoutTasks(ctx, func(task *model.TaskEntity) error {
+		// 回调：超时后检查是否需要重试并重新入队
+		if task.CanRetry() {
+			if err := m.queue.Push(ctx, task.TaskType); err != nil {
+				return fmt.Errorf("failed to push retry task: %w", err)
+			}
+			logs.InfoContextf(ctx, "[task] timeout task %d requeued for retry (Redo: %d/%d)",
+				task.ID, task.Redo, task.MaxRedo)
+		}
+		return nil
+	})
 }
 
 // GetQueue 获取队列实例（内部方法）

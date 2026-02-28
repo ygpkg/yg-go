@@ -2,26 +2,30 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
+	"github.com/ygpkg/yg-go/dbtools/redispool"
+	"github.com/ygpkg/yg-go/task/model"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 // setupInfra 初始化基础设施（数据库和 Redis）
 func setupInfra() (*gorm.DB, *redis.Client, error) {
-	// 初始化数据库
 	db, err := setupDB()
 	if err != nil {
 		return nil, nil, fmt.Errorf("数据库连接失败: %w\n\n提示: 请确保 MySQL 服务正在运行", err)
 	}
 
-	// 初始化 Redis
 	redisClient, err := setupRedis()
 	if err != nil {
 		return nil, nil, fmt.Errorf("Redis 连接失败: %w\n\n提示: 请确保 Redis 服务正在运行", err)
 	}
+
+	redispool.InitCache(redisClient)
 
 	return db, redisClient, nil
 }
@@ -71,4 +75,28 @@ func printSection(title string) {
 	fmt.Println(title)
 	fmt.Println("========================================")
 	fmt.Println()
+}
+
+func createDemoTask(ctx context.Context, taskMgr TaskCreator) error {
+	payload := DemoPayload{
+		Message: "Hello, Task System!",
+		UserID:  1001,
+	}
+	payloadJSON, _ := json.Marshal(payload)
+
+	task := &model.TaskEntity{
+		TaskType:    "demo_task",
+		TaskStatus:  model.TaskStatusPending,
+		SubjectID:   1,
+		SubjectType: "example",
+		Payload:     string(payloadJSON),
+		Timeout:     30 * time.Second,
+		MaxRedo:     3,
+	}
+
+	return taskMgr.CreateTasks(ctx, []*model.TaskEntity{task})
+}
+
+type TaskCreator interface {
+	CreateTasks(ctx context.Context, tasks []*model.TaskEntity) error
 }
