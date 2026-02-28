@@ -233,11 +233,11 @@ func (h *Checker) CheckWorkerHealth(ctx context.Context) error {
 	return nil
 }
 
-// getAllTaskTypes 获取所有任务类型（通过扫描 Redis 键）
+// getAllTaskTypes 获取所有任务类型（通过扫描心跳键）
 func (h *Checker) getAllTaskTypes(ctx context.Context) ([]string, error) {
 	var keys []string
 	var cursor uint64
-	pattern := fmt.Sprintf("%stask_queue:*", h.config.KeyPrefix)
+	pattern := fmt.Sprintf("%stask_heartbeat:*", h.config.KeyPrefix)
 
 	for {
 		kk, nextCursor, err := h.config.RedisClient.Scan(ctx, cursor, pattern, 100).Result()
@@ -254,7 +254,7 @@ func (h *Checker) getAllTaskTypes(ctx context.Context) ([]string, error) {
 	}
 
 	// 提取任务类型
-	prefix := fmt.Sprintf("%stask_queue:", h.config.KeyPrefix)
+	prefix := fmt.Sprintf("%stask_heartbeat:", h.config.KeyPrefix)
 	types := make([]string, 0, len(keys))
 	for _, key := range keys {
 		if len(key) > len(prefix) {

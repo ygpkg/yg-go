@@ -1,46 +1,17 @@
 # Task 包使用示例
 
-本目录提供 Task 包的交互式使用示例，帮助你快速上手并理解核心功能。
+本示例展示如何使用 Task 包启动一个持续运行的 Worker 服务。
 
 ## 快速开始
 
 ### 前置条件
 
-运行示例前需要确保以下服务已启动：
+确保 MySQL 和 Redis 服务正在运行：
 
-#### 1. MySQL
-
-```bash
-# 使用 Docker 启动 MySQL
-docker run -d \
-  --name mysql-task-example \
-  -e MYSQL_ROOT_PASSWORD=123456 \
-  -e MYSQL_DATABASE=demo \
-  -p 3306:3306 \
-  mysql:8.0
+```sql
+-- MySQL 创建数据库
+CREATE DATABASE demo;
 ```
-
-#### 2. Redis
-
-```bash
-# 使用 Docker 启动 Redis
-docker run -d \
-  --name redis-task-example \
-  -p 6379:6379 \
-  redis:7-alpine
-```
-
-#### 3. 配置数据库连接
-
-示例代码使用的默认配置：
-
-- **Host**: localhost
-- **Port**: 3306
-- **User**: root
-- **Password**: 123456
-- **Database**: demo
-
-如需修改配置，请编辑 `util.go` 文件中的 `setupDB()` 函数。
 
 ### 运行示例
 
@@ -49,214 +20,115 @@ cd example
 go run .
 ```
 
-## 示例列表
+## 核心组件
 
-运行后会显示交互式菜单，可以选择以下示例：
+示例启动了三个核心组件：
 
-### 1. 基本任务创建和执行
+1. **Manager**: 任务管理器，负责队列同步和超时检测
+2. **Worker**: 任务执行器，从队列获取任务并执行
+3. **HealthChecker**: 健康检查器，监控 Worker 存活状态
 
-演示最基本的任务队列使用方法：
-- 定义简单的任务执行器
-- 创建和启动 Worker
-- 创建任务并执行
-- 查询任务状态
+## 任务执行器
 
-**学习要点**：
-- `TaskExecutor` 接口的实现
-- Worker 的创建和配置
-- 任务的创建和生命周期
-
-### 2. 任务重试机制
-
-演示任务失败后的自动重试机制：
-- 创建会失败的任务
-- 配置重试次数
-- 观察自动重试过程
-- 最终成功的处理
-
-**学习要点**：
-- 任务重试机制的工作原理
-- `MaxRedo` 参数的使用
-- 失败任务的状态变化
-
-### 3. 任务超时处理
-
-演示任务超时检测和处理：
-- 设置任务超时时间
-- 模拟长时间运行的任务
-- 超时检测和任务取消
-- Context 取消的正确处理
-
-**学习要点**：
-- 如何设置任务超时时间
-- Context 取消信号的处理
-- 超时任务的重试机制
-
-### 4. 并发任务处理
-
-演示批量任务的并发处理：
-- 批量创建任务
-- 配置并发数
-- 监控并发执行情况
-- 性能统计
-
-**学习要点**：
-- 批量创建任务的方法
-- `MaxConcurrency` 参数的影响
-- 并发任务的性能优化
-
-### 5. 步骤化任务流程
-
-演示多步骤任务的顺序执行：
-- 创建多步骤任务
-- 步骤依赖关系
-- 顺序执行验证
-- 步骤失败处理
-
-**学习要点**：
-- `Step` 和 `AppGroup` 的使用
-- 步骤化任务的执行顺序
-- 前置步骤失败的处理
-
-### 6. 混合并发（不同任务类型不同并发数）
-
-演示不同任务类型使用不同并发数的场景：
-- 为不同任务类型配置独立的并发数
-- 快速任务使用高并发（10）提升吞吐量
-- 慢速任务使用低并发（2）避免资源耗尽
-- API 调用任务使用中等并发（5）
-- 向后兼容的默认并发配置
-
-**学习要点**：
-- 使用 `task.WithConcurrency()` 选项指定并发数
-- 不传选项时使用全局默认值（向后兼容）
-- 根据任务特性（CPU密集型 vs IO密集型）合理配置并发数
-- 不同任务类型独立并发，互不影响
-
-**适用场景**：
-- CPU密集型任务：使用低并发避免CPU过载
-- IO密集型任务：使用高并发提升资源利用率
-- 限流需求任务：精确控制对下游服务的并发请求
-- 不同优先级任务：核心业务高并发，辅助业务低并发
-
-**示例代码**：
-```go
-// 为不同任务类型配置独立并发数（使用 WithConcurrency 选项）
-worker.RegisterExecutor("fast_task", func(payload string) worker.TaskExecutor {
-    return &FastTaskExecutor{}
-}, worker.WithConcurrency(10)) // 快速任务高并发
-
-worker.RegisterExecutor("slow_task", func(payload string) worker.TaskExecutor {
-    return &SlowTaskExecutor{}
-}, worker.WithConcurrency(2)) // 慢速任务低并发
-
-// 使用全局默认并发数（不传选项）
-worker.RegisterExecutor("default_task", func(payload string) worker.TaskExecutor {
-    return &DefaultTaskExecutor{}
-})
-```
-
-## 代码结构
-
-```
-example/
-├── main.go         # 统一入口和交互式菜单
-├── executors.go    # 所有任务执行器实现
-├── scenarios.go    # 各个使用场景的函数实现
-├── util.go         # 工具函数（数据库、Redis 连接等）
-└── README.md       # 本文档
-```
-
-### 文件说明
-
-- **main.go**: 程序入口，实现交互式菜单，根据用户选择运行不同场景
-- **executors.go**: 包含所有任务执行器的实现，每个场景对应一个或多个执行器
-- **scenarios.go**: 包含各个使用场景的函数实现，每个函数演示一个特定功能
-- **util.go**: 提供通用工具函数，如数据库连接、Redis 连接等
-
-## 通用配置
-
-所有示例使用相同的配置结构，不同场景会根据需要调整部分参数：
+实现 `worker.TaskExecutor` 接口：
 
 ```go
-config := &task.TaskConfig{
-    WorkerID:          "example-worker-001", // Worker 唯一标识
-    MaxConcurrency:    5,                    // 最大并发数
-    Timeout:           10 * time.Minute,
-    MaxRedo:           3,
-    RedisKeyPrefix:    "task:example:",      // Redis 键前缀
-    EnableHealthCheck: true,
-    HealthCheckPeriod: 30 * time.Second,
+type TaskExecutor interface {
+    Execute(ctx context.Context) error
+    GetResult() string
+    SetResult(result string)
+    OnSuccess(ctx context.Context) error
+    OnFailure(ctx context.Context) error
 }
 ```
 
-## 故障排查
+注册执行器：
 
-### 无法连接数据库
-
-```
-Error: failed to connect database
-```
-
-**解决方法**：
-1. 确保 MySQL 服务正在运行
-2. 检查数据库连接配置（用户名、密码、数据库名）
-3. 确保数据库已创建（demo）
-
-### 无法连接 Redis
-
-```
-Error: failed to connect redis
+```go
+w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error) {
+    return NewDemoTaskExecutor(payload)
+})
 ```
 
-**解决方法**：
-1. 确保 Redis 服务正在运行
-2. 检查 Redis 地址配置（默认 localhost:6379）
-3. 检查 Redis 是否需要密码
+## 验证 queueSyncRoutine
 
-### 任务不执行
+`queueSyncRoutine` 是队列同步协程，负责确保队列中有足够消息触发 Worker 消费。
 
-1. 检查 Worker 是否成功启动
-2. 检查是否注册了对应的任务执行器
-3. 检查 Redis Stream 队列是否有消息
+### 工作原理
 
-```bash
-# 查看 Redis Stream 消息
-redis-cli
-> XINFO STREAM task:example:task_queue:demo_task
+- **同步间隔**: 每 10 秒执行一次（配置项 `QueueSyncInterval`）
+- **执行条件**: 只有 Master 节点才会执行队列同步
+- **核心逻辑**: 检查数据库中待处理任务数量，如有待处理任务则向 Redis 队列推送消息
+
+### 验证步骤
+
+1. **准备环境**: 启动 MySQL 和 Redis 服务，创建 `demo` 数据库
+2. **运行示例**: `cd task/example && go run .`
+3. **确认主节点**: 观察启动日志 `主节点状态: true`
+4. **观察同步日志**: 每 10 秒会输出队列同步日志：
+   ```
+   [task] synced queue for taskType: demo_task, pending tasks: X
+   ```
+5. **手动创建任务验证**:
+   ```sql
+   INSERT INTO core_task (
+       task_type, task_status, subject_id, subject_type, 
+       payload, timeout, max_redo, created_at, updated_at
+   ) VALUES (
+       'demo_task', 'pending', 100, 'sync_test',
+       '{"message": "queue sync test", "user_id": 100}', 
+       30000000000, 3, NOW(), NOW()
+   );
+   ```
+   创建后观察日志，确认队列同步已处理新任务。
+
+## 验证 timeoutCheckRoutine
+
+`timeoutCheckRoutine` 是超时检查协程，负责检测并处理超时的任务。
+
+### 工作原理
+
+- **检查间隔**: 每分钟执行一次
+- **执行条件**: 只有 Master 节点才会执行超时检查
+- **核心逻辑**: 检查 `running` 状态且已超时的任务，将其状态改为 `timeout`
+
+### 验证步骤
+
+1. **准备环境**: 启动 MySQL 和 Redis 服务，创建 `demo` 数据库
+2. **运行示例**: `cd task/example && go run .`
+3. **确认主节点**: 观察启动日志 `主节点状态: true`
+4. **创建超时任务**:
+   ```sql
+   INSERT INTO core_task (
+       task_type, task_status, subject_id, subject_type, 
+       payload, timeout, max_redo, created_at, updated_at,
+       start_at, worker_id
+   ) VALUES (
+       'demo_task', 'running', 9999, 'timeout_test',
+       '{"message": "timeout test", "user_id": 9999}', 
+       30000000000, -- 30秒（纳秒）
+       3, 
+       NOW(), NOW(),
+       DATE_SUB(NOW(), INTERVAL 5 MINUTE), -- 5分钟前开始，确保超时
+       'test-worker-001'
+   );
+   ```
+5. **观察日志**: 等待约 1 分钟后，观察超时检测日志：
+   ```
+   [task] timeout check running, isMaster: true
+   [task] timeout check completed successfully
+   ```
+6. **验证结果**: 查询数据库确认任务状态已变为 `timeout`
+   ```sql
+   SELECT id, task_status FROM core_task WHERE subject_id = 9999;
+   ```
+
+## 测试 SQL 示例
+
 ```
-
-## 清理数据
-
-测试完成后，可以清理测试数据：
-
-```sql
--- 清理任务表
-TRUNCATE TABLE core_task;
+example/
+├── main.go      # 程序入口
+├── executors.go # 任务执行器实现
+├── util.go      # 工具函数
+└── README.md    # 本文档
 ```
-
-```bash
-# 清理 Redis 数据
-redis-cli FLUSHDB
-```
-
-## 停止服务
-
-```bash
-# 停止 MySQL
-docker stop mysql-task-example
-docker rm mysql-task-example
-
-# 停止 Redis
-docker stop redis-task-example
-docker rm redis-task-example
-```
-
-## 更多资源
-
-- [Task 包文档](../README.md) - 完整的 API 文档和设计说明
-- [最佳实践](../README.md#最佳实践) - 生产环境使用建议
-
-## 反馈
-
-如果你在运行示例时遇到问题，或者有改进建议，欢迎提交 Issue！

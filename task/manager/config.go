@@ -54,13 +54,16 @@ type ManagerConfig struct {
 	KeyPrefix string
 	// QueueBlockTime Redis Stream 阻塞时间
 	QueueBlockTime time.Duration
+	// QueueSyncInterval 队列同步间隔，默认 1 分钟
+	QueueSyncInterval time.Duration
 }
 
 // DefaultManagerConfig 返回默认管理器配置
 func DefaultManagerConfig() *ManagerConfig {
 	return &ManagerConfig{
-		KeyPrefix:      "task:",
-		QueueBlockTime: 5 * time.Second,
+		KeyPrefix:         "task:",
+		QueueBlockTime:    5 * time.Second,
+		QueueSyncInterval: time.Minute,
 	}
 }
 
@@ -71,6 +74,9 @@ func (c *ManagerConfig) Validate() error {
 	}
 	if c.QueueBlockTime <= 0 {
 		c.QueueBlockTime = 5 * time.Second
+	}
+	if c.QueueSyncInterval <= 0 {
+		c.QueueSyncInterval = time.Minute
 	}
 	return nil
 }
