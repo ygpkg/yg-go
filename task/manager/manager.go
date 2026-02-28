@@ -418,7 +418,7 @@ func (m *Manager) startRoutine(name string, fn func()) {
 
 // queueSyncRoutine 队列同步协程
 func (m *Manager) queueSyncRoutine() {
-	ticker := time.NewTicker(time.Minute)
+	ticker := time.NewTicker(m.config.QueueSyncInterval)
 	defer ticker.Stop()
 
 	for {

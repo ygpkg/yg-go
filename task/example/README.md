@@ -50,61 +50,80 @@ w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error
 })
 ```
 
+## 验证 queueSyncRoutine
+
+`queueSyncRoutine` 是队列同步协程，负责确保队列中有足够消息触发 Worker 消费。
+
+### 工作原理
+
+- **同步间隔**: 每 10 秒执行一次（配置项 `QueueSyncInterval`）
+- **执行条件**: 只有 Master 节点才会执行队列同步
+- **核心逻辑**: 检查数据库中待处理任务数量，如有待处理任务则向 Redis 队列推送消息
+
+### 验证步骤
+
+1. **准备环境**: 启动 MySQL 和 Redis 服务，创建 `demo` 数据库
+2. **运行示例**: `cd task/example && go run .`
+3. **确认主节点**: 观察启动日志 `主节点状态: true`
+4. **观察同步日志**: 每 10 秒会输出队列同步日志：
+   ```
+   [task] synced queue for taskType: demo_task, pending tasks: X
+   ```
+5. **手动创建任务验证**:
+   ```sql
+   INSERT INTO core_task (
+       task_type, task_status, subject_id, subject_type, 
+       payload, timeout, max_redo, created_at, updated_at
+   ) VALUES (
+       'demo_task', 'pending', 100, 'sync_test',
+       '{"message": "queue sync test", "user_id": 100}', 
+       30000000000, 3, NOW(), NOW()
+   );
+   ```
+   创建后观察日志，确认队列同步已处理新任务。
+
+## 验证 timeoutCheckRoutine
+
+`timeoutCheckRoutine` 是超时检查协程，负责检测并处理超时的任务。
+
+### 工作原理
+
+- **检查间隔**: 每分钟执行一次
+- **执行条件**: 只有 Master 节点才会执行超时检查
+- **核心逻辑**: 检查 `running` 状态且已超时的任务，将其状态改为 `timeout`
+
+### 验证步骤
+
+1. **准备环境**: 启动 MySQL 和 Redis 服务，创建 `demo` 数据库
+2. **运行示例**: `cd task/example && go run .`
+3. **确认主节点**: 观察启动日志 `主节点状态: true`
+4. **创建超时任务**:
+   ```sql
+   INSERT INTO core_task (
+       task_type, task_status, subject_id, subject_type, 
+       payload, timeout, max_redo, created_at, updated_at,
+       start_at, worker_id
+   ) VALUES (
+       'demo_task', 'running', 9999, 'timeout_test',
+       '{"message": "timeout test", "user_id": 9999}', 
+       30000000000, -- 30秒（纳秒）
+       3, 
+       NOW(), NOW(),
+       DATE_SUB(NOW(), INTERVAL 5 MINUTE), -- 5分钟前开始，确保超时
+       'test-worker-001'
+   );
+   ```
+5. **观察日志**: 等待约 1 分钟后，观察超时检测日志：
+   ```
+   [task] timeout check running, isMaster: true
+   [task] timeout check completed successfully
+   ```
+6. **验证结果**: 查询数据库确认任务状态已变为 `timeout`
+   ```sql
+   SELECT id, task_status FROM core_task WHERE subject_id = 9999;
+   ```
+
 ## 测试 SQL 示例
-
-### 超时任务测试
-
-以下 SQL 创建一个会触发超时检测的任务（`running` 状态，开始时间早于超时时间 + 缓冲时间）：
-
-```sql
--- 创建一个会触发超时的任务
--- 触发条件: now > start_at + timeout + 60秒缓冲时间
--- 超时检查每分钟执行一次，且只有主节点(master)会执行
--- 
--- start_at 设置为 5 分钟前，timeout 为 30 秒
--- 此时 start_at + timeout + 60秒缓冲 ≈ 3分30秒前，已满足超时条件
-INSERT INTO core_task (
-    task_type, task_status, subject_id, subject_type, 
-    payload, timeout, max_redo, created_at, updated_at,
-    start_at, worker_id
-) VALUES (
-    'demo_task', 'running', 9999, 'timeout_test',
-    '{"message": "timeout test", "user_id": 9999}', 
-    30000000000, -- 30秒（纳秒）
-    3, 
-    NOW(), NOW(),
-    DATE_SUB(NOW(), INTERVAL 5 MINUTE), -- 5分钟前开始，确保超时
-    'test-worker-001'
-);
-
--- 注意: 超时检测有以下前提条件：
--- 1. Manager 已启动且运行超过1分钟（定时器触发）
--- 2. 当前实例是主节点（mutex.IsMaster() 返回 true）
--- 3. 全局 Redis 缓存已初始化（redispool.InitCache 已调用）
-```
-
-### 失败任务测试
-
-以下 SQL 创建一个失败状态的任务，会被 Worker 重新拉取并重试：
-
-```sql
--- 创建一个失败的任务，Rdo < MaxRedo 时会被重试
-INSERT INTO core_task (
-    task_type, task_status, subject_id, subject_type, 
-    payload, timeout, max_redo, redo,
-    err_msg, created_at, updated_at
-) VALUES (
-    'demo_task', 'failed', 8888, 'failed_test',
-    '{"message": "failed test", "user_id": 8888}', 
-    30000000000, -- 30秒（纳秒）
-    3, -- max_redo
-    1, -- redo=1，还剩2次重试机会
-    'simulated failure for testing',
-    NOW(), NOW()
-);
-```
-
-## 代码结构
 
 ```
 example/

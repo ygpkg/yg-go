@@ -68,8 +68,9 @@ func main() {
 	fmt.Println()
 
 	managerConfig := &manager.ManagerConfig{
-		KeyPrefix:      "task:example:",
-		QueueBlockTime: 5 * time.Second,
+		KeyPrefix:         "task:example:",
+		QueueBlockTime:    5 * time.Second,
+		QueueSyncInterval: 10 * time.Second,
 	}
 	taskMgr, err := manager.NewManager(managerConfig, db, redisClient)
 	if err != nil {
@@ -146,6 +147,13 @@ func main() {
 	fmt.Println("========================================")
 	fmt.Println("服务运行中，按 Ctrl+C 退出")
 	fmt.Println("========================================")
+	fmt.Println()
+	fmt.Println("验证 queueSyncRoutine 说明:")
+	fmt.Println("  - 同步间隔: 10秒 (QueueSyncInterval)")
+	fmt.Println("  - 只有 Master 节点会执行队列同步")
+	fmt.Println("  - 同步时会检查待处理任务并补充队列消息")
+	fmt.Println("  - 观察日志中的队列同步结果")
+	fmt.Println()
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
