@@ -58,8 +58,11 @@ w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error
 
 ```sql
 -- 创建一个会触发超时的任务
--- start_at 设置为当前时间往前推 2 分钟，timeout 为 30 秒
--- 超时检测会在 start_at + timeout + 60秒缓冲时间后触发
+-- 触发条件: now > start_at + timeout + 60秒缓冲时间
+-- 超时检查每分钟执行一次，且只有主节点(master)会执行
+-- 
+-- start_at 设置为 5 分钟前，timeout 为 30 秒
+-- 此时 start_at + timeout + 60秒缓冲 ≈ 3分30秒前，已满足超时条件
 INSERT INTO core_task (
     task_type, task_status, subject_id, subject_type, 
     payload, timeout, max_redo, created_at, updated_at,
@@ -70,9 +73,14 @@ INSERT INTO core_task (
     30000000000, -- 30秒（纳秒）
     3, 
     NOW(), NOW(),
-    DATE_SUB(NOW(), INTERVAL 2 MINUTE), -- 2分钟前开始，已超时
+    DATE_SUB(NOW(), INTERVAL 5 MINUTE), -- 5分钟前开始，确保超时
     'test-worker-001'
 );
+
+-- 注意: 超时检测有以下前提条件：
+-- 1. Manager 已启动且运行超过1分钟（定时器触发）
+-- 2. 当前实例是主节点（mutex.IsMaster() 返回 true）
+-- 3. 全局 Redis 缓存已初始化（redispool.InitCache 已调用）
 ```
 
 ### 失败任务测试

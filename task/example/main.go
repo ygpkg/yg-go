@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ygpkg/yg-go/mutex"
 	"github.com/ygpkg/yg-go/task/health"
 	"github.com/ygpkg/yg-go/task/manager"
 	"github.com/ygpkg/yg-go/task/worker"
@@ -40,7 +41,7 @@ func (a *WorkManagerAdapter) SaveTaskResult(ctx context.Context, workerID string
 }
 
 func (a *WorkManagerAdapter) InitTaskDBStatus(ctx context.Context) error {
-	return a.mgr.InitTaskDBStatus(ctx)
+	return nil
 }
 
 func main() {
@@ -129,6 +130,10 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("✓ Worker 已启动")
+
+	isMaster := mutex.IsMaster(mutex.WithMutexKey("task:example:_mutex"))
+	fmt.Printf("✓ 主节点状态: %v\n", isMaster)
+	fmt.Println("✓ Redis 缓存已初始化")
 
 	// 创建默认示例任务
 	if err := createDemoTask(ctx, taskMgr); err != nil {

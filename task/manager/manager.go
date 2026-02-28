@@ -437,6 +437,21 @@ func (m *Manager) queueSyncRoutine() {
 
 // timeoutCheckRoutine 任务超时检查协程
 func (m *Manager) timeoutCheckRoutine() {
+	checkTimeout := func() {
+		isMaster := mutex.IsMaster(mutex.WithMutexKey(m.config.KeyPrefix + "_mutex"))
+		logs.InfoContextf(m.ctx, "[task] timeout check running, isMaster: %v", isMaster)
+
+		if isMaster {
+			if err := m.CheckAndTimeoutTasks(m.ctx); err != nil {
+				logs.ErrorContextf(m.ctx, "[task] failed to check and timeout tasks: %v", err)
+			} else {
+				logs.InfoContextf(m.ctx, "[task] timeout check completed successfully")
+			}
+		}
+	}
+
+	checkTimeout()
+
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
@@ -445,11 +460,7 @@ func (m *Manager) timeoutCheckRoutine() {
 		case <-m.ctx.Done():
 			return
 		case <-ticker.C:
-			if mutex.IsMaster(mutex.WithMutexKey(m.config.KeyPrefix + "_mutex")) {
-				if err := m.CheckAndTimeoutTasks(m.ctx); err != nil {
-					logs.ErrorContextf(m.ctx, "[task] failed to check and timeout tasks: %v", err)
-				}
-			}
+			checkTimeout()
 		}
 	}
 }
