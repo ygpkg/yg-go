@@ -27,6 +27,7 @@ go run .
 1. **Manager**: 任务管理器，负责队列同步和超时检测
 2. **Worker**: 任务执行器，从队列获取任务并执行
 3. **HealthChecker**: 健康检查器，监控 Worker 存活状态
+4. **HealthReporter**: 健康状态上报器，定时上报 Worker 健康状态到指定服务
 
 ## 任务执行器
 
@@ -49,6 +50,83 @@ w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error
     return NewDemoTaskExecutor(payload)
 })
 ```
+
+## 健康状态上报
+
+Worker 支持定时上报健康状态到指定服务，用于监控 Worker 运行状态。
+
+### 实现 HealthReporter 接口
+
+业务侧需实现 `worker.HealthReporter` 接口：
+
+```go
+type HealthReporter interface {
+    ReportHealth(ctx context.Context, health *WorkerHealth) error
+}
+```
+
+示例实现：
+
+```go
+type MyHealthReporter struct {
+    reportEndpoint string
+}
+
+func (r *MyHealthReporter) ReportHealth(ctx context.Context, health *worker.WorkerHealth) error {
+    data := map[string]any{
+        "worker_id":  health.WorkerID,
+        "timestamp":  health.Timestamp,
+        "task_types": health.TaskTypes,
+        "status":     health.Status,
+    }
+    jsonData, _ := json.Marshal(data)
+    fmt.Printf("[HealthReport] %s -> %s\n", r.reportEndpoint, string(jsonData))
+    return nil
+}
+```
+
+### 配置和使用
+
+```go
+workerConfig := &worker.WorkerConfig{
+    WorkerID:             "worker-001",
+    Timeout:              10 * time.Minute,
+    MaxRedo:              3,
+    MaxConcurrency:       3,
+    HealthReportInterval: 30 * time.Second, // 上报间隔，0 表示不上报
+}
+
+w, _ := worker.NewWorker(workerConfig, workMgr)
+
+healthReporter := &MyHealthReporter{
+    reportEndpoint: "http://localhost:8080/api/health",
+}
+w.SetHealthReporter(healthReporter)
+
+w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error) {
+    return NewDemoTaskExecutor(payload)
+})
+
+w.Start(ctx)
+```
+
+### WorkerHealth 结构体
+
+```go
+type WorkerHealth struct {
+    WorkerID   string    // Worker 标识
+    Timestamp  time.Time // 上报时间
+    TaskTypes  []string  // 注册的任务类型列表
+    Status     string    // 状态：running、stopped
+    CustomData any       // 扩展字段，业务侧可自定义
+}
+```
+
+### 上报时机
+
+- Worker 启动后立即上报一次
+- 按 `HealthReportInterval` 间隔周期性上报
+- `HealthReportInterval` 为 0 时不启动上报
 
 ## 验证 queueSyncRoutine
 
@@ -190,8 +268,9 @@ w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error
 
 ```
 example/
-├── main.go      # 程序入口
-├── executors.go # 任务执行器实现
-├── util.go      # 工具函数
-└── README.md    # 本文档
+├── main.go             # 程序入口
+├── executors.go        # 任务执行器实现
+├── health_reporter.go  # 健康状态上报器实现
+├── util.go             # 工具函数
+└── README.md           # 本文档
 ```

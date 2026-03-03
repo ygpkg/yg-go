@@ -82,10 +82,11 @@ func main() {
 	workMgr := &WorkManagerAdapter{mgr: taskMgr}
 
 	workerConfig := &worker.WorkerConfig{
-		Timeout:        10 * time.Minute,
-		MaxRedo:        3,
-		MaxConcurrency: 3,
-		WorkerID:       "worker-001",
+		Timeout:              10 * time.Minute,
+		MaxRedo:              3,
+		MaxConcurrency:       3,
+		WorkerID:             "worker-001",
+		HealthReportInterval: 30 * time.Second,
 	}
 	w, err := worker.NewWorker(workerConfig, workMgr)
 	if err != nil {
@@ -93,6 +94,12 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("✓ Worker 创建成功")
+
+	healthReporter := &MyHealthReporter{
+		reportEndpoint: "http://localhost:8080/api/health",
+	}
+	w.SetHealthReporter(healthReporter)
+	fmt.Println("✓ 健康上报器已设置")
 
 	healthConfig := &health.CheckerConfig{
 		KeyPrefix:   "task:example:",

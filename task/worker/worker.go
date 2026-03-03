@@ -10,6 +10,11 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
+const (
+	statusRunning = "running"
+	statusStopped = "stopped"
+)
+
 // WorkManager worker 需要的管理器接口（最小化依赖）
 type WorkManager interface {
 	// GetNextTask 获取下一个待执行任务（阻塞式）
@@ -51,9 +56,10 @@ func WithConcurrency(n int) ExecutorOption {
 
 // Worker 分布式 Worker 实现
 type Worker struct {
-	config   *WorkerConfig
-	manager  WorkManager
-	registry *ExecutorRegistry
+	config         *WorkerConfig
+	manager        WorkManager
+	registry       *ExecutorRegistry
+	healthReporter HealthReporter
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -83,18 +89,21 @@ func NewWorker(config *WorkerConfig, mgr WorkManager) (*Worker, error) {
 // RegisterExecutor 注册任务执行器
 // 可通过 WithConcurrency 选项设置该任务类型的最大并发数，不设置时使用全局默认并发数
 func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory, opts ...ExecutorOption) {
-	// 默认选项配置
 	options := &executorOptions{
-		maxConcurrency: w.config.MaxConcurrency, // 默认使用全局配置
+		maxConcurrency: w.config.MaxConcurrency,
 	}
 
-	// 应用选项
 	for _, opt := range opts {
 		opt(options)
 	}
 
-	// 注册执行器（使用 registry 的锁，不需要 Worker 的全局锁）
 	w.registry.RegisterWithConcurrency(taskType, factory, options.maxConcurrency)
+}
+
+func (w *Worker) SetHealthReporter(reporter HealthReporter) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.healthReporter = reporter
 }
 
 // Start 启动 Worker
@@ -108,12 +117,10 @@ func (w *Worker) Start(ctx context.Context) error {
 
 	w.ctx, w.cancel = context.WithCancel(ctx)
 
-	// 为每个任务类型启动工作协程（支持不同并发数）
 	taskTypes := w.registry.GetAll()
 	for _, taskType := range taskTypes {
-		// 从 registry 获取并发数（不需要持有 Worker 的锁）
 		concurrency := w.registry.GetConcurrency(taskType, w.config.MaxConcurrency)
-		taskTypeCopy := taskType // 避免闭包捕获问题
+		taskTypeCopy := taskType
 		for i := 0; i < concurrency; i++ {
 			w.startRoutine(fmt.Sprintf("worker-%s-%d", taskType, i), func() {
 				w.workRoutine(taskTypeCopy)
@@ -123,6 +130,12 @@ func (w *Worker) Start(ctx context.Context) error {
 
 	w.started = true
 	logs.InfoContextf(ctx, "[task] worker started, workerID: %s", w.config.WorkerID)
+
+	if w.healthReporter != nil && w.config.HealthReportInterval > 0 {
+		w.reportHealthOnce()
+		w.startHealthReportRoutine()
+	}
+
 	return nil
 }
 
@@ -273,4 +286,33 @@ func (w *Worker) doExecute(ctx context.Context, executor TaskExecutor) (err erro
 	}()
 
 	return executor.Execute(ctx)
+}
+
+func (w *Worker) reportHealthOnce() {
+	health := &WorkerHealth{
+		WorkerID:  w.config.WorkerID,
+		Timestamp: time.Now(),
+		TaskTypes: w.registry.GetAll(),
+		Status:    statusRunning,
+	}
+
+	if err := w.healthReporter.ReportHealth(w.ctx, health); err != nil {
+		logs.ErrorContextf(w.ctx, "[task] failed to report health: %v", err)
+	}
+}
+
+func (w *Worker) startHealthReportRoutine() {
+	w.startRoutine("health-reporter", func() {
+		ticker := time.NewTicker(w.config.HealthReportInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-w.ctx.Done():
+				return
+			case <-ticker.C:
+				w.reportHealthOnce()
+			}
+		}
+	})
 }

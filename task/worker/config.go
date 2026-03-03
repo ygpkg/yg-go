@@ -14,15 +14,18 @@ type WorkerConfig struct {
 	MaxConcurrency int
 	// WorkerID Worker 标识
 	WorkerID string
+	// HealthReportInterval 健康上报间隔，0 表示不上报
+	HealthReportInterval time.Duration
 }
 
 // DefaultWorkerConfig 默认配置
 func DefaultWorkerConfig() *WorkerConfig {
 	return &WorkerConfig{
-		Timeout:        10 * time.Minute,
-		MaxRedo:        3,
-		MaxConcurrency: 5,
-		WorkerID:       "",
+		Timeout:              10 * time.Minute,
+		MaxRedo:              3,
+		MaxConcurrency:       5,
+		WorkerID:             "",
+		HealthReportInterval: 0,
 	}
 }
 
@@ -39,6 +42,9 @@ func (c *WorkerConfig) Validate() error {
 	}
 	if c.MaxConcurrency <= 0 {
 		return ErrInvalidMaxConcurrency
+	}
+	if c.HealthReportInterval < 0 {
+		return ErrInvalidHealthReportInterval
 	}
 	return nil
 }
