@@ -204,11 +204,13 @@ func (h *Checker) healthCheckRoutine() {
 	for {
 		select {
 		case <-h.ctx.Done():
+			logs.InfoContextf(h.ctx, "[task] health check routine stopping...")
 			return
 		case <-ticker.C:
 			if !mutex.IsMaster(mutex.WithMutexKey(h.config.KeyPrefix + "_mutex")) {
 				continue
 			}
+			logs.InfoContextf(h.ctx, "[task] health check routine running...")
 			if err := h.CheckWorkerHealth(h.ctx); err != nil {
 				logs.ErrorContextf(h.ctx, "[task] failed to check worker health: %v", err)
 			}
