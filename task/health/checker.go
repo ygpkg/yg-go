@@ -11,6 +11,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/mutex"
 )
 
 var (
@@ -205,6 +206,9 @@ func (h *Checker) healthCheckRoutine() {
 		case <-h.ctx.Done():
 			return
 		case <-ticker.C:
+			if !mutex.IsMaster(mutex.WithMutexKey(h.config.KeyPrefix + "_mutex")) {
+				continue
+			}
 			if err := h.CheckWorkerHealth(h.ctx); err != nil {
 				logs.ErrorContextf(h.ctx, "[task] failed to check worker health: %v", err)
 			}
