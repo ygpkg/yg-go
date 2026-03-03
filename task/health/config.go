@@ -11,11 +11,32 @@ import (
 const (
 	// HeartbeatTimeout 心跳超时时间（秒）
 	HeartbeatTimeout = 30
-	// DefaultCheckPeriod 默认健康检查周期
+	// GracePeriodTimeout 宽限期时间（秒），超过心跳超时时间但未达到宽限期时间的 worker 处于宽限期状态
+	GracePeriodTimeout = 60
 	DefaultCheckPeriod = 30 * time.Second
 )
 
-// CheckerConfig 健康检查器配置
+type WorkerStatus int
+
+const (
+	WorkerStatusHealthy WorkerStatus = iota
+	WorkerStatusGracePeriod
+	WorkerStatusDead
+)
+
+func (s WorkerStatus) String() string {
+	switch s {
+	case WorkerStatusHealthy:
+		return "healthy"
+	case WorkerStatusGracePeriod:
+		return "grace_period"
+	case WorkerStatusDead:
+		return "dead"
+	default:
+		return "unknown"
+	}
+}
+
 type CheckerConfig struct {
 	// KeyPrefix Redis 键前缀
 	KeyPrefix string
@@ -28,8 +49,6 @@ type CheckerConfig struct {
 	// 返回 error 会阻止删除心跳
 	OnWorkerDead func(ctx context.Context, info DeadWorkerInfo) error
 }
-
-// DeadWorkerInfo 死亡 Worker 信息
 type DeadWorkerInfo struct {
 	WorkerID      string
 	TaskType      string
@@ -37,7 +56,6 @@ type DeadWorkerInfo struct {
 	LastHeartbeat int64
 }
 
-// DefaultCheckerConfig 返回默认健康检查器配置
 func DefaultCheckerConfig() *CheckerConfig {
 	return &CheckerConfig{
 		KeyPrefix:   "task:",
@@ -45,7 +63,6 @@ func DefaultCheckerConfig() *CheckerConfig {
 	}
 }
 
-// Validate 验证配置
 func (c *CheckerConfig) Validate() error {
 	if c.RedisClient == nil {
 		return fmt.Errorf("health checker config: redis client is required")
