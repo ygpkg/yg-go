@@ -17,6 +17,27 @@ import (
 var (
 	stdChecker *Checker
 	once       sync.Once
+
+	deleteHeartbeatScript = redis.NewScript(`
+		local heartbeatKey = KEYS[1]
+		local gracePeriodKey = KEYS[2]
+		local workerID = ARGV[1]
+		
+		redis.call('HDEL', heartbeatKey, workerID)
+		redis.call('HDEL', gracePeriodKey, workerID)
+		return 1
+	`)
+
+	setHeartbeatScript = redis.NewScript(`
+		local heartbeatKey = KEYS[1]
+		local gracePeriodKey = KEYS[2]
+		local workerID = ARGV[1]
+		local value = ARGV[2]
+		
+		redis.call('HSET', heartbeatKey, workerID, value)
+		redis.call('HDEL', gracePeriodKey, workerID)
+		return 1
+	`)
 )
 
 func InitChecker(config *CheckerConfig) error {
@@ -69,17 +90,14 @@ func (h *Checker) gracePeriodKey(taskType string) string {
 
 func (h *Checker) SetHeartbeat(ctx context.Context, taskType, workerID string, taskID uint) error {
 	heartbeatKey := h.heartbeatKey(taskType)
+	gracePeriodKey := h.gracePeriodKey(taskType)
 	timestamp := time.Now().Unix()
 	value := fmt.Sprintf("%d-%d", timestamp, taskID)
 
-	_, err := h.config.RedisClient.HSet(ctx, heartbeatKey, workerID, value).Result()
+	keys := []string{heartbeatKey, gracePeriodKey}
+	_, err := setHeartbeatScript.Run(ctx, h.config.RedisClient, keys, workerID, value).Result()
 	if err != nil {
 		return fmt.Errorf("failed to set heartbeat: %w", err)
-	}
-
-	gracePeriodKey := h.gracePeriodKey(taskType)
-	if _, err := h.config.RedisClient.HDel(ctx, gracePeriodKey, workerID).Result(); err != nil {
-		logs.WarnContextf(ctx, "[task] failed to clear grace period status: %v, worker: %s", err, workerID)
 	}
 
 	logs.DebugContextf(ctx, "[task] set heartbeat, taskType: %s, workerID: %s, taskID: %d", taskType, workerID, taskID)
@@ -88,14 +106,12 @@ func (h *Checker) SetHeartbeat(ctx context.Context, taskType, workerID string, t
 
 func (h *Checker) DeleteHeartbeat(ctx context.Context, taskType, workerID string) error {
 	heartbeatKey := h.heartbeatKey(taskType)
-	_, err := h.config.RedisClient.HDel(ctx, heartbeatKey, workerID).Result()
+	gracePeriodKey := h.gracePeriodKey(taskType)
+
+	keys := []string{heartbeatKey, gracePeriodKey}
+	_, err := deleteHeartbeatScript.Run(ctx, h.config.RedisClient, keys, workerID).Result()
 	if err != nil {
 		return fmt.Errorf("failed to delete heartbeat: %w", err)
-	}
-
-	gracePeriodKey := h.gracePeriodKey(taskType)
-	if _, err := h.config.RedisClient.HDel(ctx, gracePeriodKey, workerID).Result(); err != nil {
-		logs.WarnContextf(ctx, "[task] failed to clear grace period status: %v, worker: %s", err, workerID)
 	}
 	return nil
 }

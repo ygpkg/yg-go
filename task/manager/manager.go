@@ -177,6 +177,25 @@ func (m *Manager) GetQueue() *Queue {
 	return m.queue
 }
 
+// ReassignDeadWorkerTasks 重新分配死亡 Worker 的任务
+// 将指定 worker 正在运行的任务标记为超时并重新入队
+func (m *Manager) ReassignDeadWorkerTasks(ctx context.Context, taskType, workerID string, taskID uint) error {
+	taskTypes, err := m.repo.HandleDeadWorkerTasks(ctx, taskType, workerID, taskID)
+	if err != nil {
+		return fmt.Errorf("failed to handle dead worker tasks: %w", err)
+	}
+
+	for _, tt := range taskTypes {
+		if err := m.queue.Push(ctx, tt); err != nil {
+			logs.ErrorContextf(ctx, "[task] failed to push task type %s for dead worker %s: %v", tt, workerID, err)
+			continue
+		}
+		logs.InfoContextf(ctx, "[task] pushed task type %s for dead worker %s reassignment", tt, workerID)
+	}
+
+	return nil
+}
+
 // GetNextStepPendingTaskTypes 获取下一步骤中需要触发的任务类型列表
 func (m *Manager) GetNextStepPendingTaskTypes(ctx context.Context, subjectID uint, appGroup string) ([]string, error) {
 	// 获取下一步骤的任务
