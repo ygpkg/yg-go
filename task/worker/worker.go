@@ -298,10 +298,16 @@ func (w *Worker) reportHealthOnce() {
 
 	if err := w.healthReporter.ReportHealth(w.ctx, health); err != nil {
 		logs.ErrorContextf(w.ctx, "[task] failed to report health: %v", err)
+	} else {
+		logs.InfoContextf(w.ctx, "[task] health report success, workerID: %s, taskTypes: %v, timestamp: %s",
+			health.WorkerID, health.TaskTypes, health.Timestamp.Format(time.RFC3339))
 	}
 }
 
 func (w *Worker) startHealthReportRoutine() {
+	logs.InfoContextf(w.ctx, "[task] health report routine started, workerID: %s, interval: %v",
+		w.config.WorkerID, w.config.HealthReportInterval)
+
 	w.startRoutine("health-reporter", func() {
 		ticker := time.NewTicker(w.config.HealthReportInterval)
 		defer ticker.Stop()
