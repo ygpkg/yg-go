@@ -15,4 +15,6 @@ var (
 	ErrWorkerNotStarted = errors.New("task: worker not started")
 	// ErrWorkerAlreadyStarted Worker 已启动
 	ErrWorkerAlreadyStarted = errors.New("task: worker already started")
+	// ErrInvalidHealthReportInterval 无效的健康上报间隔
+	ErrInvalidHealthReportInterval = errors.New("task: invalid health report interval")
 )

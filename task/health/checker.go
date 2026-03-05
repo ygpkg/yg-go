@@ -11,11 +11,33 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/logs"
+	"github.com/ygpkg/yg-go/mutex"
 )
 
 var (
 	stdChecker *Checker
 	once       sync.Once
+
+	deleteHeartbeatScript = redis.NewScript(`
+		local heartbeatKey = KEYS[1]
+		local gracePeriodKey = KEYS[2]
+		local workerID = ARGV[1]
+		
+		redis.call('HDEL', heartbeatKey, workerID)
+		redis.call('HDEL', gracePeriodKey, workerID)
+		return 1
+	`)
+
+	setHeartbeatScript = redis.NewScript(`
+		local heartbeatKey = KEYS[1]
+		local gracePeriodKey = KEYS[2]
+		local workerID = ARGV[1]
+		local value = ARGV[2]
+		
+		redis.call('HSET', heartbeatKey, workerID, value)
+		redis.call('HDEL', gracePeriodKey, workerID)
+		return 1
+	`)
 )
 
 func InitChecker(config *CheckerConfig) error {
@@ -26,7 +48,6 @@ func InitChecker(config *CheckerConfig) error {
 	return err
 }
 
-// GetChecker 获取全局健康检查器，如果未初始化则 panic
 func GetChecker() *Checker {
 	if stdChecker == nil {
 		panic(fmt.Errorf("health checker is nil"))
@@ -34,7 +55,6 @@ func GetChecker() *Checker {
 	return stdChecker
 }
 
-// Checker 健康检查器
 type Checker struct {
 	config *CheckerConfig
 
@@ -46,7 +66,6 @@ type Checker struct {
 	mu      sync.RWMutex
 }
 
-// NewChecker 创建健康检查器
 func NewChecker(config *CheckerConfig) (*Checker, error) {
 	if config == nil {
 		config = DefaultCheckerConfig()
@@ -60,19 +79,23 @@ func NewChecker(config *CheckerConfig) (*Checker, error) {
 	}, nil
 }
 
-// heartbeatKey 获取心跳 key
 func (h *Checker) heartbeatKey(taskType string) string {
-	return fmt.Sprintf("%stask_heartbeat:%s", h.config.KeyPrefix, taskType)
+	return fmt.Sprintf("%s_task_heartbeat:%s", h.config.KeyPrefix, taskType)
 }
 
-// SetHeartbeat 设置心跳
-// 更新 Worker 的心跳时间戳
+// gracePeriodKey 返回宽限期状态的Redis键
+func (h *Checker) gracePeriodKey(taskType string) string {
+	return fmt.Sprintf("%s_task_grace_period:%s", h.config.KeyPrefix, taskType)
+}
+
 func (h *Checker) SetHeartbeat(ctx context.Context, taskType, workerID string, taskID uint) error {
-	key := h.heartbeatKey(taskType)
+	heartbeatKey := h.heartbeatKey(taskType)
+	gracePeriodKey := h.gracePeriodKey(taskType)
 	timestamp := time.Now().Unix()
 	value := fmt.Sprintf("%d-%d", timestamp, taskID)
 
-	_, err := h.config.RedisClient.HSet(ctx, key, workerID, value).Result()
+	keys := []string{heartbeatKey, gracePeriodKey}
+	_, err := setHeartbeatScript.Run(ctx, h.config.RedisClient, keys, workerID, value).Result()
 	if err != nil {
 		return fmt.Errorf("failed to set heartbeat: %w", err)
 	}
@@ -81,33 +104,33 @@ func (h *Checker) SetHeartbeat(ctx context.Context, taskType, workerID string, t
 	return nil
 }
 
-// DeleteHeartbeat 删除心跳
 func (h *Checker) DeleteHeartbeat(ctx context.Context, taskType, workerID string) error {
-	key := h.heartbeatKey(taskType)
-	_, err := h.config.RedisClient.HDel(ctx, key, workerID).Result()
+	heartbeatKey := h.heartbeatKey(taskType)
+	gracePeriodKey := h.gracePeriodKey(taskType)
+
+	keys := []string{heartbeatKey, gracePeriodKey}
+	_, err := deleteHeartbeatScript.Run(ctx, h.config.RedisClient, keys, workerID).Result()
 	if err != nil {
 		return fmt.Errorf("failed to delete heartbeat: %w", err)
 	}
 	return nil
 }
 
-// GetWorkerCount 获取 Worker 数量
 func (h *Checker) GetWorkerCount(ctx context.Context, taskType string) (int64, error) {
-	key := h.heartbeatKey(taskType)
-	count, err := h.config.RedisClient.HLen(ctx, key).Result()
+	heartbeatKey := h.heartbeatKey(taskType)
+	count, err := h.config.RedisClient.HLen(ctx, heartbeatKey).Result()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get worker count: %w", err)
 	}
 	return count, nil
 }
 
-// IsWorkerAlive 检查 Worker 是否存活
 func (h *Checker) IsWorkerAlive(ctx context.Context, taskType, workerID string) (bool, error) {
-	key := h.heartbeatKey(taskType)
-	value, err := h.config.RedisClient.HGet(ctx, key, workerID).Result()
+	heartbeatKey := h.heartbeatKey(taskType)
+	value, err := h.config.RedisClient.HGet(ctx, heartbeatKey, workerID).Result()
 	if err != nil {
 		if errors.Is(err, redis.Nil) {
-			return false, nil // Worker 不存在
+			return false, nil
 		}
 		return false, err
 	}
@@ -122,11 +145,9 @@ func (h *Checker) IsWorkerAlive(ctx context.Context, taskType, workerID string) 
 		return false, nil
 	}
 
-	// 检查心跳是否在有效期内
 	return time.Now().Unix()-timestamp <= HeartbeatTimeout, nil
 }
 
-// Start 启动健康检查服务
 func (h *Checker) Start(ctx context.Context) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -137,7 +158,6 @@ func (h *Checker) Start(ctx context.Context) error {
 
 	h.ctx, h.cancel = context.WithCancel(ctx)
 
-	// 启动健康检查协程
 	h.startRoutine("health-checker", h.healthCheckRoutine)
 
 	h.started = true
@@ -145,7 +165,6 @@ func (h *Checker) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop 停止健康检查服务
 func (h *Checker) Stop(ctx context.Context) error {
 	h.mu.Lock()
 	if !h.started {
@@ -156,10 +175,8 @@ func (h *Checker) Stop(ctx context.Context) error {
 
 	logs.InfoContextf(ctx, "[task] stopping health checker...")
 
-	// 取消上下文，通知所有协程退出
 	h.cancel()
 
-	// 等待所有协程退出（带超时）
 	done := make(chan struct{})
 	go func() {
 		h.wg.Wait()
@@ -181,7 +198,6 @@ func (h *Checker) Stop(ctx context.Context) error {
 	return nil
 }
 
-// startRoutine 启动协程的统一封装
 func (h *Checker) startRoutine(name string, fn func()) {
 	h.wg.Add(1)
 	go func() {
@@ -195,7 +211,6 @@ func (h *Checker) startRoutine(name string, fn func()) {
 	}()
 }
 
-// healthCheckRoutine 健康检查协程
 func (h *Checker) healthCheckRoutine() {
 	ticker := time.NewTicker(h.config.CheckPeriod)
 	defer ticker.Stop()
@@ -203,8 +218,13 @@ func (h *Checker) healthCheckRoutine() {
 	for {
 		select {
 		case <-h.ctx.Done():
+			logs.InfoContextf(h.ctx, "[task] health check routine stopping...")
 			return
 		case <-ticker.C:
+			if !mutex.IsMaster(mutex.WithMutexKey(h.config.KeyPrefix + "_mutex")) {
+				continue
+			}
+			logs.InfoContextf(h.ctx, "[task] health check routine running...")
 			if err := h.CheckWorkerHealth(h.ctx); err != nil {
 				logs.ErrorContextf(h.ctx, "[task] failed to check worker health: %v", err)
 			}
@@ -212,12 +232,9 @@ func (h *Checker) healthCheckRoutine() {
 	}
 }
 
-// CheckWorkerHealth 检查 Worker 健康状态
-// 将超时的 Worker 移除，并将其正在执行的任务标记为失败
 func (h *Checker) CheckWorkerHealth(ctx context.Context) error {
 	now := time.Now().Unix()
 
-	// 获取所有任务类型
 	types, err := h.getAllTaskTypes(ctx)
 	if err != nil {
 		logs.ErrorContextf(ctx, "[task] failed to get task types: %v", err)
@@ -233,19 +250,18 @@ func (h *Checker) CheckWorkerHealth(ctx context.Context) error {
 	return nil
 }
 
-// getAllTaskTypes 获取所有任务类型（通过扫描心跳键）
 func (h *Checker) getAllTaskTypes(ctx context.Context) ([]string, error) {
-	var keys []string
+	var heartbeatKeys []string
 	var cursor uint64
-	pattern := fmt.Sprintf("%stask_heartbeat:*", h.config.KeyPrefix)
+	pattern := fmt.Sprintf("%s_task_heartbeat:*", h.config.KeyPrefix)
 
 	for {
-		kk, nextCursor, err := h.config.RedisClient.Scan(ctx, cursor, pattern, 100).Result()
+		keys, nextCursor, err := h.config.RedisClient.Scan(ctx, cursor, pattern, 100).Result()
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan keys: %w", err)
 		}
 
-		keys = append(keys, kk...)
+		heartbeatKeys = append(heartbeatKeys, keys...)
 		cursor = nextCursor
 
 		if cursor == 0 {
@@ -253,12 +269,11 @@ func (h *Checker) getAllTaskTypes(ctx context.Context) ([]string, error) {
 		}
 	}
 
-	// 提取任务类型
-	prefix := fmt.Sprintf("%stask_heartbeat:", h.config.KeyPrefix)
-	types := make([]string, 0, len(keys))
-	for _, key := range keys {
-		if len(key) > len(prefix) {
-			taskType := key[len(prefix):]
+	prefix := fmt.Sprintf("%s_task_heartbeat:", h.config.KeyPrefix)
+	types := make([]string, 0, len(heartbeatKeys))
+	for _, heartbeatKey := range heartbeatKeys {
+		if len(heartbeatKey) > len(prefix) {
+			taskType := heartbeatKey[len(prefix):]
 			types = append(types, taskType)
 		}
 	}
@@ -266,21 +281,34 @@ func (h *Checker) getAllTaskTypes(ctx context.Context) ([]string, error) {
 	return types, nil
 }
 
-// checkTaskTypeWorkers 检查特定任务类型的 Worker
+// checkTaskTypeWorkers 实现三阶段健康状态降级机制
+// 第一阶段 - 健康：心跳在 HeartbeatTimeout 内（30秒）
+// 第二阶段 - 宽限期：首次超时检测（30秒~60秒），标记但不删除
+// 第三阶段 - 死亡：宽限期内未恢复（60秒+），执行死亡回调
+//
+// 状态转换：
+//   - 健康 → 宽限期：首次心跳超时（>30秒）
+//   - 宽限期 → 健康：心跳恢复
+//   - 宽限期 → 死亡：60秒后仍未恢复
 func (h *Checker) checkTaskTypeWorkers(ctx context.Context, taskType string, now int64) error {
-	key := h.heartbeatKey(taskType)
+	heartbeatKey := h.heartbeatKey(taskType)
+	gracePeriodKey := h.gracePeriodKey(taskType)
 
-	// 获取所有 Worker 的心跳信息
-	workerMap, err := h.config.RedisClient.HGetAll(ctx, key).Result()
+	heartbeatMap, err := h.config.RedisClient.HGetAll(ctx, heartbeatKey).Result()
 	if err != nil {
 		return fmt.Errorf("failed to get workers: %w", err)
 	}
 
-	for workerID, value := range workerMap {
-		parts := strings.Split(value, "-")
+	gracePeriodMap, err := h.config.RedisClient.HGetAll(ctx, gracePeriodKey).Result()
+	if err != nil {
+		logs.WarnContextf(ctx, "[task] failed to get grace period map: %v", err)
+		gracePeriodMap = make(map[string]string)
+	}
+
+	for workerID, heartbeatValue := range heartbeatMap {
+		parts := strings.Split(heartbeatValue, "-")
 		if len(parts) < 2 {
-			logs.WarnContextf(ctx, "[task] invalid heartbeat format: %s:%s", workerID, value)
-			// 格式不对，删除 Worker
+			logs.WarnContextf(ctx, "[task] invalid heartbeat format: %s:%s", workerID, heartbeatValue)
 			h.DeleteHeartbeat(ctx, taskType, workerID)
 			continue
 		}
@@ -289,41 +317,54 @@ func (h *Checker) checkTaskTypeWorkers(ctx context.Context, taskType string, now
 		timestamp, err := strconv.ParseInt(timestampStr, 10, 64)
 		if err != nil {
 			logs.WarnContextf(ctx, "[task] failed to parse timestamp: %v, worker: %s", err, workerID)
-			// 格式不对，删除 Worker
 			h.DeleteHeartbeat(ctx, taskType, workerID)
 			continue
 		}
 
-		// 判断是否超时
-		if now-timestamp > HeartbeatTimeout {
-			logs.InfoContextf(ctx, "[task] worker expired: %s, taskType: %s, last heartbeat: %d", workerID, taskType, timestamp)
+		elapsed := now - timestamp
 
-			// 解析 TaskID
-			taskID, err := strconv.ParseUint(parts[1], 10, 64)
-			if err != nil {
-				logs.ErrorContextf(ctx, "[task] failed to parse task id: %v, worker: %s", err, workerID)
-				// 解析失败也认为是无效心跳，可以删除
-				h.DeleteHeartbeat(ctx, taskType, workerID)
-				continue
+		var taskID uint
+		if tid, err := strconv.ParseUint(parts[1], 10, 64); err == nil {
+			taskID = uint(tid)
+		}
+
+		status := h.getWorkerStatus(elapsed, workerID, gracePeriodMap)
+
+		switch status {
+		case WorkerStatusHealthy:
+			if _, exists := gracePeriodMap[workerID]; exists {
+				logs.InfoContextf(ctx, "[task] worker recovered: %s, taskType: %s", workerID, taskType)
+				if _, err := h.config.RedisClient.HDel(ctx, gracePeriodKey, workerID).Result(); err != nil {
+					logs.WarnContextf(ctx, "[task] failed to clear grace period status: %v, worker: %s", err, workerID)
+				}
 			}
 
-			// 如果配置了回调，则执行回调
+		case WorkerStatusGracePeriod:
+			if _, exists := gracePeriodMap[workerID]; !exists {
+				logs.WarnContextf(ctx, "[task] worker entering grace period: %s, taskType: %s, last heartbeat: %d", workerID, taskType, timestamp)
+				gracePeriodValue := fmt.Sprintf("%d-%d", now, timestamp)
+				if err := h.config.RedisClient.HSet(ctx, gracePeriodKey, workerID, gracePeriodValue).Err(); err != nil {
+					logs.ErrorContextf(ctx, "[task] failed to set grace period status: %v, worker: %s", err, workerID)
+				}
+			}
+
+		case WorkerStatusDead:
+			logs.InfoContextf(ctx, "[task] worker dead: %s, taskType: %s, last heartbeat: %d", workerID, taskType, timestamp)
+
 			if h.config.OnWorkerDead != nil {
 				info := DeadWorkerInfo{
 					WorkerID:      workerID,
 					TaskType:      taskType,
-					TaskID:        uint(taskID),
+					TaskID:        taskID,
 					LastHeartbeat: timestamp,
 				}
 
 				if err := h.config.OnWorkerDead(ctx, info); err != nil {
 					logs.ErrorContextf(ctx, "[task] worker dead callback failed: %v, worker: %s", err, workerID)
-					// 回调失败，暂时保留心跳，下次重试
 					continue
 				}
 			}
 
-			// 删除过期的 Worker
 			if err := h.DeleteHeartbeat(ctx, taskType, workerID); err != nil {
 				logs.ErrorContextf(ctx, "[task] failed to delete heartbeat: %v, worker: %s", err, workerID)
 			}
@@ -331,4 +372,37 @@ func (h *Checker) checkTaskTypeWorkers(ctx context.Context, taskType string, now
 	}
 
 	return nil
+}
+
+// getWorkerStatus 根据已过期时间和宽限期状态判断 worker 状态
+// 返回 WorkerStatus：
+//   - Healthy：已过期时间 <= HeartbeatTimeout
+//   - GracePeriod：首次超时检测，尚未进入宽限期映射
+//   - Dead：宽限期已过期（进入后 > GracePeriodTimeout）
+func (h *Checker) getWorkerStatus(elapsed int64, workerID string, graceMap map[string]string) WorkerStatus {
+	if elapsed <= HeartbeatTimeout {
+		return WorkerStatusHealthy
+	}
+
+	gracePeriodValue, inGracePeriod := graceMap[workerID]
+	if !inGracePeriod {
+		return WorkerStatusGracePeriod
+	}
+
+	parts := strings.Split(gracePeriodValue, "-")
+	if len(parts) < 1 {
+		return WorkerStatusGracePeriod
+	}
+
+	graceEnterTime, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return WorkerStatusGracePeriod
+	}
+
+	timeInGrace := time.Now().Unix() - graceEnterTime
+	if timeInGrace > GracePeriodTimeout {
+		return WorkerStatusDead
+	}
+
+	return WorkerStatusGracePeriod
 }

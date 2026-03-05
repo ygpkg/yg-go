@@ -27,6 +27,7 @@ go run .
 1. **Manager**: 任务管理器，负责队列同步和超时检测
 2. **Worker**: 任务执行器，从队列获取任务并执行
 3. **HealthChecker**: 健康检查器，监控 Worker 存活状态
+4. **HealthReporter**: 健康状态上报器，定时上报 Worker 健康状态到指定服务
 
 ## 任务执行器
 
@@ -49,6 +50,83 @@ w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error
     return NewDemoTaskExecutor(payload)
 })
 ```
+
+## 健康状态上报
+
+Worker 支持定时上报健康状态到指定服务，用于监控 Worker 运行状态。
+
+### 实现 HealthReporter 接口
+
+业务侧需实现 `worker.HealthReporter` 接口：
+
+```go
+type HealthReporter interface {
+    ReportHealth(ctx context.Context, health *WorkerHealth) error
+}
+```
+
+示例实现：
+
+```go
+type MyHealthReporter struct {
+    reportEndpoint string
+}
+
+func (r *MyHealthReporter) ReportHealth(ctx context.Context, health *worker.WorkerHealth) error {
+    data := map[string]any{
+        "worker_id":  health.WorkerID,
+        "timestamp":  health.Timestamp,
+        "task_types": health.TaskTypes,
+        "status":     health.Status,
+    }
+    jsonData, _ := json.Marshal(data)
+    fmt.Printf("[HealthReport] %s -> %s\n", r.reportEndpoint, string(jsonData))
+    return nil
+}
+```
+
+### 配置和使用
+
+```go
+workerConfig := &worker.WorkerConfig{
+    WorkerID:             "worker-001",
+    Timeout:              10 * time.Minute,
+    MaxRedo:              3,
+    MaxConcurrency:       3,
+    HealthReportInterval: 30 * time.Second, // 上报间隔，0 表示不上报
+}
+
+w, _ := worker.NewWorker(workerConfig, workMgr)
+
+healthReporter := &MyHealthReporter{
+    reportEndpoint: "http://localhost:8080/api/health",
+}
+w.SetHealthReporter(healthReporter)
+
+w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error) {
+    return NewDemoTaskExecutor(payload)
+})
+
+w.Start(ctx)
+```
+
+### WorkerHealth 结构体
+
+```go
+type WorkerHealth struct {
+    WorkerID   string    // Worker 标识
+    Timestamp  time.Time // 上报时间
+    TaskTypes  []string  // 注册的任务类型列表
+    Status     string    // 状态：running、stopped
+    CustomData any       // 扩展字段，业务侧可自定义
+}
+```
+
+### 上报时机
+
+- Worker 启动后立即上报一次
+- 按 `HealthReportInterval` 间隔周期性上报
+- `HealthReportInterval` 为 0 时不启动上报
 
 ## 验证 queueSyncRoutine
 
@@ -123,12 +201,76 @@ w.RegisterExecutor("demo_task", func(payload string) (worker.TaskExecutor, error
    SELECT id, task_status FROM core_task WHERE subject_id = 9999;
    ```
 
-## 测试 SQL 示例
+## 验证健康检查机制
+
+`health.Checker` 是健康检查器，负责监控 Worker 存活状态并处理死亡 Worker 的任务。
+
+### 工作原理
+
+#### 心跳存储结构
+- **存储位置**: Redis Hash，键格式为 `{KeyPrefix}task_heartbeat:{taskType}`
+- **数据格式**: `timestamp-taskID`（时间戳-任务ID）
+- **示例**: Worker `worker-001` 执行任务 `123` 时，心跳值为 `1709012345-123`
+
+#### 检查流程
+1. **检查周期**: 每 30 秒执行一次（`DefaultCheckPeriod`）
+2. **执行条件**: 只有 Master 节点才会执行健康检查
+3. **超时判定**: 当前时间戳 - 心跳时间戳 > 30 秒（`HeartbeatTimeout`）
+4. **死亡处理**: 调用 `OnWorkerDead` 回调，将死亡 Worker 的任务标记为失败
+
+### 验证健康检查
+
+此方式用于验证健康检查器的基本功能。
+
+1. **准备环境**: 启动 MySQL 和 Redis 服务，创建 `demo` 数据库
+2. **运行示例**: `cd task/example && go run .`
+3. **确认主节点**: 观察启动日志 `主节点状态: true`
+4. **创建测试任务**:
+   ```sql
+   INSERT INTO core_task (
+       task_type, task_status, subject_id, subject_type, 
+       payload, timeout, max_redo, created_at, updated_at
+   ) VALUES (
+       'demo_task', 'running', 8888, 'health_test',
+       '{"message": "health check test"}', 
+       30000000000, 3, NOW(), NOW()
+   );
+   SELECT id FROM core_task WHERE subject_id = 8888;
+   ```
+   > 记录返回的任务 ID（假设为 123），后续步骤需要使用
+   
+5. **手动插入过期心跳**（将 `{TASK_ID}` 替换为步骤4返回的真实任务ID）:
+   ```bash
+   redis-cli HSET task:example:task_heartbeat:demo_task worker-002 "1709012345-{TASK_ID}"
+   # 示例：redis-cli HSET task:example:task_heartbeat:demo_task worker-002 "1709012345-123"
+   ```
+   > 注意：时间戳 `1709012345` 是一个过期的 Unix 时间戳
+
+6. **观察日志**: 等待最多 30 秒，观察健康检查日志：
+   ```
+   [task] worker expired: worker-002, taskType: demo_task, last heartbeat: 1709012345
+   ! 发现死亡 Worker: worker-002, 任务ID: 123
+   ```
+7. **验证任务状态**: 检查任务是否被标记为失败
+   ```sql
+   SELECT id, task_status, err_msg FROM core_task WHERE subject_id = 8888;
+   ```
+   预期结果：`task_status` 为 `failed`，`err_msg` 为 `worker heartbeat timeout`
+
+### 注意事项
+
+1. **Master 职责**: 健康检查只在 Master 节点执行，确保不会重复处理
+2. **心跳超时**: 默认 30 秒，可根据业务需求调整 `HeartbeatTimeout` 常量
+3. **回调处理**: `OnWorkerDead` 回调用于处理死亡 Worker 的任务（如标记失败、重新入队等）
+4. **心跳清理**: 正常停止 Worker 时应调用 `DeleteHeartbeat` 清理心跳记录
+
+## 项目结构
 
 ```
 example/
-├── main.go      # 程序入口
-├── executors.go # 任务执行器实现
-├── util.go      # 工具函数
-└── README.md    # 本文档
+├── main.go             # 程序入口
+├── executors.go        # 任务执行器实现
+├── health_reporter.go  # 健康状态上报器实现
+├── util.go             # 工具函数
+└── README.md           # 本文档
 ```

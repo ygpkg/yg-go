@@ -267,7 +267,6 @@ func (repo *TaskRepository) CheckAndTimeoutTasks(ctx context.Context, onTimeoutC
 // InitTaskDBStatus 初始化数据库中的任务状态
 // 将所有运行中的任务标记为失败（用于启动时恢复）
 func (repo *TaskRepository) InitTaskDBStatus(ctx context.Context) error {
-	// 由于需要批量更新并使用 gorm.Expr，这里保留原始实现
 	err := repo.db.WithContext(ctx).Model(&model.TaskEntity{}).
 		Where("task_status = ?", model.TaskStatusRunning).
 		Updates(map[string]interface{}{
@@ -279,6 +278,59 @@ func (repo *TaskRepository) InitTaskDBStatus(ctx context.Context) error {
 		return fmt.Errorf("failed to init task status: %w", err)
 	}
 	return nil
+}
+
+// HandleDeadWorkerTasks 处理死亡 Worker 的任务
+// 将指定 worker 正在运行的任务标记为超时，并返回需要重新入队的任务类型
+func (repo *TaskRepository) HandleDeadWorkerTasks(ctx context.Context, taskType, workerID string, taskID uint) ([]string, error) {
+	now := time.Now()
+
+	var runningTasks []*model.TaskEntity
+	err := repo.db.WithContext(ctx).
+		Where("worker_id = ?", workerID).
+		Where("task_status = ?", model.TaskStatusRunning).
+		Find(&runningTasks).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to get running tasks for worker %s: %w", workerID, err)
+	}
+
+	if len(runningTasks) == 0 {
+		return nil, nil
+	}
+
+	var taskIDs []uint
+	for _, task := range runningTasks {
+		taskIDs = append(taskIDs, task.ID)
+	}
+
+	err = repo.db.WithContext(ctx).Model(&model.TaskEntity{}).
+		Where("id IN ?", taskIDs).
+		Where("task_status = ?", model.TaskStatusRunning).
+		Updates(map[string]interface{}{
+			"task_status": model.TaskStatusTimeout,
+			"err_msg":     "worker dead, task re-assigned",
+			"redo":        gorm.Expr("redo + 1"),
+			"end_at":      now,
+		}).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to update tasks for dead worker %s: %w", workerID, err)
+	}
+
+	logs.InfoContextf(ctx, "[task] marked %d tasks as timeout for dead worker %s", len(runningTasks), workerID)
+
+	taskTypeSet := make(map[string]struct{})
+	for _, task := range runningTasks {
+		if task.CanRetry() {
+			taskTypeSet[task.TaskType] = struct{}{}
+		}
+	}
+
+	var taskTypes []string
+	for tt := range taskTypeSet {
+		taskTypes = append(taskTypes, tt)
+	}
+
+	return taskTypes, nil
 }
 
 // GetNextStepTasks 获取下一个步骤的任务
