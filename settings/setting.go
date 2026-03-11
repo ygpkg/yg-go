@@ -139,7 +139,7 @@ func Get(group, key string) (*SettingItem, error) {
 	}
 
 	err = dbtools.Core().Table(TableNameSettings).
-		Where("`group` = ? AND `key` = ?", group, key).
+		Where(map[string]interface{}{"group": group, "key": key}).
 		First(ret).Error
 	if err != nil {
 		logs.Errorf("[settings] get %s failed, %s", group+"/"+key, err)
@@ -207,7 +207,7 @@ func GetJSON(group, key string, value interface{}) error {
 func List(group string, keys ...string) ([]*SettingItem, error) {
 	ret := []*SettingItem{}
 	err := dbtools.Core().Table(TableNameSettings).
-		Where("`group` = ? AND `key` IN (?)", group, keys).
+		Where(map[string]interface{}{"group": group, "key": keys}).
 		Find(&ret).Error
 	if err != nil {
 		return nil, err
@@ -222,7 +222,7 @@ func Updates(sets ...*SettingItem) error {
 		if set.ID != 0 {
 			sql = sql.Where("id = ?", set.ID)
 		} else {
-			sql = sql.Where("`group` = ? AND `key` = ?", set.Group, set.Key)
+			sql = sql.Where(map[string]interface{}{"group": set.Group, "key": set.Key})
 		}
 		update := &SettingItem{
 			Value:     set.Value,
