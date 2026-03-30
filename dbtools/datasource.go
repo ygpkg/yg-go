@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/ygpkg/yg-go/logs"
+	"gorm.io/driver/clickhouse"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -46,6 +47,10 @@ func InitDBConn(name, dburl string) (*gorm.DB, error) {
 		})
 	case "postgresql", "postgres", "pg":
 		db, err = gorm.Open(postgres.Open(dburl), &gorm.Config{
+			CreateBatchSize: 200,
+		})
+	case "clickhouse":
+		db, err = gorm.Open(clickhouse.Open(dburl), &gorm.Config{
 			CreateBatchSize: 200,
 		})
 	default:

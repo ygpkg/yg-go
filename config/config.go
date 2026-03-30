@@ -35,9 +35,10 @@ type MainConfig struct {
 	// Deprecated: 1.23.21 use DatabaseConns
 	MysqlConns map[string]string `yaml:"mysql_conns"`
 	// Deprecated 1.23.21 use DatabaseConns
-	PostgresConns map[string]string `yaml:"postgres_conns"`
-	DatabaseConns map[string]string `yaml:"database_conns"`
-	Env           string            `yaml:"env"`
+	PostgresConns   map[string]string `yaml:"postgres_conns"`
+	DatabaseConns   map[string]string `yaml:"database_conns"`
+	ClickhouseConns map[string]string `yaml:"clickhouse_conns"`
+	Env             string            `yaml:"env"`
 }
 
 // LoadCoreConfigFromFile .
