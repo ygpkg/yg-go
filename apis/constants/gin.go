@@ -2,6 +2,7 @@ package constants
 
 const (
 	CtxKeyRequestID = "reqid"
+	CtxKeyTraceID   = "traceid"
 	CtxKeyLogger    = "logger"
 	CtxKeyCode      = "code"
 
@@ -17,4 +18,9 @@ const (
 	CtxKeyUin        = "uin"
 	CtxKeyAPIKeyID   = "api_key_id"
 	CtxKeyLang       = "lang"
+)
+
+const (
+	HeaderKeyRequestID = "X-Request-Id"
+	HeaderKeyTraceID   = "X-Trace-Id"
 )
