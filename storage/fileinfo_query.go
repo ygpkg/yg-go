@@ -141,6 +141,12 @@ func (q *FileQuery) First() (*FileInfo, error) {
 	return &file, err
 }
 
+func (q *FileQuery) Last() (*FileInfo, error) {
+	var file FileInfo
+	err := q.db.Last(&file).Error
+	return &file, err
+}
+
 // List 获取多条记录
 func (q *FileQuery) List() ([]FileInfo, error) {
 	var list []FileInfo
