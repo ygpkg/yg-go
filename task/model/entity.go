@@ -52,9 +52,9 @@ type TaskEntity struct {
 	// Payload 任务参数，通常为 JSON 格式的业务数据
 	Payload string `gorm:"type:longtext" json:"payload" comment:"任务参数"`
 	// Result 任务执行结果，通常为 JSON 格式的返回数据
-	Result string `gorm:"type:text" json:"result" comment:"任务执行结果"`
+	Result string `gorm:"type:longtext" json:"result" comment:"任务执行结果"`
 	// ErrMsg 错误信息，任务失败、超时、取消时记录原因
-	ErrMsg string `gorm:"type:text" json:"err_msg" comment:"错误信息"`
+	ErrMsg string `gorm:"type:longtext" json:"err_msg" comment:"错误信息"`
 	// WorkerID Worker 标识，分布式模式下标识处理该任务的 Worker
 	WorkerID string `gorm:"type:varchar(64)" json:"worker_id" comment:"Worker标识"`
 	// StartAt 任务开始执行时间
