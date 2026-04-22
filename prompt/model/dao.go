@@ -8,6 +8,7 @@ import (
 
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // PromptCond CorePrompt 查询条件，支持按公司、应用、分组、编码、名称模糊、状态等维度筛选
@@ -20,7 +21,7 @@ type PromptCond struct {
 	Group     string
 	Code      string
 	NameLike  string
-	Status    int
+	Status    PromptStatus
 	OrderBy   []string
 	Offset    int
 	Limit     int
@@ -46,91 +47,143 @@ type PromptDao struct {
 	db *gorm.DB
 }
 
-// NewPromptDao 创建 PromptDao 实例
+// NewPromptDao creates a PromptDao instance with the given db connection
 func NewPromptDao(db *gorm.DB) *PromptDao {
 	return &PromptDao{db: db}
 }
 
-// TableName 返回 PromptDao 操作的表名
+// TableName returns the table name that PromptDao operates on
 func (dao *PromptDao) TableName() string {
 	return TableNameCorePrompt
 }
 
-// Insert 新增一条 CorePrompt 记录
-func (dao *PromptDao) Insert(ctx context.Context, entity *CorePrompt) error {
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+// DB returns the underlying gorm.DB instance
+func (dao *PromptDao) DB() *gorm.DB {
+	return dao.db
+}
+
+// WithTx returns a new PromptDao that uses the given transaction db
+func (dao *PromptDao) WithTx(tx *gorm.DB) *PromptDao {
+	return &PromptDao{db: tx}
+}
+
+// Create inserts a new CorePrompt record
+func (dao *PromptDao) Create(ctx context.Context, entity *CorePrompt) error {
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
 	if err := db.Create(entity).Error; err != nil {
-		return fmt.Errorf("[PromptDao] Insert fail, err: %v", err)
+		return fmt.Errorf("[PromptDao] Create fail, err: %v", err)
 	}
 	return nil
 }
 
-// BatchInsert 批量新增 CorePrompt 记录，空列表直接返回 nil
-func (dao *PromptDao) BatchInsert(ctx context.Context, entityList CorePromptList) error {
+// CreateBatch batch inserts CorePrompt records, empty list returns nil directly
+func (dao *PromptDao) CreateBatch(ctx context.Context, entityList CorePromptList) error {
 	if len(entityList) == 0 {
 		return nil
 	}
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
 	if err := db.Create(entityList).Error; err != nil {
-		return fmt.Errorf("[PromptDao] BatchInsert fail, err: %v", err)
+		return fmt.Errorf("[PromptDao] CreateBatch fail, err: %v", err)
 	}
 	return nil
 }
 
-// UpdateByID 按主键更新 CorePrompt 非0字段（struct 映射）
-func (dao *PromptDao) UpdateByID(ctx context.Context, id uint, entity *CorePrompt) error {
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
-	if err := db.Where("id = ?", id).Updates(entity).Error; err != nil {
-		return fmt.Errorf("[PromptDao] UpdateByID fail, id:%d, err: %v", id, err)
-	}
-	return nil
-}
-
-// UpdateMap 按主键更新 CorePrompt 指定字段（map 映射）
-func (dao *PromptDao) UpdateMap(ctx context.Context, id uint, updateMap map[string]interface{}) error {
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
-	if err := db.Where("id = ?", id).Updates(updateMap).Error; err != nil {
-		return fmt.Errorf("[PromptDao] UpdateMap fail, id:%d, err: %v", id, err)
-	}
-	return nil
-}
-
-// Delete 按主键软删 CorePrompt（置 deleted_at）
-func (dao *PromptDao) Delete(ctx context.Context, id uint) error {
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
-	if err := db.Where("id = ?", id).Updates(map[string]interface{}{"deleted_at": time.Now()}).Error; err != nil {
-		return fmt.Errorf("[PromptDao] Delete fail, id:%d, err: %v", id, err)
-	}
-	return nil
-}
-
-// DeleteByIDs 按主键列表批量软删 CorePrompt（置 deleted_at）
-func (dao *PromptDao) DeleteByIDs(ctx context.Context, ids []uint) error {
-	if len(ids) == 0 {
-		return nil
-	}
-	now := time.Now()
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
-	if err := db.Where("id IN ?", ids).Updates(map[string]interface{}{"deleted_at": now}).Error; err != nil {
-		return fmt.Errorf("[PromptDao] DeleteByIDs fail, err: %v", err)
-	}
-	return nil
-}
-
-// GetByID 按主键查询单条 CorePrompt
+// GetByID queries a single CorePrompt by primary key
 func (dao *PromptDao) GetByID(ctx context.Context, id uint) (*CorePrompt, error) {
 	var entity CorePrompt
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
 	if err := db.Where("id = ?", id).Find(&entity).Error; err != nil {
 		return nil, fmt.Errorf("[PromptDao] GetByID fail, id:%d, err: %v", id, err)
 	}
 	return &entity, nil
 }
 
-// GetByCond 按条件查询单条 CorePrompt
+// GetByIDs queries CorePrompt records by primary key list, empty list returns nil
+func (dao *PromptDao) GetByIDs(ctx context.Context, ids []uint) (CorePromptList, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	var entityList CorePromptList
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
+	if err := db.Where("id IN ?", ids).Find(&entityList).Error; err != nil {
+		return nil, fmt.Errorf("[PromptDao] GetByIDs fail, err: %v", err)
+	}
+	return entityList, nil
+}
+
+// UpdateByID updates CorePrompt non-zero fields by primary key (struct mapping)
+func (dao *PromptDao) UpdateByID(ctx context.Context, id uint, entity *CorePrompt) error {
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
+	if err := db.Where("id = ?", id).Updates(entity).Error; err != nil {
+		return fmt.Errorf("[PromptDao] UpdateByID fail, id:%d, err: %v", id, err)
+	}
+	return nil
+}
+
+// UpdateMap updates CorePrompt specified fields by primary key (map mapping)
+func (dao *PromptDao) UpdateMap(ctx context.Context, id uint, updateMap map[string]interface{}) error {
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
+	if err := db.Where("id = ?", id).Updates(updateMap).Error; err != nil {
+		return fmt.Errorf("[PromptDao] UpdateMap fail, id:%d, err: %v", id, err)
+	}
+	return nil
+}
+
+// UpdateMapBatch batch updates CorePrompt specified fields by condition
+func (dao *PromptDao) UpdateMapBatch(ctx context.Context, cond *PromptCond, updateMap map[string]interface{}) error {
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
+	dao.BuildCondition(db, cond)
+	if err := db.Updates(updateMap).Error; err != nil {
+		return fmt.Errorf("[PromptDao] UpdateMapBatch fail, cond:%s, err: %v", logs.JSON(cond), err)
+	}
+	return nil
+}
+
+// SaveBatchOnConflict batch saves CorePrompt records, upserting on conflict
+func (dao *PromptDao) SaveBatchOnConflict(ctx context.Context, entityList CorePromptList, conflictColumns ...string) error {
+	if len(entityList) == 0 {
+		return nil
+	}
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
+	if len(conflictColumns) > 0 {
+		cols := make([]clause.Column, 0, len(conflictColumns))
+		for _, c := range conflictColumns {
+			cols = append(cols, clause.Column{Name: c})
+		}
+		db = db.Clauses(clause.OnConflict{Columns: cols, UpdateAll: true})
+	}
+	if err := db.Create(entityList).Error; err != nil {
+		return fmt.Errorf("[PromptDao] SaveBatchOnConflict fail, err: %v", err)
+	}
+	return nil
+}
+
+// Delete soft-deletes CorePrompt by primary key (sets deleted_at)
+func (dao *PromptDao) Delete(ctx context.Context, id uint) error {
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
+	if err := db.Where("id = ?", id).Updates(map[string]interface{}{"deleted_at": time.Now()}).Error; err != nil {
+		return fmt.Errorf("[PromptDao] Delete fail, id:%d, err: %v", id, err)
+	}
+	return nil
+}
+
+// DeleteByIDs soft-deletes CorePrompt by primary key list (sets deleted_at)
+func (dao *PromptDao) DeleteByIDs(ctx context.Context, ids []uint) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	now := time.Now()
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
+	if err := db.Where("id IN ?", ids).Updates(map[string]interface{}{"deleted_at": now}).Error; err != nil {
+		return fmt.Errorf("[PromptDao] DeleteByIDs fail, err: %v", err)
+	}
+	return nil
+}
+
+// GetByCond queries a single CorePrompt by condition
 func (dao *PromptDao) GetByCond(ctx context.Context, cond *PromptCond) (*CorePrompt, error) {
 	var entity CorePrompt
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
 	dao.BuildCondition(db, cond)
 	if err := db.Find(&entity).Error; err != nil {
 		return nil, fmt.Errorf("[PromptDao] GetByCond fail, cond:%s, err: %v", logs.JSON(cond), err)
@@ -138,30 +191,30 @@ func (dao *PromptDao) GetByCond(ctx context.Context, cond *PromptCond) (*CorePro
 	return &entity, nil
 }
 
-// GetByAppAndGroup 按应用与业务分组查询 CorePrompt
+// GetByAppAndGroup queries CorePrompt by app and group
 func (dao *PromptDao) GetByAppAndGroup(ctx context.Context, app, group string) (*CorePrompt, error) {
 	var entity CorePrompt
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
-	if err := db.Where("app = ? AND group = ?", app, group).Find(&entity).Error; err != nil {
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
+	if err := db.Where("app = ? AND `group` = ?", app, group).Find(&entity).Error; err != nil {
 		return nil, fmt.Errorf("[PromptDao] GetByAppAndGroup fail, app:%s, group:%s, err: %v", app, group, err)
 	}
 	return &entity, nil
 }
 
-// GetByCode 按业务编码查询 CorePrompt
+// GetByCode queries CorePrompt by business code
 func (dao *PromptDao) GetByCode(ctx context.Context, code string) (*CorePrompt, error) {
 	var entity CorePrompt
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
 	if err := db.Where("code = ?", code).Find(&entity).Error; err != nil {
 		return nil, fmt.Errorf("[PromptDao] GetByCode fail, code:%s, err: %v", code, err)
 	}
 	return &entity, nil
 }
 
-// GetListByCond 按条件查询 CorePrompt 列表
+// GetListByCond queries CorePrompt list by condition
 func (dao *PromptDao) GetListByCond(ctx context.Context, cond *PromptCond) (CorePromptList, error) {
 	var entityList CorePromptList
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
 	dao.BuildCondition(db, cond)
 	if err := db.Find(&entityList).Error; err != nil {
 		return nil, fmt.Errorf("[PromptDao] GetListByCond fail, cond:%s, err: %v", logs.JSON(cond), err)
@@ -169,9 +222,9 @@ func (dao *PromptDao) GetListByCond(ctx context.Context, cond *PromptCond) (Core
 	return entityList, nil
 }
 
-// GetPageListByCond 按条件分页查询 CorePrompt 列表并返回总数
+// GetPageListByCond queries paginated CorePrompt list by condition with total count
 func (dao *PromptDao) GetPageListByCond(ctx context.Context, cond *PromptCond) (CorePromptList, int64, error) {
-	db := dao.db.WithContext(ctx).Model(&CorePrompt{}).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
 	dao.BuildCondition(db, cond)
 	var count int64
 	if err := db.Count(&count).Error; err != nil {
@@ -190,9 +243,9 @@ func (dao *PromptDao) GetPageListByCond(ctx context.Context, cond *PromptCond) (
 	return entityList, count, nil
 }
 
-// CountByCond 按条件统计 CorePrompt 总数
+// CountByCond counts CorePrompt records by condition
 func (dao *PromptDao) CountByCond(ctx context.Context, cond *PromptCond) (int64, error) {
-	db := dao.db.WithContext(ctx).Model(&CorePrompt{}).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePrompt{})
 	dao.BuildCondition(db, cond)
 	var count int64
 	if err := db.Count(&count).Error; err != nil {
@@ -201,7 +254,7 @@ func (dao *PromptDao) CountByCond(ctx context.Context, cond *PromptCond) (int64,
 	return count, nil
 }
 
-// BuildCondition 构建 CorePrompt 查询的 WHERE 条件链，含 company/app/group/code/status/软删等维度
+// BuildCondition builds WHERE condition chain for CorePrompt queries
 func (dao *PromptDao) BuildCondition(db *gorm.DB, cond *PromptCond) {
 	if cond == nil {
 		return
@@ -223,7 +276,7 @@ func (dao *PromptDao) BuildCondition(db *gorm.DB, cond *PromptCond) {
 		db.Where(fmt.Sprintf("%s.app = ?", tn), cond.App)
 	}
 	if cond.Group != "" {
-		db.Where(fmt.Sprintf("%s.group = ?", tn), cond.Group)
+		db.Where(fmt.Sprintf("%s.`group` = ?", tn), cond.Group)
 	}
 	if cond.Code != "" {
 		db.Where(fmt.Sprintf("%s.code = ?", tn), cond.Code)
@@ -247,91 +300,154 @@ type PromptVersionDao struct {
 	db *gorm.DB
 }
 
-// NewPromptVersionDao 创建 PromptVersionDao 实例
+// NewPromptVersionDao creates a PromptVersionDao instance with the given db connection
 func NewPromptVersionDao(db *gorm.DB) *PromptVersionDao {
 	return &PromptVersionDao{db: db}
 }
 
-// TableName 返回 PromptVersionDao 操作的表名
+// TableName returns the table name that PromptVersionDao operates on
 func (dao *PromptVersionDao) TableName() string {
 	return TableNameCorePromptVersion
 }
 
-// Insert 新增一条 CorePromptVersion 记录
-func (dao *PromptVersionDao) Insert(ctx context.Context, entity *CorePromptVersion) error {
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+// DB returns the underlying gorm.DB instance
+func (dao *PromptVersionDao) DB() *gorm.DB {
+	return dao.db
+}
+
+// WithTx returns a new PromptVersionDao that uses the given transaction db
+func (dao *PromptVersionDao) WithTx(tx *gorm.DB) *PromptVersionDao {
+	return &PromptVersionDao{db: tx}
+}
+
+// Create inserts a new CorePromptVersion record
+func (dao *PromptVersionDao) Create(ctx context.Context, entity *CorePromptVersion) error {
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
 	if err := db.Create(entity).Error; err != nil {
-		return fmt.Errorf("[PromptVersionDao] Insert fail, err: %v", err)
+		return fmt.Errorf("[PromptVersionDao] Create fail, err: %v", err)
 	}
 	return nil
 }
 
-// BatchInsert 批量新增 CorePromptVersion 记录，空列表直接返回 nil
-func (dao *PromptVersionDao) BatchInsert(ctx context.Context, entityList CorePromptVersionList) error {
+// CreateBatch batch inserts CorePromptVersion records, empty list returns nil
+func (dao *PromptVersionDao) CreateBatch(ctx context.Context, entityList CorePromptVersionList) error {
 	if len(entityList) == 0 {
 		return nil
 	}
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
 	if err := db.Create(entityList).Error; err != nil {
-		return fmt.Errorf("[PromptVersionDao] BatchInsert fail, err: %v", err)
+		return fmt.Errorf("[PromptVersionDao] CreateBatch fail, err: %v", err)
 	}
 	return nil
 }
 
-// UpdateByID 按主键更新 CorePromptVersion 非0字段（struct 映射）
-func (dao *PromptVersionDao) UpdateByID(ctx context.Context, id uint, entity *CorePromptVersion) error {
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
-	if err := db.Where("id = ?", id).Updates(entity).Error; err != nil {
-		return fmt.Errorf("[PromptVersionDao] UpdateByID fail, id:%d, err: %v", id, err)
-	}
-	return nil
-}
-
-// UpdateMap 按主键更新 CorePromptVersion 指定字段（map 映射）
-func (dao *PromptVersionDao) UpdateMap(ctx context.Context, id uint, updateMap map[string]interface{}) error {
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
-	if err := db.Where("id = ?", id).Updates(updateMap).Error; err != nil {
-		return fmt.Errorf("[PromptVersionDao] UpdateMap fail, id:%d, err: %v", id, err)
-	}
-	return nil
-}
-
-// Delete 按主键软删 CorePromptVersion（置 deleted_at）
-func (dao *PromptVersionDao) Delete(ctx context.Context, id uint) error {
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
-	if err := db.Where("id = ?", id).Updates(map[string]interface{}{"deleted_at": time.Now()}).Error; err != nil {
-		return fmt.Errorf("[PromptVersionDao] Delete fail, id:%d, err: %v", id, err)
-	}
-	return nil
-}
-
-// GetByID 按主键查询单条 CorePromptVersion
+// GetByID queries a single CorePromptVersion by primary key
 func (dao *PromptVersionDao) GetByID(ctx context.Context, id uint) (*CorePromptVersion, error) {
 	var entity CorePromptVersion
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
 	if err := db.Where("id = ?", id).Find(&entity).Error; err != nil {
 		return nil, fmt.Errorf("[PromptVersionDao] GetByID fail, id:%d, err: %v", id, err)
 	}
 	return &entity, nil
 }
 
-// GetByIDs 按主键列表批量查询 CorePromptVersion，空列表直接返回 nil
+// GetByIDs queries CorePromptVersion records by primary key list, empty list returns nil
 func (dao *PromptVersionDao) GetByIDs(ctx context.Context, ids []uint) (CorePromptVersionList, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 	var entityList CorePromptVersionList
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
 	if err := db.Where("id IN ?", ids).Find(&entityList).Error; err != nil {
 		return nil, fmt.Errorf("[PromptVersionDao] GetByIDs fail, err: %v", err)
 	}
 	return entityList, nil
 }
 
-// GetListByCond 按条件查询 CorePromptVersion 列表
+// UpdateByID updates CorePromptVersion non-zero fields by primary key (struct mapping)
+func (dao *PromptVersionDao) UpdateByID(ctx context.Context, id uint, entity *CorePromptVersion) error {
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
+	if err := db.Where("id = ?", id).Updates(entity).Error; err != nil {
+		return fmt.Errorf("[PromptVersionDao] UpdateByID fail, id:%d, err: %v", id, err)
+	}
+	return nil
+}
+
+// UpdateMap updates CorePromptVersion specified fields by primary key (map mapping)
+func (dao *PromptVersionDao) UpdateMap(ctx context.Context, id uint, updateMap map[string]interface{}) error {
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
+	if err := db.Where("id = ?", id).Updates(updateMap).Error; err != nil {
+		return fmt.Errorf("[PromptVersionDao] UpdateMap fail, id:%d, err: %v", id, err)
+	}
+	return nil
+}
+
+// UpdateMapBatch batch updates CorePromptVersion specified fields by condition
+func (dao *PromptVersionDao) UpdateMapBatch(ctx context.Context, cond *PromptVersionCond, updateMap map[string]interface{}) error {
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
+	dao.BuildCondition(db, cond)
+	if err := db.Updates(updateMap).Error; err != nil {
+		return fmt.Errorf("[PromptVersionDao] UpdateMapBatch fail, cond:%s, err: %v", logs.JSON(cond), err)
+	}
+	return nil
+}
+
+// SaveBatchOnConflict batch saves CorePromptVersion records, upserting on conflict
+func (dao *PromptVersionDao) SaveBatchOnConflict(ctx context.Context, entityList CorePromptVersionList, conflictColumns ...string) error {
+	if len(entityList) == 0 {
+		return nil
+	}
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
+	if len(conflictColumns) > 0 {
+		cols := make([]clause.Column, 0, len(conflictColumns))
+		for _, c := range conflictColumns {
+			cols = append(cols, clause.Column{Name: c})
+		}
+		db = db.Clauses(clause.OnConflict{Columns: cols, UpdateAll: true})
+	}
+	if err := db.Create(entityList).Error; err != nil {
+		return fmt.Errorf("[PromptVersionDao] SaveBatchOnConflict fail, err: %v", err)
+	}
+	return nil
+}
+
+// Delete soft-deletes CorePromptVersion by primary key (sets deleted_at)
+func (dao *PromptVersionDao) Delete(ctx context.Context, id uint) error {
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
+	if err := db.Where("id = ?", id).Updates(map[string]interface{}{"deleted_at": time.Now()}).Error; err != nil {
+		return fmt.Errorf("[PromptVersionDao] Delete fail, id:%d, err: %v", id, err)
+	}
+	return nil
+}
+
+// DeleteByIDs soft-deletes CorePromptVersion by primary key list (sets deleted_at)
+func (dao *PromptVersionDao) DeleteByIDs(ctx context.Context, ids []uint) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	now := time.Now()
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
+	if err := db.Where("id IN ?", ids).Updates(map[string]interface{}{"deleted_at": now}).Error; err != nil {
+		return fmt.Errorf("[PromptVersionDao] DeleteByIDs fail, err: %v", err)
+	}
+	return nil
+}
+
+// GetByCond queries a single CorePromptVersion by condition
+func (dao *PromptVersionDao) GetByCond(ctx context.Context, cond *PromptVersionCond) (*CorePromptVersion, error) {
+	var entity CorePromptVersion
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
+	dao.BuildCondition(db, cond)
+	if err := db.Find(&entity).Error; err != nil {
+		return nil, fmt.Errorf("[PromptVersionDao] GetByCond fail, cond:%s, err: %v", logs.JSON(cond), err)
+	}
+	return &entity, nil
+}
+
+// GetListByCond queries CorePromptVersion list by condition
 func (dao *PromptVersionDao) GetListByCond(ctx context.Context, cond *PromptVersionCond) (CorePromptVersionList, error) {
 	var entityList CorePromptVersionList
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
 	dao.BuildCondition(db, cond)
 	if err := db.Find(&entityList).Error; err != nil {
 		return nil, fmt.Errorf("[PromptVersionDao] GetListByCond fail, cond:%s, err: %v", logs.JSON(cond), err)
@@ -339,9 +455,9 @@ func (dao *PromptVersionDao) GetListByCond(ctx context.Context, cond *PromptVers
 	return entityList, nil
 }
 
-// GetPageListByCond 按条件分页查询 CorePromptVersion 列表并返回总数
+// GetPageListByCond queries paginated CorePromptVersion list by condition with total count
 func (dao *PromptVersionDao) GetPageListByCond(ctx context.Context, cond *PromptVersionCond) (CorePromptVersionList, int64, error) {
-	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{}).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
 	dao.BuildCondition(db, cond)
 	var count int64
 	if err := db.Count(&count).Error; err != nil {
@@ -360,20 +476,31 @@ func (dao *PromptVersionDao) GetPageListByCond(ctx context.Context, cond *Prompt
 	return entityList, count, nil
 }
 
-// GetListByPromptID 按 promptID 查询该模板下所有版本，0 值直接返回 nil
+// GetListByPromptID queries all versions under a prompt template by promptID, 0 returns nil
 func (dao *PromptVersionDao) GetListByPromptID(ctx context.Context, promptID uint) (CorePromptVersionList, error) {
 	if promptID == 0 {
 		return nil, nil
 	}
 	var entityList CorePromptVersionList
-	db := dao.db.WithContext(ctx).Table(dao.TableName())
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
 	if err := db.Where("prompt_id = ?", promptID).Find(&entityList).Error; err != nil {
 		return nil, fmt.Errorf("[PromptVersionDao] GetListByPromptID fail, promptID:%d, err: %v", promptID, err)
 	}
 	return entityList, nil
 }
 
-// BuildCondition 构建 CorePromptVersion 查询的 WHERE 条件链，含 company/promptID/软删等维度
+// CountByCond counts CorePromptVersion records by condition
+func (dao *PromptVersionDao) CountByCond(ctx context.Context, cond *PromptVersionCond) (int64, error) {
+	db := dao.db.WithContext(ctx).Model(&CorePromptVersion{})
+	dao.BuildCondition(db, cond)
+	var count int64
+	if err := db.Count(&count).Error; err != nil {
+		return 0, fmt.Errorf("[PromptVersionDao] CountByCond fail, cond:%s, err: %v", logs.JSON(cond), err)
+	}
+	return count, nil
+}
+
+// BuildCondition builds WHERE condition chain for CorePromptVersion queries
 func (dao *PromptVersionDao) BuildCondition(db *gorm.DB, cond *PromptVersionCond) {
 	if cond == nil {
 		return

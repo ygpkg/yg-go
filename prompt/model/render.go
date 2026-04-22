@@ -11,7 +11,7 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
-// DefaultFuncMap prompt 模板渲染使用的自定义函数映射，包含 Upper/Lower/Trunct/JoinComma
+// DefaultFuncMap provides custom function mappings for prompt template rendering, including Upper/Lower/Trunct/JoinComma.
 var DefaultFuncMap = template.FuncMap{
 	"Upper":     strings.ToUpper,
 	"Lower":     strings.ToLower,
@@ -19,7 +19,7 @@ var DefaultFuncMap = template.FuncMap{
 	"JoinComma": joinCommaFunc,
 }
 
-// truncFunc 截断字符串至指定长度，超出部分加省略号
+// truncFunc truncates a string to the specified length, appending ellipsis for the excess part.
 func truncFunc(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
@@ -30,12 +30,12 @@ func truncFunc(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-// joinCommaFunc 将字符串切片用逗号连接
+// joinCommaFunc joins a string slice with commas.
 func joinCommaFunc(items []string) string {
 	return strings.Join(items, ", ")
 }
 
-// ExtractVariableNames 从 Go template AST 中提取所有变量引用名（{{.VarName}}），返回去重后的集合
+// ExtractVariableNames extracts all variable reference names ({{.VarName}}) from the Go template AST and returns a deduplicated set.
 func ExtractVariableNames(content string) ([]string, error) {
 	t, err := template.New("prompt_extract").Parse(content)
 	if err != nil {
@@ -51,7 +51,7 @@ func ExtractVariableNames(content string) ([]string, error) {
 	return names, nil
 }
 
-// walkAST 递归遍历模板 AST 的 Node 列表，提取 NodeField 和 NodeVariable 中的变量名
+// walkAST recursively traverses the template AST node list, extracting variable names from NodeField and NodeVariable.
 func walkAST(node parse.Node, seen map[string]bool) {
 	switch n := node.(type) {
 	case *parse.ListNode:
@@ -100,8 +100,8 @@ func walkAST(node parse.Node, seen map[string]bool) {
 	}
 }
 
-// ParseVariableKeys 从 content AST 提取变量名，与声明的 variable_keys 交叉校验
-// 允许 variable_keys 声明多于 AST 引用的变量，不允许 AST 引用但未声明
+// ParseVariableKeys extracts variable names from the content AST and cross-validates them with declared variable_keys.
+// It allows variable_keys to declare more variables than the AST references, but forbids AST references that are undeclared.
 func ParseVariableKeys(ctx context.Context, content string, declaredKeys []VarKey) ([]VarKey, error) {
 	if content == "" {
 		return nil, ErrEmptyContent
@@ -140,7 +140,7 @@ func ParseVariableKeys(ctx context.Context, content string, declaredKeys []VarKe
 	return declaredKeys, nil
 }
 
-// isValidEnumType 校验 EnumType 是否为合法的变量类型枚举值
+// isValidEnumType validates whether an EnumType is a valid variable type enum value.
 func isValidEnumType(t EnumType) bool {
 	switch t {
 	case VarKeyTypeString, VarKeyTypeInt, VarKeyTypeEnum,
@@ -151,9 +151,9 @@ func isValidEnumType(t EnumType) bool {
 	}
 }
 
-// ValidatePromptValue 按 variable_keys 校验传入的 prompt_value
-// 校验维度：required、类型匹配、enum 取值范围、int/float 范围、string 长度、list 项数
-// 非 required 且缺失的变量，使用 VarKey.Default 填充
+// ValidatePromptValue validates the incoming prompt_value against variable_keys.
+// Validation dimensions: required, type matching, enum value range, int/float range, string length, list item count.
+// For non-required missing variables, VarKey.Default is used to fill.
 func ValidatePromptValue(ctx context.Context, keys []VarKey, values map[string]any) (map[string]any, error) {
 	result := make(map[string]any, len(keys))
 
@@ -257,8 +257,8 @@ func ValidatePromptValue(ctx context.Context, keys []VarKey, values map[string]a
 	return result, nil
 }
 
-// ValidateAndRender 校验参数 + 渲染模板，返回最终 Prompt 字符串
-// 流程：ParseVariableKeys → ValidatePromptValue → text/template Execute
+// ValidateAndRender validates prompt variables and renders the template content into the final prompt string.
+// Validation flow: ParseVariableKeys → ValidatePromptValue → text/template Execute
 func ValidateAndRender(ctx context.Context, content string, variableKeys []VarKey, promptValue map[string]any) (string, error) {
 	if content == "" {
 		return "", ErrEmptyContent

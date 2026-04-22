@@ -31,7 +31,7 @@ const (
 	VarKeyTypeList   EnumType = "list"
 )
 
-// VarKey prompt 模板变量声明，包含变量名称、类型、校验规则与默认值
+// VarKey declares a prompt template variable, including its name, type, validation rules, and default value.
 type VarKey struct {
 	Name       string   `json:"name"`
 	Type       EnumType `json:"type"`
@@ -48,16 +48,16 @@ type VarKey struct {
 // CorePrompt prompt 模板主表实体，归属公司并按应用+业务分组划分，code 用于业务硬编码查找
 type CorePrompt struct {
 	gorm.Model
-	CompanyID       uint   `gorm:"column:company_id;type:bigint unsigned;not null;comment:公司ID;index:idx_cp_company" json:"company_id"`
-	Uin             uint   `gorm:"column:uin;type:bigint unsigned;not null;default:0;comment:创建人UIN" json:"uin"`
-	App             string `gorm:"column:app;type:varchar(64);not null;comment:所属应用(如dotteacher/dotworker)" json:"app"`
-	Group           string `gorm:"column:group;type:varchar(64);not null;comment:业务分组(如question_variant)" json:"group"`
-	Name            string `gorm:"column:name;type:varchar(128);not null;comment:模板名称" json:"name"`
-	Code            string `gorm:"column:code;type:varchar(64);not null;comment:模板编码(业务硬编码查找);index:idx_cp_code,unique" json:"code"`
-	LatestVersionID uint   `gorm:"column:latest_version_id;type:bigint unsigned;not null;default:0;comment:当前生效的最新版本ID" json:"latest_version_id"`
-	Status          int    `gorm:"column:status;type:tinyint;not null;default:1;comment:1启用 0禁用" json:"status"`
-	CreatedUin      uint   `gorm:"column:created_uin;type:bigint unsigned;not null;default:0;comment:创建人UIN" json:"created_uin"`
-	UpdatedUin      uint   `gorm:"column:updated_uin;type:bigint unsigned;not null;default:0;comment:更新人UIN" json:"updated_uin"`
+	CompanyID       uint         `gorm:"column:company_id;type:bigint unsigned;not null;comment:公司ID;index:idx_cp_company" json:"company_id"`
+	Uin             uint         `gorm:"column:uin;type:bigint unsigned;not null;default:0;comment:创建人UIN" json:"uin"`
+	App             string       `gorm:"column:app;type:varchar(64);not null;comment:所属应用(如dotteacher/dotworker)" json:"app"`
+	Group           string       `gorm:"column:group;type:varchar(64);not null;comment:业务分组(如question_variant)" json:"group"`
+	Name            string       `gorm:"column:name;type:varchar(128);not null;comment:模板名称" json:"name"`
+	Code            string       `gorm:"column:code;type:varchar(64);not null;comment:模板编码(业务硬编码查找);index:idx_cp_code,unique" json:"code"`
+	LatestVersionID uint         `gorm:"column:latest_version_id;type:bigint unsigned;not null;default:0;comment:当前生效的最新版本ID" json:"latest_version_id"`
+	Status          PromptStatus `gorm:"column:status;type:tinyint;not null;default:1;comment:1启用 0禁用" json:"status"`
+	CreatedUin      uint         `gorm:"column:created_uin;type:bigint unsigned;not null;default:0;comment:创建人UIN" json:"created_uin"`
+	UpdatedUin      uint         `gorm:"column:updated_uin;type:bigint unsigned;not null;default:0;comment:更新人UIN" json:"updated_uin"`
 }
 
 // TableName 返回 CorePrompt 表名
@@ -65,7 +65,7 @@ func (CorePrompt) TableName() string {
 	return TableNameCorePrompt
 }
 
-// CorePromptList CorePrompt 列表类型别名，提供 ToMap 等集合方法
+// CorePromptList is a list alias of CorePrompt that provides collection methods such as ToMap.
 type CorePromptList []CorePrompt
 
 // ToMap 按 ID 为键将列表转为 map
@@ -97,7 +97,7 @@ func (CorePromptVersion) TableName() string {
 	return TableNameCorePromptVersion
 }
 
-// CorePromptVersionList CorePromptVersion 列表类型别名，提供 ToMap 等集合方法
+// CorePromptVersionList is a list alias of CorePromptVersion that provides collection methods such as ToMap.
 type CorePromptVersionList []CorePromptVersion
 
 // ToMap 按 ID 为键将列表转为 map
