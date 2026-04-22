@@ -7,7 +7,7 @@ import (
 	"github.com/ygpkg/yg-go/llm/llmtype"
 )
 
-// ProviderFactory 驱动工厂函数签名，由各 provider 驻动在 init() 中注册
+// ProviderFactory is the factory function signature for creating an LLM client instance.
 type ProviderFactory func(apiKey string, opts ...Option) (llmtype.Client, error)
 
 var (
@@ -22,10 +22,7 @@ func RegisterProvider(name string, factory ProviderFactory) {
 	providers[name] = factory
 }
 
-// NewClient 根据驱动名称创建 LLM 客户端实例
-// provider: 驱动名称，如 "openai"、"deepseek"、"qwen"
-// apiKey: API 密钥
-// opts: 可选配置项（WithBaseURL / WithProxy / WithDefaultModel 等）
+// NewClient creates an LLM client instance by provider name.
 func NewClient(provider string, apiKey string, opts ...Option) (llmtype.Client, error) {
 	mu.RLock()
 	factory, ok := providers[provider]

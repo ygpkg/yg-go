@@ -13,6 +13,9 @@ import (
 	"github.com/ygpkg/yg-go/llm/llmtype"
 )
 
+// DefaultHTTPTimeout is the default timeout for OpenAI HTTP client requests.
+const DefaultHTTPTimeout = 120 * time.Second
+
 // OpenAIClient OpenAI 驱动适配器，实现 llmtype.Client 接口
 // 通过 sashabaranov/go-openai SDK 与兼容 OpenAI 协议的 API 通信
 type OpenAIClient struct {
@@ -20,8 +23,7 @@ type OpenAIClient struct {
 	defaultModel string
 }
 
-// Register 将 OpenAI 驻动注册到全局工厂，业务侧需显式调用 openai.Register() 初始化
-// 替代 init() 函数以避免 gochecknoinits lint 规则
+// Register registers the OpenAI provider into the global factory. Call openai.Register() explicitly to initialize.
 func Register() {
 	llm.RegisterProvider("openai", newOpenAIFactory)
 }
@@ -47,7 +49,7 @@ func newOpenAIFactory(apiKey string, opts ...llm.Option) (llmtype.Client, error)
 			Transport: &http.Transport{
 				Proxy: http.ProxyURL(proxyURL),
 			},
-			Timeout: 120 * time.Second,
+			Timeout: DefaultHTTPTimeout,
 		}
 	}
 

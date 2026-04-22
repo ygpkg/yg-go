@@ -1,6 +1,6 @@
 package llm
 
-// Config 驱动工厂配置项
+// Config holds the driver factory configuration including base URL, proxy, model name, and HTTP client.
 type Config struct {
 	BaseURL    string
 	ProxyURL   string
@@ -8,7 +8,7 @@ type Config struct {
 	HTTPClient any
 }
 
-// Option 驱动工厂配置选项函数
+// Option is a functional option interface for configuring the LLM driver factory.
 type Option interface {
 	Apply(*Config)
 }
@@ -17,21 +17,21 @@ type optionFunc func(*Config)
 
 func (f optionFunc) Apply(cfg *Config) { f(cfg) }
 
-// WithBaseURL 设置自定义 API 基地址（兼容 OpenAI 协议的其他厂商如 DeepSeek、千问）
+// WithBaseURL sets a custom API base URL for providers compatible with the OpenAI protocol.
 func WithBaseURL(baseURL string) Option {
 	return optionFunc(func(cfg *Config) {
 		cfg.BaseURL = baseURL
 	})
 }
 
-// WithProxy 设置 HTTP 代理地址（格式：http://user:pass@host:port 或 socks5://host:port）
+// WithProxy sets the HTTP proxy URL for outbound requests.
 func WithProxy(proxyURL string) Option {
 	return optionFunc(func(cfg *Config) {
 		cfg.ProxyURL = proxyURL
 	})
 }
 
-// WithDefaultModel 设置默认模型名称（请求中未指定 Model 时使用）
+// WithDefaultModel sets the default model name used when the request does not specify one.
 func WithDefaultModel(model string) Option {
 	return optionFunc(func(cfg *Config) {
 		cfg.ModelName = model
