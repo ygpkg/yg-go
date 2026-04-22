@@ -1,18 +1,5 @@
 package config
 
-// ChatGPTConfig holds the configuration for ChatGPT API access.
-type ChatGPTConfig struct {
-	Token      string            `yaml:"token"`
-	TokenName  string            `yaml:"token_name"`
-	Tokens     map[string]string `yaml:"tokens"`
-	HTTPClient HTTPClientConfig  `yaml:"http_client"`
-}
-
-// HTTPClientConfig holds HTTP client settings including proxy configuration.
-type HTTPClientConfig struct {
-	Proxy *ProxyConfig `yaml:"proxy"`
-}
-
 // ProxyConfig holds proxy connection settings including scheme, address, and credentials.
 type ProxyConfig struct {
 	Scheme   string `yaml:"scheme"`
