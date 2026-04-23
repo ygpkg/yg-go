@@ -70,7 +70,7 @@ type Message struct {
 }
 
 // MarshalJSON 自定义序列化：当 Parts 非空时，content 字段输出为 Part 数组格式
-func (m Message) MarshalJSON() ([]byte, error) {
+func (m *Message) MarshalJSON() ([]byte, error) {
 	if len(m.Parts) > 0 {
 		rawParts := make([]json.RawMessage, 0, len(m.Parts))
 		for _, part := range m.Parts {

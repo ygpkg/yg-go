@@ -13,23 +13,23 @@ import (
 	"github.com/ygpkg/yg-go/llm/llmtype"
 )
 
-// DefaultHTTPTimeout is the default timeout for OpenAI HTTP client requests.
+// DefaultHTTPTimeout is the default timeout for outbound HTTP requests.
 const DefaultHTTPTimeout = 120 * time.Second
 
-// OpenAIClient OpenAI 驱动适配器，实现 llmtype.Client 接口
-// 通过 sashabaranov/go-openai SDK 与兼容 OpenAI 协议的 API 通信
-type OpenAIClient struct {
+// Client adapts the sashabaranov/go-openai SDK to implement the llmtype.Client interface.
+// It communicates with APIs compatible with the OpenAI protocol.
+type Client struct {
 	client       *oai.Client
 	defaultModel string
 }
 
 // Register registers the OpenAI provider into the global factory. Call openai.Register() explicitly to initialize.
 func Register() {
-	llm.RegisterProvider("openai", newOpenAIFactory)
+	llm.RegisterProvider("openai", newFactory)
 }
 
-// newOpenAIFactory OpenAI 驱动工厂函数
-func newOpenAIFactory(apiKey string, opts ...llm.Option) (llmtype.Client, error) {
+// newFactory creates a Client instance using the given API key and options.
+func newFactory(apiKey string, opts ...llm.Option) (llmtype.Client, error) {
 	cfg := &llm.Config{}
 	for _, opt := range opts {
 		opt.Apply(cfg)
@@ -54,14 +54,14 @@ func newOpenAIFactory(apiKey string, opts ...llm.Option) (llmtype.Client, error)
 	}
 
 	client := oai.NewClientWithConfig(clientConfig)
-	return &OpenAIClient{
+	return &Client{
 		client:       client,
 		defaultModel: cfg.ModelName,
 	}, nil
 }
 
 // Chat 同步调用大模型，等待完整响应返回
-func (c *OpenAIClient) Chat(ctx context.Context, req *llmtype.ChatRequest) (*llmtype.ChatResponse, error) {
+func (c *Client) Chat(ctx context.Context, req *llmtype.ChatRequest) (*llmtype.ChatResponse, error) {
 	if req.Model == "" {
 		req.Model = c.defaultModel
 	}
@@ -76,7 +76,7 @@ func (c *OpenAIClient) Chat(ctx context.Context, req *llmtype.ChatRequest) (*llm
 }
 
 // ChatStream 流式调用大模型，通过回调函数逐块处理增量响应
-func (c *OpenAIClient) ChatStream(ctx context.Context, req *llmtype.ChatRequest, handler llmtype.StreamHandler) error {
+func (c *Client) ChatStream(ctx context.Context, req *llmtype.ChatRequest, handler llmtype.StreamHandler) error {
 	if req.Model == "" {
 		req.Model = c.defaultModel
 	}
