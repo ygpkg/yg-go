@@ -1120,6 +1120,11 @@ github.com/robfig/cron/v3
 # github.com/rs/xid v1.6.0
 ## explicit; go 1.16
 github.com/rs/xid
+# github.com/sashabaranov/go-openai v1.41.2
+## explicit; go 1.18
+github.com/sashabaranov/go-openai
+github.com/sashabaranov/go-openai/internal
+github.com/sashabaranov/go-openai/jsonschema
 # github.com/satori/go.uuid v1.2.0
 ## explicit
 github.com/satori/go.uuid
