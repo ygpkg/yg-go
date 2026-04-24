@@ -11,7 +11,7 @@ type ProxyConfig struct {
 // LLMModelConfig holds LLM model selection and parameter options.
 type LLMModelConfig struct {
 	Provider    string       `json:"provider" yaml:"provider"`
-	APIKey      string       `json:"api_key" yaml:"api_key"`
+	APIKEY      string       `json:"api_key" yaml:"api_key"`
 	BaseURL     string       `json:"base_url" yaml:"base_url"`
 	ModelName   string       `json:"model_name" yaml:"model_name"`
 	Proxy       *ProxyConfig `json:"proxy,omitempty" yaml:"proxy,omitempty"`
