@@ -21,7 +21,7 @@ type PromptCond struct {
 	Group     string
 	Code      string
 	NameLike  string
-	Status    PromptStatus
+	Status    []PromptStatus
 	OrderBy   []string
 	Offset    int
 	Limit     int
@@ -284,8 +284,8 @@ func (dao *PromptDao) BuildCondition(db *gorm.DB, cond *PromptCond) {
 	if cond.NameLike != "" {
 		db.Where(fmt.Sprintf("%s.name LIKE ?", tn), cond.NameLike+"%")
 	}
-	if cond.Status >= 0 {
-		db.Where(fmt.Sprintf("%s.status = ?", tn), cond.Status)
+	if len(cond.Status) > 0 {
+		db.Where(tn + ".status IN ?", cond.Status)
 	}
 	if cond.IsDelete {
 		db.Unscoped()
