@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ygpkg/yg-go/logs"
 	"gorm.io/driver/clickhouse"
@@ -49,6 +50,21 @@ func InitDBConn(name, dburl string) (*gorm.DB, error) {
 		db, err = gorm.Open(postgres.Open(dburl), &gorm.Config{
 			CreateBatchSize: 200,
 		})
+		if err != nil {
+			logs.Errorf("[init-db] open postgres(%s) failed, %s", name, err)
+			return nil, err
+		}
+		pgdb, err := db.DB()
+		if err != nil {
+			logs.Errorf("[init-db] get sqlDB from postgres(%s) failed, %s", name, err)
+			return nil, err
+		}
+
+		// 设置连接池参数
+		pgdb.SetMaxOpenConns(50)                  // 最大打开连接数
+		pgdb.SetMaxIdleConns(10)                  // 最大空闲连接数
+		pgdb.SetConnMaxLifetime(30 * time.Minute) // 连接最大存活时间
+		pgdb.SetConnMaxIdleTime(5 * time.Minute)  // 空闲连接最大存活时间
 	case "clickhouse":
 		db, err = gorm.Open(clickhouse.Open(dburl), &gorm.Config{
 			CreateBatchSize: 200,
