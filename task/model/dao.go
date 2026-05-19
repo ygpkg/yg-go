@@ -15,6 +15,8 @@ type TaskCond struct {
 	Uin         uint
 	ID          uint
 	IDs         []uint
+	SubjectID   uint
+	Step        int
 	WorkerID    string
 	TaskType    string
 	TaskStatus  TaskStatus
@@ -195,6 +197,14 @@ func (dao *TaskDao) BuildCondition(db *gorm.DB, cond *TaskCond) {
 	if cond.TaskStatus != "" {
 		query := fmt.Sprintf("%s.task_status = ?", dao.TableName())
 		db.Where(query, cond.TaskStatus)
+	}
+	if cond.SubjectID > 0 {
+		query := fmt.Sprintf("%s.subject_id = ?", dao.TableName())
+		db.Where(query, cond.SubjectID)
+	}
+	if cond.Step > 0 {
+		query := fmt.Sprintf("%s.step = ?", dao.TableName())
+		db.Where(query, cond.Step)
 	}
 	if cond.IsDelete {
 		db.Unscoped()

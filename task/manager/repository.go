@@ -333,6 +333,16 @@ func (repo *TaskRepository) HandleDeadWorkerTasks(ctx context.Context, taskType,
 	return taskTypes, nil
 }
 
+// GetTasksByCond 根据条件查询任务列表
+func (repo *TaskRepository) GetTasksByCond(ctx context.Context, cond *model.TaskCond) (model.TaskList, error) {
+	return repo.taskDao.GetListByCond(ctx, cond)
+}
+
+// GetTaskByCond 根据条件查询单个任务
+func (repo *TaskRepository) GetTaskByCond(ctx context.Context, cond *model.TaskCond) (*model.TaskEntity, error) {
+	return repo.taskDao.GetByCond(ctx, cond)
+}
+
 // GetNextStepTasks 获取下一个步骤的任务
 // 返回第一个未全部完成的 step 中的所有任务
 func (repo *TaskRepository) GetNextStepTasks(ctx context.Context, subjectID uint, appGroup string) ([]*model.TaskEntity, error) {

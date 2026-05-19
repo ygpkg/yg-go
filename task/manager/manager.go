@@ -152,6 +152,16 @@ func (m *Manager) GetNextStepTasks(ctx context.Context, subjectID uint, appGroup
 	return m.repo.GetNextStepTasks(ctx, subjectID, appGroup)
 }
 
+// GetTaskByCond 根据条件查询单个任务
+func (m *Manager) GetTaskByCond(ctx context.Context, cond *model.TaskCond) (*model.TaskEntity, error) {
+	return m.repo.GetTaskByCond(ctx, cond)
+}
+
+// GetTasksByCond 根据条件查询任务列表
+func (m *Manager) GetTasksByCond(ctx context.Context, cond *model.TaskCond) (model.TaskList, error) {
+	return m.repo.GetTasksByCond(ctx, cond)
+}
+
 // InitTaskDBStatus 初始化数据库中的任务状态
 func (m *Manager) InitTaskDBStatus(ctx context.Context) error {
 	return m.repo.InitTaskDBStatus(ctx)
