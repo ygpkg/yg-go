@@ -7,52 +7,34 @@ import (
 
 // TaskExecutor 任务执行器接口
 type TaskExecutor interface {
+	// Execute 执行任务，包含任务的核心业务逻辑
 	Execute(ctx context.Context) error
 
+	// GetResult 获取执行结果
 	GetResult() string
 
+	// SetResult 设置执行结果
 	SetResult(result string)
 
+	// OnSuccess 成功后回调，在任务执行成功后调用，可用于清理资源、更新状态等
+	// 注意：回调在任务状态保存后执行，如需数据库事务请自行创建
 	OnSuccess(ctx context.Context) error
 
+	// OnFailure 失败后回调，在任务执行失败后调用，可用于清理资源、记录日志等
+	// 注意：回调在任务状态保存后执行，如需数据库事务请自行创建
 	OnFailure(ctx context.Context) error
 }
 
 // ExecutorFactory 执行器工厂函数
+// 接受payload参数，由业务层在注册时决定如何解析
 type ExecutorFactory func(payload string) (TaskExecutor, error)
 
-// PreHookFunc 前置钩子函数
-type PreHookFunc func(ctx context.Context) error
-
-// executorOptions 执行器选项配置
-type executorOptions struct {
-	maxConcurrency int
-	preHook        PreHookFunc
-}
-
-// ExecutorOption 执行器注册选项
-type ExecutorOption func(*executorOptions)
-
-// WithConcurrency 设置任务类型的最大并发数
-func WithConcurrency(n int) ExecutorOption {
-	return func(opts *executorOptions) {
-		opts.maxConcurrency = n
-	}
-}
-
-// WithPreHook 设置任务执行前置钩子
-func WithPreHook(hook PreHookFunc) ExecutorOption {
-	return func(opts *executorOptions) {
-		opts.preHook = hook
-	}
-}
-
 // ExecutorRegistry 执行器注册表
+// 用于管理任务类型和执行器工厂的映射关系
 type ExecutorRegistry struct {
 	mu             sync.RWMutex
 	executors      map[string]ExecutorFactory
-	concurrencyMap map[string]int
-	preHookMap     map[string]PreHookFunc
+	concurrencyMap map[string]int // 任务类型 -> 并发数映射
 }
 
 // NewExecutorRegistry 创建执行器注册表
@@ -60,7 +42,6 @@ func NewExecutorRegistry() *ExecutorRegistry {
 	return &ExecutorRegistry{
 		executors:      make(map[string]ExecutorFactory),
 		concurrencyMap: make(map[string]int),
-		preHookMap:     make(map[string]PreHookFunc),
 	}
 }
 
@@ -77,17 +58,6 @@ func (r *ExecutorRegistry) RegisterWithConcurrency(taskType string, factory Exec
 	defer r.mu.Unlock()
 	r.executors[taskType] = factory
 	r.concurrencyMap[taskType] = concurrency
-}
-
-// RegisterWithOptions 注册执行器并设置选项
-func (r *ExecutorRegistry) RegisterWithOptions(taskType string, factory ExecutorFactory, opts *executorOptions) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.executors[taskType] = factory
-	if opts != nil {
-		r.concurrencyMap[taskType] = opts.maxConcurrency
-		r.preHookMap[taskType] = opts.preHook
-	}
 }
 
 // Get 获取执行器工厂
@@ -117,11 +87,4 @@ func (r *ExecutorRegistry) GetAll() []string {
 		types = append(types, t)
 	}
 	return types
-}
-
-// GetPreHook 获取指定任务类型的前置钩子
-func (r *ExecutorRegistry) GetPreHook(taskType string) PreHookFunc {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.preHookMap[taskType]
 }
