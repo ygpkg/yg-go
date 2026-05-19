@@ -18,7 +18,7 @@ const (
 // WorkManager worker 需要的管理器接口（最小化依赖）
 type WorkManager interface {
 	// GetNextTask 获取下一个待执行任务（阻塞式）
-	GetNextTask(ctx context.Context, taskType, workerID string) (TaskInfo, error)
+	GetNextTask(ctx context.Context, taskType string, workerID string) (TaskInfo, error)
 
 	// SaveTaskResult 保存任务执行结果
 	SaveTaskResult(ctx context.Context, workerID string, info TaskInfo, result string, err error, onCallback func(context.Context) error) error
@@ -37,6 +37,21 @@ type TaskInfo struct {
 	SubjectID uint
 	Redo      int
 	MaxRedo   int
+}
+
+// ExecutorOption 执行器注册选项
+type ExecutorOption func(*executorOptions)
+
+// executorOptions 执行器选项配置
+type executorOptions struct {
+	maxConcurrency int
+}
+
+// WithConcurrency 设置任务类型的最大并发数
+func WithConcurrency(n int) ExecutorOption {
+	return func(opts *executorOptions) {
+		opts.maxConcurrency = n
+	}
 }
 
 // Worker 分布式 Worker 实现
@@ -73,7 +88,6 @@ func NewWorker(config *WorkerConfig, mgr WorkManager) (*Worker, error) {
 
 // RegisterExecutor 注册任务执行器
 // 可通过 WithConcurrency 选项设置该任务类型的最大并发数，不设置时使用全局默认并发数
-// 可通过 WithPreHook 选项设置前置钩子，在 Execute 之前执行
 func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory, opts ...ExecutorOption) {
 	options := &executorOptions{
 		maxConcurrency: w.config.MaxConcurrency,
@@ -83,7 +97,7 @@ func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory, opts
 		opt(options)
 	}
 
-	w.registry.RegisterWithOptions(taskType, factory, options)
+	w.registry.RegisterWithConcurrency(taskType, factory, options.maxConcurrency)
 }
 
 func (w *Worker) SetHealthReporter(reporter HealthReporter) {
@@ -234,15 +248,6 @@ func (w *Worker) executeTask(ctx context.Context, info TaskInfo) {
 		logs.ErrorContextf(ctx, "[task] failed to create executor: %v", err)
 		w.manager.SaveTaskResult(ctx, w.config.WorkerID, info, "", fmt.Errorf("create executor failed: %w", err), nil)
 		return
-	}
-
-	// 执行前置钩子
-	if hook := w.registry.GetPreHook(info.TaskType); hook != nil {
-		if err := hook(ctx); err != nil {
-			logs.ErrorContextf(ctx, "[task] pre-hook failed: %v", err)
-			w.manager.SaveTaskResult(ctx, w.config.WorkerID, info, "", fmt.Errorf("pre-hook failed: %w", err), nil)
-			return
-		}
 	}
 
 	// 执行任务
