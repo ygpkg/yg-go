@@ -283,3 +283,142 @@ func TestExecutorRegistry_Concurrency(t *testing.T) {
 		t.Errorf("Expected %d task types, got %d", numGoroutines, len(types))
 	}
 }
+
+// TestPreHook_Success 测试前置钩子成功时正常执行
+func TestPreHook_Success(t *testing.T) {
+	registry := NewExecutorRegistry()
+
+	var hookCalled bool
+	registry.RegisterWithOptions("test_task", func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
+	}, &executorOptions{
+		preHook: func(ctx context.Context) error {
+			hookCalled = true
+			return nil
+		},
+	})
+
+	hook := registry.GetPreHook("test_task")
+	if hook == nil {
+		t.Fatal("Expected pre-hook to be set")
+	}
+	if err := hook(context.Background()); err != nil {
+		t.Errorf("Expected pre-hook to succeed, got: %v", err)
+	}
+	if !hookCalled {
+		t.Error("Expected pre-hook to be called")
+	}
+}
+
+// TestPreHook_Failure 测试前置钩子失败时返回错误
+func TestPreHook_Failure(t *testing.T) {
+	registry := NewExecutorRegistry()
+
+	registry.RegisterWithOptions("test_task", func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
+	}, &executorOptions{
+		preHook: func(ctx context.Context) error {
+			return fmt.Errorf("hook failed")
+		},
+	})
+
+	hook := registry.GetPreHook("test_task")
+	if hook == nil {
+		t.Fatal("Expected pre-hook to be set")
+	}
+	if err := hook(context.Background()); err == nil {
+		t.Error("Expected pre-hook to fail")
+	}
+}
+
+// TestPreHook_NotSet 测试不设置前置钩子时不影响
+func TestPreHook_NotSet(t *testing.T) {
+	registry := NewExecutorRegistry()
+
+	registry.Register("test_task", func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
+	})
+
+	hook := registry.GetPreHook("test_task")
+	if hook != nil {
+		t.Error("Expected pre-hook to be nil when not set")
+	}
+}
+
+// TestRegisterWithOptions_WithPreHook 测试通过 RegisterWithOptions 注册前置钩子
+func TestRegisterWithOptions_WithPreHook(t *testing.T) {
+	registry := NewExecutorRegistry()
+
+	hook := func(ctx context.Context) error {
+		return nil
+	}
+
+	registry.RegisterWithOptions("task_with_hook", func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
+	}, &executorOptions{
+		maxConcurrency: 10,
+		preHook:        hook,
+	})
+
+	// 验证前置钩子
+	if h := registry.GetPreHook("task_with_hook"); h == nil {
+		t.Error("Expected pre-hook to be set")
+	}
+
+	// 验证并发数
+	concurrency := registry.GetConcurrency("task_with_hook", 5)
+	if concurrency != 10 {
+		t.Errorf("Expected concurrency to be 10, got %d", concurrency)
+	}
+
+	// 验证工厂可用
+	factory, ok := registry.Get("task_with_hook")
+	if !ok {
+		t.Fatal("Expected factory to be found")
+	}
+	executor, err := factory("test_payload")
+	if err != nil {
+		t.Errorf("Expected factory to create executor, got: %v", err)
+	}
+	if executor == nil {
+		t.Error("Expected executor to be created")
+	}
+}
+
+// TestPreHook_WithExecutorOption 测试通过 ExecutorOption 注册前置钩子
+func TestPreHook_WithExecutorOption(t *testing.T) {
+	hook := func(ctx context.Context) error {
+		return nil
+	}
+
+	opts := &executorOptions{}
+	WithPreHook(hook)(opts)
+
+	if opts.preHook == nil {
+		t.Error("Expected pre-hook to be set via WithPreHook")
+	}
+}
+
+// TestPreHook_OptionsPersistAcrossTasks 测试选项不会跨任务类型泄漏
+func TestPreHook_OptionsPersistAcrossTasks(t *testing.T) {
+	registry := NewExecutorRegistry()
+
+	registry.RegisterWithOptions("task_a", func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
+	}, &executorOptions{
+		preHook: func(ctx context.Context) error {
+			return nil
+		},
+	})
+
+	registry.Register("task_b", func(payload string) (TaskExecutor, error) {
+		return newMockExecutor(payload)
+	})
+
+	if h := registry.GetPreHook("task_a"); h == nil {
+		t.Error("Expected pre-hook for task_a")
+	}
+	if h := registry.GetPreHook("task_b"); h != nil {
+		t.Error("Expected no pre-hook for task_b")
+	}
+}
