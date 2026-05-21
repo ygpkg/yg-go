@@ -79,7 +79,7 @@ func (s3fs *S3Fs) Save(ctx context.Context, fi *FileInfo, r io.Reader) error {
 		return fmt.Errorf("reader is empty")
 	}
 	uploader := manager.NewUploader(s3fs.client)
-	_, err := uploader.Upload(s3fs.ctx, &s3.PutObjectInput{
+	_, err := uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(s3fs.s3fsCfg.Bucket),
 		Key:         aws.String(fi.StoragePath),
 		Body:        r,
