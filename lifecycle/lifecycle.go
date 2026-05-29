@@ -100,17 +100,17 @@ func (l *LifeCycle) WaitExit() {
 	for {
 		select {
 		case sig := <-sigChan:
-			logs.Infof("catch signal: %v", sig)
+			logs.Debugf("catch signal: %v", sig)
 			for _, lisSig := range l.listenSigs {
 				if lisSig == sig {
-					logs.Warnf("^C exit.")
+					logs.Debug("^C exit.")
 					l.exit()
 					return
 				}
 			}
 
 		case <-l.chExit:
-			logs.Warnf("others exit.")
+			logs.Debug("others exit.")
 			l.exit()
 			return
 		}
@@ -119,13 +119,13 @@ func (l *LifeCycle) WaitExit() {
 
 func (l *LifeCycle) exit() {
 	if l.exitTimeout < time.Microsecond {
-		logs.Warnf("Forced exit.")
+		logs.Debug("Forced exit.")
 		os.Exit(0)
 	}
 	go func() {
 		select {
 		case <-time.Tick(l.exitTimeout):
-			logs.Warnf("Timeout. Forced exit.")
+			logs.Debug("Timeout. Forced exit.")
 			os.Exit(1)
 		}
 	}()
