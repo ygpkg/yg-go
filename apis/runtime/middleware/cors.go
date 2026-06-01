@@ -29,6 +29,8 @@ func CORS() gin.HandlerFunc {
 			"Authorization",
 			"Upgrade",
 			"Connection",
+			"App-Version",
+			"App-Type",
 		},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,

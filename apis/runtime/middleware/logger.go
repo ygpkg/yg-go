@@ -50,31 +50,29 @@ func Logger(whitelist ...string) gin.HandlerFunc {
 				"code": fmt.Sprint(ctx.Writer.Status()),
 			}).Buckets(0.2, 0.8, 1.6, 5, 10, 60).
 			Observe(cost.Seconds())
+		logArgs := []interface{}{
+			"method", ctx.Request.Method,
+			"uri", ctx.Request.RequestURI,
+			"reqbody", reqBody,
+			"reqsize", ctx.Request.ContentLength,
+			"latency", fmt.Sprintf("%.3f", cost.Seconds()),
+			"clientip", runtime.GetRealIP(ctx.Request),
+			"respsize", ctx.Writer.Size(),
+			"referer", ctx.Request.Referer(),
+			"uin", ctx.GetUint(constants.CtxKeyUin),
+		}
+		if v := ctx.Request.Header.Get("App-Version"); v != "" {
+			logArgs = append(logArgs, "appversion", v)
+		}
+		if v := ctx.Request.Header.Get("App-Type"); v != "" {
+			logArgs = append(logArgs, "apptype", v)
+		}
+
 		if ctx.Writer.Status() >= 500 {
-			logs.LoggerFromContext(ctx).Errorw(fmt.Sprint(ctx.Writer.Status()),
-				"method", ctx.Request.Method,
-				"uri", ctx.Request.RequestURI,
-				"reqbody", reqBody,
-				"reqsize", ctx.Request.ContentLength,
-				"latency", fmt.Sprintf("%.3f", cost.Seconds()),
-				"clientip", runtime.GetRealIP(ctx.Request),
-				"respsize", ctx.Writer.Size(),
-				"referer", ctx.Request.Referer(),
-				"uin", ctx.GetUint(constants.CtxKeyUin),
-			)
+			logs.LoggerFromContext(ctx).Errorw(fmt.Sprint(ctx.Writer.Status()), logArgs...)
 		} else {
 			code := ctx.GetInt(constants.CtxKeyCode)
-			logs.LoggerFromContext(ctx).Infow(fmt.Sprint(code),
-				"method", ctx.Request.Method,
-				"uri", ctx.Request.RequestURI,
-				"reqbody", reqBody,
-				"reqsize", ctx.Request.ContentLength,
-				"latency", fmt.Sprintf("%.3f", cost.Seconds()),
-				"clientip", runtime.GetRealIP(ctx.Request),
-				"respsize", ctx.Writer.Size(),
-				"referer", ctx.Request.Referer(),
-				"uin", ctx.GetUint(constants.CtxKeyUin),
-			)
+			logs.LoggerFromContext(ctx).Infow(fmt.Sprint(code), logArgs...)
 		}
 	}
 }
