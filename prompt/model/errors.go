@@ -2,6 +2,9 @@ package model
 
 import "errors"
 
+// ErrPromptDisabled indicates that the prompt is disabled.
+var ErrPromptDisabled = errors.New("prompt is disabled")
+
 // ErrEmptyContent indicates that the prompt content is empty.
 var ErrEmptyContent = errors.New("prompt content is empty")
 
