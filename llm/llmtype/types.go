@@ -271,8 +271,8 @@ type ChatRequest struct {
 	Temperature *float32   `json:"temperature,omitempty"`
 	MaxTokens   int        `json:"max_tokens,omitempty"`
 	TopP        *float32   `json:"top_p,omitempty"`
-	TraceID     string     `json:"-"`
-	TaskID      string     `json:"-"`
+	TraceID     string     `json:"trace_id"`
+	TaskID      string     `json:"task_id"`
 }
 
 // ─── ChatResponse ───
