@@ -61,5 +61,6 @@ func LoginStatus() gin.HandlerFunc {
 		}
 		ls.State = auth.StateSucc
 		ls.Claim = claims
+		ls.Issuer = claims.Issuer
 	}
 }

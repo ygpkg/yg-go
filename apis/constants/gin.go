@@ -17,4 +17,5 @@ const (
 	CtxKeyUin        = "uin"
 	CtxKeyAPIKeyID   = "api_key_id"
 	CtxKeyLang       = "lang"
+	CtxKeyIssuer     = "issuer"
 )

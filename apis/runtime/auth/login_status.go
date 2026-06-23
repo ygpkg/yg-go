@@ -36,11 +36,12 @@ const (
 
 // LoginStatus 登录状态
 type LoginStatus struct {
-	Token string
-	Claim *UserClaims
-	Err   error
-	Role  Role
-	State State
+	Token  string
+	Claim  *UserClaims
+	Issuer string
+	Err    error
+	Role   Role
+	State  State
 
 	idmap map[string]uint
 }
