@@ -98,7 +98,10 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 	}
 	fields = append(fields, zap.Int("rows", affectedRows))
 
-	if realCode != 200 && realCode != 201 {
+	// Exists API（HEAD /_doc/{id}）：404 表示文档不存在，属正常结果，不当作错误日志
+	if method == http.MethodHead && realCode == http.StatusNotFound {
+		e.l.With(fields...).Debug(dslBody)
+	} else if realCode != 200 && realCode != 201 {
 		e.l.With(fields...).Error(dslBody)
 	} else {
 		e.l.With(fields...).Debug(dslBody)
