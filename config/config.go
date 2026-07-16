@@ -1,8 +1,8 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/ygpkg/yg-go/settings/remote"
@@ -82,27 +82,17 @@ func LoadCoreConfig(configPath ...string) (*CoreConfig, error) {
 
 // LoadYamlLocalFile .
 func LoadYamlLocalFile(file string, cfg interface{}) error {
-	f, err := os.Open(file)
+	data, err := os.ReadFile(file)
+
 	if err != nil {
 		fmt.Printf("[config] laod %s failed, %s\n", file, err)
 		return err
 	}
-	defer f.Close()
+	data = []byte(os.ExpandEnv(string(data)))
 
-	err = yaml.NewDecoder(f).Decode(cfg)
+	err = yaml.NewDecoder(bytes.NewReader(data)).Decode(cfg)
 	if err != nil {
 		fmt.Printf("[config] decode %s failed, %s\n", file, err)
-		return err
-	}
-
-	return nil
-}
-
-// LoadYamlReader .
-func LoadYamlReader(r io.Reader, cfg interface{}) error {
-	err := yaml.NewDecoder(r).Decode(cfg)
-	if err != nil {
-		fmt.Printf("[config] decode %T failed, %s\n", r, err)
 		return err
 	}
 
