@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/ygpkg/yg-go/config"
-	"github.com/ygpkg/yg-go/dbtools"
+	dbtools "github.com/ygpkg/yg-go/dbtools/v2"
 	"gorm.io/gorm"
 )
 

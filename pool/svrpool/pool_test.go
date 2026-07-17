@@ -8,7 +8,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/ygpkg/yg-go/config"
-	"github.com/ygpkg/yg-go/dbtools"
+	dbtools "github.com/ygpkg/yg-go/dbtools/v2"
+	_ "github.com/ygpkg/yg-go/dbtools/v2/mysqldrv"
 	"github.com/ygpkg/yg-go/dbtools/redispool"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -40,7 +41,7 @@ func db() {
 		fmt.Println(err)
 		return
 	}
-	err = dbtools.InitMutilMySQL(cfg.MainConf.MysqlConns)
+	err = dbtools.InitMultiDBConn(cfg.MainConf.MysqlConns)
 	if err != nil {
 		logs.Errorf("[main] connect mysql failed, %s", err)
 		return

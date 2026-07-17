@@ -3,7 +3,7 @@ package exportjob
 import (
 	"time"
 
-	"github.com/ygpkg/yg-go/dbtools"
+	dbtools "github.com/ygpkg/yg-go/dbtools/v2"
 	"github.com/ygpkg/yg-go/job"
 	"github.com/ygpkg/yg-go/logs"
 )

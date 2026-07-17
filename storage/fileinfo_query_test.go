@@ -4,7 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/ygpkg/yg-go/dbtools"
+	_ "github.com/ygpkg/yg-go/dbtools/v2/mysqldrv"
+	dbtools "github.com/ygpkg/yg-go/dbtools/v2"
 )
 
 // ---------- 测试开始 ----------
@@ -12,7 +13,7 @@ import (
 func TestFileQuery_First(t *testing.T) {
 
 	dbConfigStr := ""
-	error := dbtools.InitMutilMySQL(map[string]string{
+	error := dbtools.InitMultiDBConn(map[string]string{
 		"core": dbConfigStr,
 	})
 	if error != nil {

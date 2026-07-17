@@ -16,11 +16,11 @@ import (
 	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
 
-	storagev2 "github.com/ygpkg/yg-go/storage/v2"
+	storage "github.com/ygpkg/yg-go/storage/v2"
 )
 
 func init() {
-	storagev2.Register("tencos", func(cfg config.StorageConfig) (storagev2.Storager, error) {
+	storage.Register("tencos", func(cfg config.StorageConfig) (storage.Storager, error) {
 		if cfg.Tencent == nil {
 			return nil, fmt.Errorf("tencent cos config is nil")
 		}
@@ -28,7 +28,7 @@ func init() {
 	})
 }
 
-var _ storagev2.Storager = (*TencentCos)(nil)
+var _ storage.Storager = (*TencentCos)(nil)
 
 type TencentCos struct {
 	opt    config.StorageOption
@@ -58,7 +58,7 @@ func NewTencentCos(cfg config.TencentCOSConfig, opt config.StorageOption) (*Tenc
 	}, nil
 }
 
-func (tc *TencentCos) Save(ctx context.Context, fi *storagev2.FileInfo, r io.Reader) error {
+func (tc *TencentCos) Save(ctx context.Context, fi *storage.FileInfo, r io.Reader) error {
 	if fi.StoragePath == "" {
 		return fmt.Errorf("storage path is empty")
 	}
@@ -224,7 +224,7 @@ func (tc *TencentCos) copyDirectory(storagePath, dest string) error {
 	return nil
 }
 
-func (tc *TencentCos) CreateMultipartUpload(ctx context.Context, in *storagev2.CreateMultipartUploadInput) (*string, error) {
+func (tc *TencentCos) CreateMultipartUpload(ctx context.Context, in *storage.CreateMultipartUploadInput) (*string, error) {
 	if in == nil || in.StoragePath == nil || *in.StoragePath == "" {
 		return nil, fmt.Errorf("storage path is empty")
 	}
@@ -236,7 +236,7 @@ func (tc *TencentCos) CreateMultipartUpload(ctx context.Context, in *storagev2.C
 	return &initRst.UploadID, nil
 }
 
-func (tc *TencentCos) GeneratePresignedURL(ctx context.Context, in *storagev2.GeneratePresignedURLInput) (*string, error) {
+func (tc *TencentCos) GeneratePresignedURL(ctx context.Context, in *storage.GeneratePresignedURLInput) (*string, error) {
 	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.PartNumber == nil {
 		return nil, fmt.Errorf("storagePath, uploadID or partNumber is nil")
 	}
@@ -263,7 +263,7 @@ func (tc *TencentCos) GeneratePresignedURL(ctx context.Context, in *storagev2.Ge
 	return &urlStr, nil
 }
 
-func (tc *TencentCos) UploadPart(ctx context.Context, in *storagev2.UploadPartInput) (*string, error) {
+func (tc *TencentCos) UploadPart(ctx context.Context, in *storage.UploadPartInput) (*string, error) {
 	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.PartNumber == nil {
 		return nil, fmt.Errorf("storagePath, uploadID or partNumber is nil")
 	}
@@ -284,7 +284,7 @@ func (tc *TencentCos) UploadPart(ctx context.Context, in *storagev2.UploadPartIn
 	return &etag, nil
 }
 
-func (tc *TencentCos) CompleteMultipartUpload(ctx context.Context, in *storagev2.CompleteMultipartUploadInput) error {
+func (tc *TencentCos) CompleteMultipartUpload(ctx context.Context, in *storage.CompleteMultipartUploadInput) error {
 	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.Parts == nil {
 		return fmt.Errorf("storagePath, uploadID or parts is nil")
 	}
@@ -299,7 +299,7 @@ func (tc *TencentCos) CompleteMultipartUpload(ctx context.Context, in *storagev2
 	return err
 }
 
-func (tc *TencentCos) AbortMultipartUpload(ctx context.Context, in *storagev2.AbortMultipartUploadInput) error {
+func (tc *TencentCos) AbortMultipartUpload(ctx context.Context, in *storage.AbortMultipartUploadInput) error {
 	if in == nil || in.StoragePath == nil || in.UploadID == nil {
 		return fmt.Errorf("storagePath or uploadID is nil")
 	}
@@ -310,7 +310,7 @@ func (tc *TencentCos) AbortMultipartUpload(ctx context.Context, in *storagev2.Ab
 	return err
 }
 
-func (tc *TencentCos) InitUploadTask(ctx context.Context, tempFile *storagev2.TempFile) error {
+func (tc *TencentCos) InitUploadTask(ctx context.Context, tempFile *storage.TempFile) error {
 	initOpt := &cos.InitiateMultipartUploadOptions{
 		ObjectPutHeaderOptions: &cos.ObjectPutHeaderOptions{
 			XCosMetaXXX: &http.Header{
@@ -327,7 +327,7 @@ func (tc *TencentCos) InitUploadTask(ctx context.Context, tempFile *storagev2.Te
 	return nil
 }
 
-func (tc *TencentCos) ListUploadExistsTrunk(ctx context.Context, tempFile *storagev2.TempFile) ([]int, error) {
+func (tc *TencentCos) ListUploadExistsTrunk(ctx context.Context, tempFile *storage.TempFile) ([]int, error) {
 	listRst, _, err := tc.client.Object.ListParts(ctx, tempFile.StoragePath, tempFile.ThirdUploadID, nil)
 	if err != nil {
 		logs.Errorf("tencent cos list parts error: %v", err)
@@ -346,7 +346,7 @@ func (tc *TencentCos) ListUploadExistsTrunk(ctx context.Context, tempFile *stora
 	return exiPartNumber, nil
 }
 
-func (tc *TencentCos) UploadTrunk(ctx context.Context, tempFile *storagev2.TempFile, partNumber int, r io.Reader, size int64) error {
+func (tc *TencentCos) UploadTrunk(ctx context.Context, tempFile *storage.TempFile, partNumber int, r io.Reader, size int64) error {
 	upOpt := &cos.ObjectUploadPartOptions{
 		ContentLength: size,
 	}
@@ -358,7 +358,7 @@ func (tc *TencentCos) UploadTrunk(ctx context.Context, tempFile *storagev2.TempF
 	return nil
 }
 
-func (tc *TencentCos) CompleteUploadTask(ctx context.Context, tempFile *storagev2.TempFile) error {
+func (tc *TencentCos) CompleteUploadTask(ctx context.Context, tempFile *storage.TempFile) error {
 	filename := tempFile.StoragePath
 	uploadid := tempFile.ThirdUploadID
 	listRst, _, err := tc.client.Object.ListParts(ctx, filename, uploadid, nil)

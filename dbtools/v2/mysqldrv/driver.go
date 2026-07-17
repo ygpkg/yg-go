@@ -3,13 +3,13 @@ package mysqldrv
 import (
 	"net/url"
 
-	dbv2 "github.com/ygpkg/yg-go/dbtools/v2"
+	dbtools "github.com/ygpkg/yg-go/dbtools/v2"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
 
 func init() {
-	dbv2.Register("mysql", func(dsn string) (gorm.Dialector, error) {
+	dbtools.Register("mysql", func(dsn string) (gorm.Dialector, error) {
 		parsed, err := url.Parse(dsn)
 		if err != nil {
 			return nil, err

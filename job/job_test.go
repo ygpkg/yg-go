@@ -5,13 +5,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ygpkg/yg-go/dbtools"
+	_ "github.com/ygpkg/yg-go/dbtools/v2/mysqldrv"
+	dbtools "github.com/ygpkg/yg-go/dbtools/v2"
 	"github.com/ygpkg/yg-go/logs"
 )
 
 func TestRegistryCronFunc(t *testing.T) {
 
-	dbtools.InitMutilMySQL(map[string]string{
+	dbtools.InitMultiDBConn(map[string]string{
 		"core": "",
 	})
 	InitDB(dbtools.Core())
@@ -35,7 +36,7 @@ func SyncLLMModelAndAccountToLLMModelHealth() {
 // **测试定时任务失败**
 func TestRegistryCronFunc_Failure(t *testing.T) {
 	// **初始化数据库**（此处模拟数据库初始化失败）
-	dbtools.InitMutilMySQL(map[string]string{
+	dbtools.InitMultiDBConn(map[string]string{
 		"core": "",
 	})
 	InitDB(dbtools.Core())
@@ -56,7 +57,7 @@ func TestRegistryCronFunc_Failure(t *testing.T) {
 // **测试定时任务崩溃**
 func TestRegistryCronFunc_Panic(t *testing.T) {
 	// **初始化数据库**（此处模拟数据库初始化失败）
-	dbtools.InitMutilMySQL(map[string]string{
+	dbtools.InitMultiDBConn(map[string]string{
 		"core": "",
 	})
 	InitDB(dbtools.Core())

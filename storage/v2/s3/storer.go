@@ -23,11 +23,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/ygpkg/yg-go/config"
 
-	storagev2 "github.com/ygpkg/yg-go/storage/v2"
+	storage "github.com/ygpkg/yg-go/storage/v2"
 )
 
 func init() {
-	storagev2.Register("s3", func(cfg config.StorageConfig) (storagev2.Storager, error) {
+	storage.Register("s3", func(cfg config.StorageConfig) (storage.Storager, error) {
 		if cfg.S3 == nil {
 			return nil, fmt.Errorf("s3 config is nil")
 		}
@@ -35,7 +35,7 @@ func init() {
 	})
 }
 
-var _ storagev2.Storager = (*S3Fs)(nil)
+var _ storage.Storager = (*S3Fs)(nil)
 
 type S3Fs struct {
 	opt     config.StorageOption
@@ -77,7 +77,7 @@ func NewS3Fs(cfg config.S3StorageConfig, opt config.StorageOption) (*S3Fs, error
 	return s3fs, nil
 }
 
-func (s3fs *S3Fs) Save(ctx context.Context, fi *storagev2.FileInfo, r io.Reader) error {
+func (s3fs *S3Fs) Save(ctx context.Context, fi *storage.FileInfo, r io.Reader) error {
 	if fi.StoragePath == "" {
 		return fmt.Errorf("storage path is empty")
 	}
@@ -217,7 +217,7 @@ func (sfs *S3Fs) UploadDirectory(localDirPath, destDir string) ([]string, error)
 			return fmt.Errorf("failed to open file %s: %w", filePath, err)
 		}
 		defer file.Close()
-		fi := &storagev2.FileInfo{
+		fi := &storage.FileInfo{
 			StoragePath: storagePath,
 			FileExt:     fileExt,
 		}
@@ -288,7 +288,7 @@ func (sfs *S3Fs) copyDirectory(sourcePrefix, destPrefix string) error {
 	return nil
 }
 
-func (s3fs *S3Fs) CreateMultipartUpload(ctx context.Context, in *storagev2.CreateMultipartUploadInput) (*string, error) {
+func (s3fs *S3Fs) CreateMultipartUpload(ctx context.Context, in *storage.CreateMultipartUploadInput) (*string, error) {
 	if in == nil || in.StoragePath == nil || aws.ToString(in.StoragePath) == "" {
 		return nil, fmt.Errorf("storage path is empty")
 	}
@@ -303,7 +303,7 @@ func (s3fs *S3Fs) CreateMultipartUpload(ctx context.Context, in *storagev2.Creat
 	return out.UploadId, nil
 }
 
-func (s3fs *S3Fs) GeneratePresignedURL(ctx context.Context, in *storagev2.GeneratePresignedURLInput) (*string, error) {
+func (s3fs *S3Fs) GeneratePresignedURL(ctx context.Context, in *storage.GeneratePresignedURLInput) (*string, error) {
 	if in == nil || in.StoragePath == nil {
 		return nil, fmt.Errorf("storagePath is nil")
 	}
@@ -354,7 +354,7 @@ func (s3fs *S3Fs) GeneratePresignedURL(ctx context.Context, in *storagev2.Genera
 	}
 }
 
-func (s3fs *S3Fs) UploadPart(ctx context.Context, in *storagev2.UploadPartInput) (*string, error) {
+func (s3fs *S3Fs) UploadPart(ctx context.Context, in *storage.UploadPartInput) (*string, error) {
 	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.PartNumber == nil {
 		return nil, fmt.Errorf("storagePath, uploadID or partNumber is nil")
 	}
@@ -374,7 +374,7 @@ func (s3fs *S3Fs) UploadPart(ctx context.Context, in *storagev2.UploadPartInput)
 	return out.ETag, nil
 }
 
-func (s3fs *S3Fs) CompleteMultipartUpload(ctx context.Context, in *storagev2.CompleteMultipartUploadInput) error {
+func (s3fs *S3Fs) CompleteMultipartUpload(ctx context.Context, in *storage.CompleteMultipartUploadInput) error {
 	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.Parts == nil {
 		return fmt.Errorf("storagePath, uploadID or parts is nil")
 	}
@@ -387,7 +387,7 @@ func (s3fs *S3Fs) CompleteMultipartUpload(ctx context.Context, in *storagev2.Com
 	return err
 }
 
-func (s3fs *S3Fs) AbortMultipartUpload(ctx context.Context, in *storagev2.AbortMultipartUploadInput) error {
+func (s3fs *S3Fs) AbortMultipartUpload(ctx context.Context, in *storage.AbortMultipartUploadInput) error {
 	if in == nil || in.StoragePath == nil || in.UploadID == nil {
 		return fmt.Errorf("storagePath or uploadID is nil")
 	}

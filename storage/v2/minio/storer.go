@@ -16,11 +16,11 @@ import (
 	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
 
-	storagev2 "github.com/ygpkg/yg-go/storage/v2"
+	storage "github.com/ygpkg/yg-go/storage/v2"
 )
 
 func init() {
-	storagev2.Register("minio", func(cfg config.StorageConfig) (storagev2.Storager, error) {
+	storage.Register("minio", func(cfg config.StorageConfig) (storage.Storager, error) {
 		if cfg.Minoss == nil {
 			return nil, fmt.Errorf("minio config is nil")
 		}
@@ -28,7 +28,7 @@ func init() {
 	})
 }
 
-var _ storagev2.Storager = (*MinFs)(nil)
+var _ storage.Storager = (*MinFs)(nil)
 
 type MinFs struct {
 	opt    config.StorageOption
@@ -64,7 +64,7 @@ func NewMinFs(cfg config.MinossConfig, opt config.StorageOption) (*MinFs, error)
 	return mc, nil
 }
 
-func (mfs *MinFs) Save(ctx context.Context, fi *storagev2.FileInfo, r io.Reader) error {
+func (mfs *MinFs) Save(ctx context.Context, fi *storage.FileInfo, r io.Reader) error {
 	if fi.StoragePath == "" {
 		return fmt.Errorf("storage path is empty")
 	}
@@ -185,7 +185,7 @@ func (mfs *MinFs) copyDirectory(storagePath, dest string) error {
 	return nil
 }
 
-func (mfs *MinFs) CreateMultipartUpload(ctx context.Context, in *storagev2.CreateMultipartUploadInput) (*string, error) {
+func (mfs *MinFs) CreateMultipartUpload(ctx context.Context, in *storage.CreateMultipartUploadInput) (*string, error) {
 	if in == nil || in.StoragePath == nil || *in.StoragePath == "" {
 		return nil, fmt.Errorf("storage path is empty")
 	}
@@ -198,11 +198,11 @@ func (mfs *MinFs) CreateMultipartUpload(ctx context.Context, in *storagev2.Creat
 	return &uploadID, nil
 }
 
-func (mfs *MinFs) GeneratePresignedURL(ctx context.Context, in *storagev2.GeneratePresignedURLInput) (*string, error) {
+func (mfs *MinFs) GeneratePresignedURL(ctx context.Context, in *storage.GeneratePresignedURLInput) (*string, error) {
 	return nil, fmt.Errorf("presigned part URL not supported for MinIO")
 }
 
-func (mfs *MinFs) UploadPart(ctx context.Context, in *storagev2.UploadPartInput) (*string, error) {
+func (mfs *MinFs) UploadPart(ctx context.Context, in *storage.UploadPartInput) (*string, error) {
 	if in == nil || in.StoragePath == nil || *in.StoragePath == "" {
 		return nil, fmt.Errorf("storage path is empty")
 	}
@@ -221,7 +221,7 @@ func (mfs *MinFs) UploadPart(ctx context.Context, in *storagev2.UploadPartInput)
 	return &objPart.ETag, nil
 }
 
-func (mfs *MinFs) CompleteMultipartUpload(ctx context.Context, in *storagev2.CompleteMultipartUploadInput) error {
+func (mfs *MinFs) CompleteMultipartUpload(ctx context.Context, in *storage.CompleteMultipartUploadInput) error {
 	if in == nil || in.StoragePath == nil || in.UploadID == nil || in.Parts == nil {
 		return fmt.Errorf("storagePath, uploadID or parts is nil")
 	}
@@ -237,7 +237,7 @@ func (mfs *MinFs) CompleteMultipartUpload(ctx context.Context, in *storagev2.Com
 	return err
 }
 
-func (mfs *MinFs) AbortMultipartUpload(ctx context.Context, in *storagev2.AbortMultipartUploadInput) error {
+func (mfs *MinFs) AbortMultipartUpload(ctx context.Context, in *storage.AbortMultipartUploadInput) error {
 	if in == nil || in.StoragePath == nil || in.UploadID == nil {
 		return fmt.Errorf("storagePath or uploadID is nil")
 	}

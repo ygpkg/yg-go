@@ -1,7 +1,7 @@
 package manager
 
 import (
-	"github.com/ygpkg/yg-go/dbtools"
+	dbtools "github.com/ygpkg/yg-go/dbtools/v2"
 	"github.com/ygpkg/yg-go/task/model"
 	"gorm.io/gorm"
 )

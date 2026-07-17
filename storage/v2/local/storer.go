@@ -10,11 +10,11 @@ import (
 	"github.com/ygpkg/yg-go/config"
 	"github.com/ygpkg/yg-go/logs"
 
-	storagev2 "github.com/ygpkg/yg-go/storage/v2"
+	storage "github.com/ygpkg/yg-go/storage/v2"
 )
 
 func init() {
-	storagev2.Register("local", func(cfg config.StorageConfig) (storagev2.Storager, error) {
+	storage.Register("local", func(cfg config.StorageConfig) (storage.Storager, error) {
 		if cfg.Local == nil {
 			return nil, fmt.Errorf("local config is nil")
 		}
@@ -22,7 +22,7 @@ func init() {
 	})
 }
 
-var _ storagev2.Storager = (*LocalStorage)(nil)
+var _ storage.Storager = (*LocalStorage)(nil)
 
 type LocalStorage struct {
 	cfg config.LocalStorageConfig
@@ -40,7 +40,7 @@ func NewLocalStorage(cfg config.LocalStorageConfig) (*LocalStorage, error) {
 	return ls, nil
 }
 
-func (ls *LocalStorage) Save(ctx context.Context, fi *storagev2.FileInfo, r io.Reader) error {
+func (ls *LocalStorage) Save(ctx context.Context, fi *storage.FileInfo, r io.Reader) error {
 	fi.StoragePath = filepath.Clean(fi.StoragePath)
 	fpath := filepath.Join(ls.Dir, fi.StoragePath)
 	dir := filepath.Dir(fpath)
@@ -174,18 +174,18 @@ func (ls *LocalStorage) copyDirectory(srcPath, destPath string) error {
 	return nil
 }
 
-func (l *LocalStorage) CreateMultipartUpload(ctx context.Context, in *storagev2.CreateMultipartUploadInput) (*string, error) {
+func (l *LocalStorage) CreateMultipartUpload(ctx context.Context, in *storage.CreateMultipartUploadInput) (*string, error) {
 	return nil, fmt.Errorf("multipart upload not supported for LocalStorage")
 }
-func (l *LocalStorage) GeneratePresignedURL(ctx context.Context, in *storagev2.GeneratePresignedURLInput) (*string, error) {
+func (l *LocalStorage) GeneratePresignedURL(ctx context.Context, in *storage.GeneratePresignedURLInput) (*string, error) {
 	return nil, fmt.Errorf("presigned part URL not supported for LocalStorage")
 }
-func (l *LocalStorage) UploadPart(ctx context.Context, in *storagev2.UploadPartInput) (*string, error) {
+func (l *LocalStorage) UploadPart(ctx context.Context, in *storage.UploadPartInput) (*string, error) {
 	return nil, fmt.Errorf("multipart upload not supported for LocalStorage")
 }
-func (l *LocalStorage) CompleteMultipartUpload(ctx context.Context, in *storagev2.CompleteMultipartUploadInput) error {
+func (l *LocalStorage) CompleteMultipartUpload(ctx context.Context, in *storage.CompleteMultipartUploadInput) error {
 	return fmt.Errorf("multipart upload not supported for LocalStorage")
 }
-func (l *LocalStorage) AbortMultipartUpload(ctx context.Context, in *storagev2.AbortMultipartUploadInput) error {
+func (l *LocalStorage) AbortMultipartUpload(ctx context.Context, in *storage.AbortMultipartUploadInput) error {
 	return fmt.Errorf("multipart upload not supported for LocalStorage")
 }
