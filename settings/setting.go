@@ -1,6 +1,7 @@
 package settings
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -70,15 +71,41 @@ func (item *SettingItem) SecretValue() string {
 	return item.Value
 }
 
+// Option .
+type Option func(*option)
+
+type option struct {
+	ctx context.Context
+}
+
+// WithContext .
+func WithContext(ctx context.Context) Option {
+	return func(o *option) {
+		o.ctx = ctx
+	}
+}
+
+func getDB(opts ...Option) (*gorm.DB, context.Context) {
+	o := &option{}
+	for _, opt := range opts {
+		opt(o)
+	}
+	if o.ctx == nil {
+		o.ctx = context.Background()
+	}
+	return dbtools.Core().WithContext(o.ctx), o.ctx
+}
+
 // InitDB .
 func InitDB() error {
 	return dbtools.InitModel(dbtools.Core(), &SettingItem{})
 }
 
 // GetByID .
-func GetByID(id uint) (*SettingItem, error) {
+func GetByID(id uint, opts ...Option) (*SettingItem, error) {
+	db, _ := getDB(opts...)
 	ret := &SettingItem{}
-	err := dbtools.Core().Table(TableNameSettings).
+	err := db.Table(TableNameSettings).
 		Where("id = ?", id).
 		Find(ret).Error
 	if err != nil {
@@ -88,25 +115,26 @@ func GetByID(id uint) (*SettingItem, error) {
 }
 
 // Set .
-func Set(group, key, value string) error {
-	return SetText(group, key, value)
+func Set(group, key, value string, opts ...Option) error {
+	return SetText(group, key, value, opts...)
 }
 
-func SetText(group, key, value string) error {
+func SetText(group, key, value string, opts ...Option) error {
 	si := &SettingItem{
 		Group:     group,
 		Key:       key,
 		Value:     value,
 		ValueType: ValueText,
 	}
-	return UpsertSetting(si)
+	return UpsertSetting(si, opts...)
 }
 
 // SetYaml 插入yaml配置
-func SetYaml(group, key string, value interface{}) error {
+func SetYaml(group, key string, value interface{}, opts ...Option) error {
+	_, ctx := getDB(opts...)
 	vData, err := yaml.Marshal(value)
 	if err != nil {
-		logs.Errorf("[settings] yaml marshal failed, %s", err)
+		logs.ErrorContextf(ctx, "[settings] yaml marshal failed, %s", err)
 		return err
 	}
 	si := &SettingItem{
@@ -115,21 +143,23 @@ func SetYaml(group, key string, value interface{}) error {
 		Value:     string(vData),
 		ValueType: ValueYaml,
 	}
-	return UpsertSetting(si)
+	return UpsertSetting(si, opts...)
 }
 
 // UpsertSetting or update the trade calendar of a stock.
-func UpsertSetting(v *SettingItem) error {
+func UpsertSetting(v *SettingItem, opts ...Option) error {
+	db, _ := getDB(opts...)
 	rdsKey := redisCacheKey(v.Group, v.Key)
 	cache.Std().Delete(rdsKey)
-	return dbtools.Core().Table(TableNameSettings).
+	return db.Table(TableNameSettings).
 		Clauses(clause.OnConflict{
 			DoUpdates: clause.AssignmentColumns([]string{"name", "describe", "value", "value_type", "default"}),
 		}).Create(v).Error
 }
 
 // Get 获取数据库或者缓存配置项
-func Get(group, key string) (*SettingItem, error) {
+func Get(group, key string, opts ...Option) (*SettingItem, error) {
+	db, ctx := getDB(opts...)
 	ret := &SettingItem{}
 
 	rdsKey := redisCacheKey(group, key)
@@ -138,11 +168,11 @@ func Get(group, key string) (*SettingItem, error) {
 		return ret, nil
 	}
 
-	err = dbtools.Core().Table(TableNameSettings).
+	err = db.Table(TableNameSettings).
 		Where(map[string]interface{}{"group": group, "key": key}).
 		First(ret).Error
 	if err != nil {
-		logs.Errorf("[settings] get %s failed, %s", group+"/"+key, err)
+		logs.ErrorContextf(ctx, "[settings] get %s failed, %s", group+"/"+key, err)
 		return nil, err
 	}
 
@@ -154,8 +184,8 @@ func Get(group, key string) (*SettingItem, error) {
 }
 
 // GetValue 获取配置值，如果是加密配置，返回解密后的值
-func GetValue(group, key string) (string, error) {
-	si, err := Get(group, key)
+func GetValue(group, key string, opts ...Option) (string, error) {
+	si, err := Get(group, key, opts...)
 	if err != nil {
 		return "", err
 	}
@@ -163,8 +193,8 @@ func GetValue(group, key string) (string, error) {
 }
 
 // GetYaml 获取yaml配置
-func GetYaml(group, key string, value interface{}) error {
-	text, err := GetValue(group, key)
+func GetYaml(group, key string, value interface{}, opts ...Option) error {
+	text, err := GetValue(group, key, opts...)
 	if err != nil {
 		return err
 	}
@@ -172,13 +202,13 @@ func GetYaml(group, key string, value interface{}) error {
 }
 
 // GetText 获取文本配置
-func GetText(group, key string) (string, error) {
-	return GetValue(group, key)
+func GetText(group, key string, opts ...Option) (string, error) {
+	return GetValue(group, key, opts...)
 }
 
 // GetSecret 获取密码配置
-func GetSecret(group, key string) (string, error) {
-	si, err := Get(group, key)
+func GetSecret(group, key string, opts ...Option) (string, error) {
+	si, err := Get(group, key, opts...)
 	if err != nil {
 		return "", err
 	}
@@ -186,8 +216,8 @@ func GetSecret(group, key string) (string, error) {
 }
 
 // GetSecretYaml 获取密码配置YAML
-func GetSecretYaml(group, key string, value interface{}) error {
-	date, err := GetSecret(group, key)
+func GetSecretYaml(group, key string, value interface{}, opts ...Option) error {
+	date, err := GetSecret(group, key, opts...)
 	if err != nil {
 		return err
 	}
@@ -195,8 +225,8 @@ func GetSecretYaml(group, key string, value interface{}) error {
 }
 
 // GetJSON 获取json配置
-func GetJSON(group, key string, value interface{}) error {
-	text, err := GetValue(group, key)
+func GetJSON(group, key string, value interface{}, opts ...Option) error {
+	text, err := GetValue(group, key, opts...)
 	if err != nil {
 		return err
 	}
@@ -205,8 +235,18 @@ func GetJSON(group, key string, value interface{}) error {
 
 // List 配置列表
 func List(group string, keys ...string) ([]*SettingItem, error) {
+	return listDB(group, keys, dbtools.Core())
+}
+
+// ListWithCtx 配置列表，支持 ctx
+func ListWithCtx(group string, keys []string, opts ...Option) ([]*SettingItem, error) {
+	db, _ := getDB(opts...)
+	return listDB(group, keys, db)
+}
+
+func listDB(group string, keys []string, db *gorm.DB) ([]*SettingItem, error) {
 	ret := []*SettingItem{}
-	err := dbtools.Core().Table(TableNameSettings).
+	err := db.Table(TableNameSettings).
 		Where(map[string]interface{}{"group": group, "key": keys}).
 		Find(&ret).Error
 	if err != nil {
@@ -217,8 +257,18 @@ func List(group string, keys ...string) ([]*SettingItem, error) {
 
 // Updates 更新settings值
 func Updates(sets ...*SettingItem) error {
+	return updatesDB(context.Background(), sets, dbtools.Core())
+}
+
+// UpdatesWithCtx 更新settings值，支持 ctx
+func UpdatesWithCtx(sets []*SettingItem, opts ...Option) error {
+	db, ctx := getDB(opts...)
+	return updatesDB(ctx, sets, db)
+}
+
+func updatesDB(ctx context.Context, sets []*SettingItem, db *gorm.DB) error {
 	for _, set := range sets {
-		sql := dbtools.Core().Table(TableNameSettings)
+		sql := db.Table(TableNameSettings)
 		if set.ID != 0 {
 			sql = sql.Where("id = ?", set.ID)
 		} else {
@@ -232,7 +282,7 @@ func Updates(sets ...*SettingItem) error {
 		}
 		err := sql.Select("value", "value_type", "describe", "name").Updates(update).Error
 		if err != nil {
-			logs.Errorf("[settings] update %s failed, %s", set.Identify(), err)
+			logs.ErrorContextf(ctx, "[settings] update %s failed, %s", set.Identify(), err)
 			return err
 		}
 		rdsKey := redisCacheKey(set.Group, set.Key)

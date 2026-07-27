@@ -50,7 +50,7 @@ func LoginStatus() gin.HandlerFunc {
 				return nil, fmt.Errorf("token claims is not UserClaims")
 			}
 
-			return auth.GetJwtSecret(c.Issuer)
+			return auth.GetJwtSecretWithCtx(ctx, c.Issuer)
 		})
 		if err != nil {
 			logs.Warnw("[manager_auth] parse claims failed.",
