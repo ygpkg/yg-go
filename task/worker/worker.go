@@ -100,6 +100,23 @@ func (w *Worker) RegisterExecutor(taskType string, factory ExecutorFactory, opts
 	w.registry.RegisterWithConcurrency(taskType, factory, options.maxConcurrency)
 }
 
+// RegisterExecutorWithInfo 注册携带完整任务信息的任务执行器
+// 与 RegisterExecutor 的区别仅在于工厂能拿到 TaskInfo（TaskID、Timeout 等）。
+// 同一任务类型同时存在两种工厂时优先使用本方法注册的工厂；
+// 未注册 Info 版工厂的任务类型仍走旧的 RegisterExecutor 路径。
+// 可通过 WithConcurrency 选项设置该任务类型的最大并发数，不设置时使用全局默认并发数。
+func (w *Worker) RegisterExecutorWithInfo(taskType string, factory ExecutorFactoryWithInfo, opts ...ExecutorOption) {
+	options := &executorOptions{
+		maxConcurrency: w.config.MaxConcurrency,
+	}
+
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	w.registry.RegisterWithInfoAndConcurrency(taskType, factory, options.maxConcurrency)
+}
+
 func (w *Worker) SetHealthReporter(reporter HealthReporter) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -196,13 +213,37 @@ func (w *Worker) workRoutine(taskType string) {
 		case <-w.ctx.Done():
 			return
 		default:
-			w.processOneTask(taskType)
+			if w.processOneTask(taskType) {
+				continue
+			}
+			// 空闲（空任务或取任务失败）：按 IdleInterval 退避，避免空队列热循环打库。
+			// IdleInterval <= 0 时立即返回 true，行为与旧版本一致。
+			if !w.waitIdle() {
+				return
+			}
 		}
 	}
 }
 
-// processOneTask 处理一个任务
-func (w *Worker) processOneTask(taskType string) {
+// waitIdle 空闲退避；返回 false 表示 Worker 已停止，工作协程应退出
+func (w *Worker) waitIdle() bool {
+	if w.config.IdleInterval <= 0 {
+		return true
+	}
+
+	timer := time.NewTimer(w.config.IdleInterval)
+	defer timer.Stop()
+
+	select {
+	case <-w.ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
+// processOneTask 处理一个任务；返回 true 表示执行了任务，false 表示空闲
+func (w *Worker) processOneTask(taskType string) bool {
 	ctx := logs.WithContextFields(w.ctx, "worker_id", w.config.WorkerID, "task_type", taskType)
 
 	// 从 manager 获取任务（阻塞等待）
@@ -212,16 +253,17 @@ func (w *Worker) processOneTask(taskType string) {
 		if !errors.Is(err, context.Canceled) {
 			logs.ErrorContextf(ctx, "[task] failed to get next task: %v", err)
 		}
-		return
+		return false
 	}
 
 	if taskInfo.TaskID == 0 {
 		// 没有任务，继续循环
-		return
+		return false
 	}
 
 	// 执行任务
 	w.executeTask(ctx, taskInfo)
+	return true
 }
 
 // executeTask 执行任务
@@ -234,20 +276,34 @@ func (w *Worker) executeTask(ctx context.Context, info TaskInfo) {
 
 	ctx = logs.WithContextFields(ctx, "task_id", info.TaskID)
 
-	// 获取执行器
-	factory, ok := w.registry.Get(info.TaskType)
-	if !ok {
+	// 优先取 Info 版工厂（能拿到 TaskID 等完整信息）；未注册时回退旧路径
+	factoryWithInfo, hasInfoFactory := w.registry.GetWithInfo(info.TaskType)
+	factory, hasFactory := w.registry.Get(info.TaskType)
+	if !hasInfoFactory && !hasFactory {
 		logs.ErrorContextf(ctx, "[task] executor not found for task type: %s, task_id: %d", info.TaskType, info.TaskID)
 		w.manager.SaveTaskResult(ctx, w.config.WorkerID, info, "", fmt.Errorf("executor not found"), nil)
 		return
 	}
 
-	// 通过工厂函数创建执行器，传入payload由业务层决定如何解析
-	executor, err := factory(info.Payload)
+	// 通过工厂函数创建执行器，传入payload或完整任务信息由业务层决定如何解析
+	var executor TaskExecutor
+	var err error
+	if hasInfoFactory {
+		executor, err = factoryWithInfo(info)
+	} else {
+		executor, err = factory(info.Payload)
+	}
 	if err != nil {
 		logs.ErrorContextf(ctx, "[task] failed to create executor: %v", err)
 		w.manager.SaveTaskResult(ctx, w.config.WorkerID, info, "", fmt.Errorf("create executor failed: %w", err), nil)
 		return
+	}
+
+	// 任务自带超时时，用它约束执行过程；Timeout 为 0 时不设超时（与旧版本行为一致）
+	if info.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, info.Timeout)
+		defer cancel()
 	}
 
 	// 执行任务

@@ -16,6 +16,9 @@ type WorkerConfig struct {
 	WorkerID string
 	// HealthReportInterval 健康上报间隔，0 表示不上报
 	HealthReportInterval time.Duration
+	// IdleInterval 空闲退避间隔：队列为空或取任务失败时，工作协程等待该时长后再继续，
+	// 避免空队列热循环打库。0 表示不退避（与旧版本行为一致）。
+	IdleInterval time.Duration
 }
 
 // DefaultWorkerConfig 默认配置
@@ -26,6 +29,7 @@ func DefaultWorkerConfig() *WorkerConfig {
 		MaxConcurrency:       5,
 		WorkerID:             "",
 		HealthReportInterval: 0,
+		IdleInterval:         0,
 	}
 }
 
@@ -45,6 +49,9 @@ func (c *WorkerConfig) Validate() error {
 	}
 	if c.HealthReportInterval < 0 {
 		return ErrInvalidHealthReportInterval
+	}
+	if c.IdleInterval < 0 {
+		return ErrInvalidIdleInterval
 	}
 	return nil
 }
