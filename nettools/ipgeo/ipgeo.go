@@ -1,6 +1,7 @@
 package ipgeo
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -14,7 +15,7 @@ import (
 func GetLocationByIP(ip string) (string, error) {
 	apiURL := "https://apis.map.qq.com/ws/location/v1/ip"
 	// 获取 IP API 的密钥
-	ipKey, err := settings.GetText("cook", "IPKey")
+	ipKey, err := settings.GetText(context.Background(), "cook", "IPKey")
 	if err != nil {
 		logs.Errorf("[cook] [GetLocationByIP] Failed to get ipKey: %s", err.Error())
 		return "", fmt.Errorf("failed to get ipKey: %w", err)

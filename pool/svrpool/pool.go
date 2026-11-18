@@ -99,7 +99,7 @@ type ServicePool struct {
 // NewServicePool 创建服务池
 func NewServicePool(ctx context.Context, group, key string) *ServicePool {
 	var conf config.ServicePoolConfig
-	if err := settings.GetYaml(group, key, &conf); err != nil {
+	if err := settings.GetYaml(ctx, group, key, &conf); err != nil {
 		logs.Errorw("NewServicePool error", "key", key, "err", err)
 		return nil
 	}
@@ -137,7 +137,7 @@ func (s *ServicePool) refreshSetting() {
 // loadSetting 从配置中加载服务
 func loadSetting(group, key string) (config.ServicePoolConfig, error) {
 	conf := config.ServicePoolConfig{}
-	err := settings.GetYaml(group, key, &conf)
+	err := settings.GetYaml(context.Background(), group, key, &conf)
 	if err != nil {
 		logs.Warnw("loadSetting error", "err", err)
 		return conf, err

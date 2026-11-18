@@ -2,6 +2,7 @@ package config
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 
@@ -64,7 +65,8 @@ func LoadCoreConfigFromEnv() (*CoreConfig, error) {
 		}
 	}
 	cfg := &CoreConfig{}
-	err := remote.GetRemoteYAML(os.Getenv("YGCFG_KEY"), cfg)
+	// 启动期加载配置，无请求上下文，使用 Background。
+	err := remote.GetRemoteYAML(context.Background(), os.Getenv("YGCFG_KEY"), cfg)
 	if err != nil {
 		return nil, err
 	}

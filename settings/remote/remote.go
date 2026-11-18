@@ -2,6 +2,7 @@ package remote
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
@@ -63,12 +64,12 @@ type getSettingContentResponse struct {
 }
 
 // Get gets the remote settings.
-func (c *RemoteSettingClient) Get(key string) (string, error) {
+func (c *RemoteSettingClient) Get(ctx context.Context, key string) (string, error) {
 	in := getSettingContentRequest{}
 	in.Request.GroupName = c.Group
 	in.Request.SettingKey = key
 	out := getSettingContentResponse{}
-	err := c.doReuqest(&in, &out, "")
+	err := c.doRequest(ctx, &in, &out, "")
 	if err != nil {
 		return "", err
 	}
@@ -84,7 +85,7 @@ func (c *RemoteSettingClient) Get(key string) (string, error) {
 	expectedSignature := encryptor.HmacHash(sha1.New, c.SK, strings.Join(tokenSli, "."))
 	tokenSli = append(tokenSli, expectedSignature)
 	token := strings.Join(tokenSli, ".")
-	err = c.doReuqest(&in, &out, token)
+	err = c.doRequest(ctx, &in, &out, token)
 	if err != nil {
 		return "", err
 	}
@@ -94,10 +95,10 @@ func (c *RemoteSettingClient) Get(key string) (string, error) {
 	return out.Response.Content, nil
 }
 
-func (c *RemoteSettingClient) doReuqest(in *getSettingContentRequest, out *getSettingContentResponse, token string) error {
+func (c *RemoteSettingClient) doRequest(ctx context.Context, in *getSettingContentRequest, out *getSettingContentResponse, token string) error {
 	inBody := new(bytes.Buffer)
 	json.NewEncoder(inBody).Encode(in)
-	req, err := http.NewRequest("POST", c.BaseURL, inBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL, inBody)
 	if err != nil {
 		return err
 	}
@@ -121,20 +122,20 @@ func InitRemoteSettingClientWithEnv(cli *RemoteSettingClient) {
 	stdRemoteClient = cli
 }
 
-func GetRemoteText(key string) (string, error) {
-	return stdRemoteClient.Get(key)
+func GetRemoteText(ctx context.Context, key string) (string, error) {
+	return stdRemoteClient.Get(ctx, key)
 }
 
-func GetRemoteYAML(key string, val interface{}) error {
-	content, err := stdRemoteClient.Get(key)
+func GetRemoteYAML(ctx context.Context, key string, val interface{}) error {
+	content, err := stdRemoteClient.Get(ctx, key)
 	if err != nil {
 		return err
 	}
 	return yaml.Unmarshal([]byte(content), val)
 }
 
-func GetRemoteJSON(key string, val interface{}) error {
-	content, err := stdRemoteClient.Get(key)
+func GetRemoteJSON(ctx context.Context, key string, val interface{}) error {
+	content, err := stdRemoteClient.Get(ctx, key)
 	if err != nil {
 		return err
 	}

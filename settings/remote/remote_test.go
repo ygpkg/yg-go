@@ -1,10 +1,13 @@
 package remote
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestRemoteGet(t *testing.T) {
 	cli := NewRemoteSettingClientWithEnv()
-	content, err := cli.Get("account_main")
+	content, err := cli.Get(context.Background(), "account_main")
 	if err != nil {
 		t.Log(err)
 		return

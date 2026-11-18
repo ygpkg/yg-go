@@ -15,7 +15,8 @@ var stdRedis *redis.Client
 // InitRedis 初始化redis连接
 func InitRedis(group, key string) error {
 	cfg := &config.RedisConfig{}
-	err := settings.GetYaml(group, key, cfg)
+	// 初始化路径无请求上下文，使用 Background。
+	err := settings.GetYaml(context.Background(), group, key, cfg)
 	if err != nil {
 		logs.Errorf("[dbutil] load redis config failed, %s", err)
 		return err
