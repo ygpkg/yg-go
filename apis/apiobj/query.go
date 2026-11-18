@@ -90,21 +90,21 @@ func (p PageQuery) IsValite(allower interface{}) error {
 			ob = strings.TrimSuffix(ob, " desc")
 			ob = strings.TrimSuffix(ob, " asc")
 			if !containsString(allowOrderFields, ob) {
-				return fmt.Errorf("不支持的排序字段: %s" + ob)
+				return fmt.Errorf("不支持的排序字段: %s", ob)
 			}
 		}
 	}
 	if allowFilterFields != nil {
 		for _, f := range p.Filters {
 			if !containsString(allowFilterFields, f.Field) {
-				return fmt.Errorf("不支持的过滤字段: %s" + f.Field)
+				return fmt.Errorf("不支持的过滤字段: %s", f.Field)
 			}
 			if len(f.Value) == 0 {
-				return fmt.Errorf("过滤字段值不能为空: %v" + f.Field)
+				return fmt.Errorf("过滤字段值不能为空: %v", f.Field)
 			}
 			if strings.HasSuffix(f.Field, "_at") {
 				if len(f.Value) != 2 {
-					return fmt.Errorf("时间过滤字段值必须为两个: %v" + f.Field)
+					return fmt.Errorf("时间过滤字段值必须为两个: %v", f.Field)
 				}
 			}
 		}
