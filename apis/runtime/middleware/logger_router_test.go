@@ -33,16 +33,18 @@ func routerBufferLogger(buf *bytes.Buffer) gin.HandlerFunc {
 	}
 }
 
-// newRouterEngine 组装裸 NewRouter，只在引擎链最前面插一条捕获中间件。
-// router() 里 IdentityFields 是框架中间件最后一环，WithMiddleware 追加的中间件排在它之后，
-// 在那里换 logger 会把已经写入的 companyid/uin 一起换掉；捕获点必须在身份字段写入之前。
-// 路由直接注册在引擎上，才能拿到插入后的完整链路。
-func newRouterEngine(t *testing.T, buf *bytes.Buffer, opts ...server.RouterOption) (*server.Router, *gin.Engine) {
+// newRouterEngine 组装 NewRouter，并用新 API 把捕获中间件插到 server.Logger 之前。
+// 捕获点必须在 server.Logger 之前：访问日志是 内置 Logger 在 ctx.Next() 之后输出的，
+// 只有在它之前换掉 ctx 上的 logger，访问日志与业务日志才会落进同一个 buffer。
+// 身份字段顺序契约由库保证：Inject 在 IdentityFields 之前（先写 idmap 再读），
+// WithMiddleware 的尾插在这两者之后，故显式用 WithMiddlewareBefore 而不是 WithMiddleware。
+func newRouterEngine(t *testing.T, buf *bytes.Buffer) (*server.Router, *gin.Engine) {
 	t.Helper()
-	svr := server.NewRouter("/v1", opts...)
-	eng := svr.GinEngine()
-	eng.Handlers = append(gin.HandlersChain{routerBufferLogger(buf)}, eng.Handlers...)
-	return svr, eng
+	svr := server.NewRouter(
+		server.WithPrefixes("/v1"),
+		server.WithMiddlewareBefore(server.Logger, routerBufferLogger(buf)),
+	)
+	return svr, svr.GinEngine()
 }
 
 func routerOutputLines(t *testing.T, buf *bytes.Buffer) []string {
@@ -74,7 +76,7 @@ func routerAssertKeyOnce(t *testing.T, line, key string) {
 	}
 }
 
-// 验收 1 + 2：裸 NewRouter + 一条路由，访问日志里 companyid / uin 各出现一次、匿名值为 0，
+// 验收 1 + 2：最小 NewRouter 装配 + 一条路由，访问日志里 companyid / uin 各出现一次、匿名值为 0，
 // handler 内的业务日志同样带这两个键。
 func TestNewRouterLogsIdentityFields(t *testing.T) {
 	gin.SetMode(gin.TestMode)

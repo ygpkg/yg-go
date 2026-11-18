@@ -26,8 +26,44 @@ const (
 	ctxKeyIdentityFields = "yg-go-log-identity-fields"
 )
 
-// Logger .
-func Logger(whitelist ...string) gin.HandlerFunc {
+// LoggerOption 配置 Logger 中间件。
+type LoggerOption func(*loggerOptions)
+
+// loggerOptions 是 Logger 的可配置项。
+type loggerOptions struct {
+	// whitelist 命中后缀的白名单路径跳过访问日志；默认空（server 内置 Logger 条目单独传 {".Ping", "metrics"}）。
+	whitelist []string
+}
+
+// defaultLoggerOptions 返回默认配置：不跳过任何路径（与 1.23 线的 middleware.Logger() 一致）。
+// 要跳过探针路径时用 WithLoggerWhitelist 显式传入（会整体覆盖默认空列表）。
+func defaultLoggerOptions() *loggerOptions {
+	return &loggerOptions{}
+}
+
+// WithLoggerWhitelist 覆盖默认白名单（传空表示不跳过任何路径）。
+//
+// 命名带 Logger 前缀：选项按中间件归属，避免 WithWhitelist 这种「不知道属于谁」的名字
+// （例如鉴权中间件的接口白名单会是 WithAuthWhitelist，与这里互不混淆）。
+func WithLoggerWhitelist(items ...string) LoggerOption {
+	return func(opts *loggerOptions) {
+		opts.whitelist = append([]string{}, items...)
+	}
+}
+
+// Logger 访问日志与请求直方图。
+//
+// 默认不跳过任何路径；需要跳过探针时传选项：
+//
+//	middleware.Logger(middleware.WithLoggerWhitelist(".Ping", "metrics", "/healthz"))
+func Logger(opts ...LoggerOption) gin.HandlerFunc {
+	cfg := defaultLoggerOptions()
+	for _, opt := range opts {
+		if opt != nil {
+			opt(cfg)
+		}
+	}
+	whitelist := cfg.whitelist
 	return func(ctx *gin.Context) {
 		reqid := ctx.GetString(constants.CtxKeyRequestID)
 
