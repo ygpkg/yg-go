@@ -7,6 +7,12 @@
 [![GoDoc](https://godoc.org/github.com/ygpkg/yg-go?status.png)](http://godoc.org/github.com/ygpkg/yg-go)
 [![license](https://img.shields.io/badge/license-GPL%20V3.0-blue.svg?maxAge=2592000)](https://github.com/ygpkg/yg-go/blob/master/LICENSE)
 
+## 版本与分支策略
+
+> **`release-1.23` 分支已封板**：该分支进入维护期，**只修 bug，不再新增功能**。新的功能开发、能力演进与结构调整一律落在 `main` 分支。
+
+`main` 分支聚焦 **Go 1.27** 版本，作为后续功能的唯一开发主线。若你依赖的是旧版本行为，请继续使用 `release-1.23`；若需要新特性，请跟进 `main`。
+
 # 使用说明
 
 ## 目录结构

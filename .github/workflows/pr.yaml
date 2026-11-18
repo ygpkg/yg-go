@@ -20,6 +20,9 @@ jobs:
       with:
         go-version: '1.27.4'  # 指定Go的版本
 
+    - name: Check asynctask dependency boundaries
+      run: bash scripts/check-asynctask-deps.sh
+
     - name: Lint with golangci-lint
       uses: golangci/golangci-lint-action@v8
       with:
