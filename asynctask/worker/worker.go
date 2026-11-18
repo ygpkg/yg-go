@@ -183,6 +183,17 @@ func defaultWorkerID() string {
 
 // Register 注册任务类型与处理器，必须在 Run 之前。重复类型返回 ErrDuplicateType，
 // Run 之后返回 ErrWorkerAlreadyRunning。
+// RegisterResult 注册「带结果」的执行契约（推荐用于每类型并发 >1 的场景）。
+//
+// 与 Register 的唯一差别是 Handler 额外实现 ResultHandler：Execute 成功后 worker 从
+// ExecuteResult 的返回值取结果快照写进 core_async_task.result。
+func (w *Worker) RegisterResult(taskType string, h ResultHandler, opts ...HandlerOption) error {
+	if h == nil {
+		return asynctask.ErrNilHandler
+	}
+	return w.Register(taskType, resultHandlerAdapter{ResultHandler: h}, opts...)
+}
+
 func (w *Worker) Register(taskType string, h Handler, opts ...HandlerOption) error {
 	if w.src == nil {
 		return asynctask.ErrInvalidConfig
