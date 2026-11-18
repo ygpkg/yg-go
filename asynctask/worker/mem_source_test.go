@@ -19,7 +19,7 @@ type memSource struct {
 	mu     sync.Mutex
 	queues map[string][]*asynctask.AsyncTask
 
-	results   []recordedResult       // 每次 Save 的客观结果
+	results   []recordedResult       // 每次 Save 的客观结果（含结果快照）
 	renews    []*asynctask.AsyncTask // 每次 Renew 的任务（执行期续租证据）
 	releases  []*asynctask.AsyncTask // 每次 Release 的任务（停机/交付失败放租约证据）
 	callbacks int                    // 被实际调用的钩子次数
@@ -41,6 +41,8 @@ type recordedResult struct {
 	Outcome     asynctask.Outcome
 	Failure     asynctask.FailureKind
 	Err         error
+	// Payload 是本次 Save 收到的结果快照（ResultProvider 用例断言用）。
+	Payload asynctask.Result
 }
 
 func newMemSource() *memSource {
@@ -98,6 +100,7 @@ func (m *memSource) Save(ctx context.Context, task *asynctask.AsyncTask, r async
 		Outcome:     r.Outcome,
 		Failure:     r.Failure,
 		Err:         r.Err,
+		Payload:     r,
 	})
 	// 模拟 Source 的重试决策：仅当 outcome=failed 且仍可重试时把任务重新入队。
 	requeue := false
