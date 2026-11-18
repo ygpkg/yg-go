@@ -2,7 +2,7 @@
 // （查询 / 取消 / 重放 / 统计 / 类型启停）。
 //
 // 关键点：
-//   - manager.New 默认 AutoMigrate 建三张表；必须显式 manager.Start(ctx) 起维护循环，
+//   - 本包不建表：示例里先执行 asynctask/ddl 的 DDL；必须显式 manager.Start(ctx) 起维护循环，
 //     否则「次数用尽 + 租约过期」的卡死任务无人回收、终态记录也不会按 Retention 清理；
 //   - worker 复用 manager.Source() 的同一个 DB Source，两处 LeaseTTL 必须一致；
 //   - 结束用 Close / Shutdown 释放连接与在途任务。
@@ -24,6 +24,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/ygpkg/yg-go/asynctask"
+	"github.com/ygpkg/yg-go/asynctask/ddl"
 	"github.com/ygpkg/yg-go/asynctask/manager"
 	"github.com/ygpkg/yg-go/asynctask/worker"
 )
@@ -66,8 +67,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("open sqlite: %v", err)
 	}
+	if err := ddl.Apply(db); err != nil {
+		log.Fatalf("apply asynctask ddl: %v", err)
+	}
 
-	// 任务中心：默认 AutoMigrate 建表。LeaseTTL 与下方 worker 保持一致。
+	// 任务中心：表已由上面的 DDL 建好。LeaseTTL 与下方 worker 保持一致。
 	center, err := manager.New(&manager.Config{LeaseTTL: 60 * time.Second}, db)
 	if err != nil {
 		log.Fatalf("manager.New: %v", err)

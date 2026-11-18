@@ -34,6 +34,7 @@ import (
 
 	"github.com/ygpkg/yg-go/asynctask"
 	"github.com/ygpkg/yg-go/asynctask/center"
+	"github.com/ygpkg/yg-go/asynctask/ddl"
 	"github.com/ygpkg/yg-go/asynctask/manager"
 	"github.com/ygpkg/yg-go/asynctask/source/remote"
 	"github.com/ygpkg/yg-go/asynctask/wire"
@@ -129,6 +130,9 @@ func main() {
 	})
 	if err != nil {
 		log.Fatalf("open sqlite: %v", err)
+	}
+	if err := ddl.Apply(db); err != nil {
+		log.Fatalf("apply asynctask ddl: %v", err)
 	}
 	mgr, err := manager.New(&manager.Config{LeaseTTL: 60 * time.Second}, db)
 	if err != nil {

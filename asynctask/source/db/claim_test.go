@@ -6,16 +6,13 @@ import (
 	"time"
 )
 
-// newTestStore 用 gorm.io/driver/sqlite（mattn cgo）开一个内存库并 AutoMigrate 两表，返回 store。
+// newTestStore 构造一个 sqlite 内存库（已按 ddl.SQLite() 建表）上的 store。
 //
 // SQLite 无 SKIP LOCKED、无隔离级别设置：认领在这里退化为无锁普通事务，
 // 只验证「认领成功 / 空队列 / 次数用尽 / 租约未过期」这类单连接语义，不验证并发。
 func newTestStore(t *testing.T) *store {
 	t.Helper()
-	db := openTestDB(t, false)
-	if err := db.AutoMigrate(&CoreAsyncTask{}, &CoreAsyncTaskRun{}); err != nil {
-		t.Fatalf("automigrate: %v", err)
-	}
+	db := openTestDB(t)
 	return newStore(db, DialectSQLite, 60*time.Second)
 }
 

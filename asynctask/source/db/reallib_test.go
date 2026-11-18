@@ -3,73 +3,35 @@ package db
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ygpkg/yg-go/asynctask"
-	"gorm.io/driver/mysql"
-	"gorm.io/driver/postgres"
+	"github.com/ygpkg/yg-go/asynctask/ddl"
+	"github.com/ygpkg/yg-go/internal/testdb"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 // 真库验收：A1 并发认领不重复、A2 租约接管、A8 EXPLAIN 命中索引。
 //
-// 连不上就 t.Skip（skip≠验证过）。DSN 取自环境变量或 .env 的默认本机值：
+// 连不上就 t.Skip（skip≠验证过）。DSN 取自环境变量或本机默认值（见 internal/testdb）：
 //
 //	MYSQL_DSN / POSTGRES_DSN
 func realMySQLDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	dsn := os.Getenv("MYSQL_DSN")
-	if dsn == "" {
-		// 注意：DSN 的 loc 必须与会话 time_zone 一致（internals「时间来源」硬约束）。
-		// 容器默认 UTC，这里把会话钉到 +08:00 与 loc=Local 对齐，否则 NOW() 与 Go 写入
-		// 的时间差整小时，任务永不「到期」。
-		dsn = "root:123456@tcp(127.0.0.1:3306)/demo?charset=utf8mb4&parseTime=True&loc=Local&time_zone=%27%2B08%3A00%27"
-	}
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	if err != nil {
-		t.Skipf("skip MySQL: 连不上 (%v)", err)
-	}
-	sqlDB, err := db.DB()
-	if err == nil {
-		if err := sqlDB.Ping(); err != nil {
-			t.Skipf("skip MySQL: ping 失败 (%v)", err)
-		}
-	}
-	return db
+	return testdb.Open(t, ddl.DialectMySQL)
 }
 
 func realPGDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	dsn := os.Getenv("POSTGRES_DSN")
-	if dsn == "" {
-		dsn = "host=127.0.0.1 user=postgres password=123456 dbname=demo port=5432 sslmode=disable TimeZone=Asia/Shanghai"
-	}
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
-	if err != nil {
-		t.Skipf("skip PostgreSQL: 连不上 (%v)", err)
-	}
-	sqlDB, err := db.DB()
-	if err == nil {
-		if err := sqlDB.Ping(); err != nil {
-			t.Skipf("skip PostgreSQL: ping 失败 (%v)", err)
-		}
-	}
-	return db
+	return testdb.Open(t, ddl.DialectPostgres)
 }
 
-// resetRealDB 重建两表，隔离各用例。
+// resetRealDB 重建三张表（DROP + 按 ddl 建表），隔离各用例。
 func resetRealDB(t *testing.T, db *gorm.DB) {
 	t.Helper()
-	if err := db.Migrator().DropTable(&CoreAsyncTask{}, &CoreAsyncTaskRun{}); err != nil {
-		t.Fatalf("drop: %v", err)
-	}
-	if err := db.AutoMigrate(&CoreAsyncTask{}, &CoreAsyncTaskRun{}); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	testdb.Reset(t, db)
 }
 
 // seedAsyncTasks 插入 n 条到点的 pending 任务。

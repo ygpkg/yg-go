@@ -9,30 +9,19 @@ package manager
 // p3_test.go / p4_test.go 中单独移植。
 
 import (
-	"fmt"
-	"sync/atomic"
 	"testing"
 
-	"gorm.io/driver/sqlite"
+	"github.com/ygpkg/yg-go/internal/testdb"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
-var testDBSeq int64
-
-// openTestDB 用 yg-go 现成的 gorm.io/driver/sqlite（mattn cgo）开一个独立的内存库。
-// 用 file:<唯一名>?mode=memory&cache=shared 保证每个测试拿到互不干扰的库。
-// gorm 日志置 Silent，避免测试输出被 SQL 刷屏。
+// openTestDB 打开一个独立的 sqlite 内存库，并按 asynctask/ddl/sqlite.sql 建表。
+//
+// 建表走 DDL 而不是 AutoMigrate：uniq_key 的唯一性只在活跃期生效，
+// AutoMigrate 会把它建成全局唯一，让单测锁死错误语义。
 func openTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	dsn := fmt.Sprintf("file:asynctask_mgr_%d?mode=memory&cache=shared", atomic.AddInt64(&testDBSeq, 1))
-	gdb, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	return gdb
+	return testdb.OpenSQLite(t)
 }
 
 // newChainTestManager 构造一个可达内部字段的 Manager（用于直接驱动 source/db 认领）。

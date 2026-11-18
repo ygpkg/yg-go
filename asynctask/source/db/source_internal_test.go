@@ -12,10 +12,7 @@ import (
 // 直接对 finishAsyncTask 断言 RowsAffected 守卫：worker_id 不匹配时 UPDATE 匹配 0 行、不改写，
 // 也不回填 task.Status。这是 DB 内部实现细节（finishAsyncTask 未导出），因此放在 source/db 内部测试。
 func TestSource_LostLease_DirectFinishAsyncTaskRowsAffected(t *testing.T) {
-	gdb := openTestDB(t, true)
-	if err := gdb.AutoMigrate(&CoreAsyncTask{}, &CoreAsyncTaskRun{}); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	gdb := openTestDB(t)
 	src, err := New(Config{DB: gdb, LeaseTTL: 60 * time.Second})
 	if err != nil {
 		t.Fatalf("new source: %v", err)

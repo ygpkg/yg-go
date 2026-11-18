@@ -35,7 +35,10 @@ type Manager struct {
 	maintDone   chan struct{}
 }
 
-// New 构造任务中心。gormDB 必须是写主库；默认执行 AutoMigrate（WithoutAutoMigrate 关闭）。
+// New 构造任务中心。gormDB 必须是写主库。
+//
+// 本函数不建表：请在部署时执行一次 asynctask/ddl 的完整 DDL（Postgres()/MySQL()），
+// 而不是让每个服务实例各自 ALTER。
 // 副作用：不启动后台循环、不消费消息。
 func New(cfg *Config, gormDB *gorm.DB, opts ...Option) (*Manager, error) {
 	if gormDB == nil {
@@ -48,7 +51,7 @@ func New(cfg *Config, gormDB *gorm.DB, opts ...Option) (*Manager, error) {
 		// 填 0 值项为默认（调用方只覆盖想改的字段时，其余保持默认）。
 		applyConfigDefaults(base)
 	}
-	o := &newOptions{Config: base, autoMigrate: true}
+	o := &newOptions{Config: base}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.apply(o)
@@ -83,12 +86,6 @@ func New(cfg *Config, gormDB *gorm.DB, opts ...Option) (*Manager, error) {
 	}
 	if o.notifier != nil {
 		m.mode = ModePollNotify
-	}
-
-	if o.autoMigrate {
-		if err := AutoMigrate(gormDB); err != nil {
-			return nil, err
-		}
 	}
 
 	return m, nil
@@ -160,7 +157,8 @@ func validateConfig(c *Config) error {
 //	err == ErrNotify   => 任务已落库（task != nil, submitted == true），但通知没发出去；
 //	                      不要重试 Submit（会多建一条任务），兜底轮询会接手
 //	submitted == true  => 新建了一条任务
-//	submitted == false => 命中既有 UniqKey，task 为既有任务（可能已是终态）
+//	submitted == false => 命中既有 UniqKey 的**活跃行**（pending/running），task 为那条既有任务；
+//	                      终态行不算命中：唯一的「活跃期唯一」约束让同键终态后可以重建
 func (c *Manager) Submit(ctx context.Context, spec *asynctask.AsyncTaskSpec) (*asynctask.AsyncTask, bool, error) {
 	return c.submit(ctx, spec, -1)
 }
@@ -194,28 +192,32 @@ func (c *Manager) submit(ctx context.Context, spec *asynctask.AsyncTaskSpec, pre
 			return nil, false, err
 		}
 	} else {
-		// 冲突：回查既有行；回查为空（并发提交者回滚/副本延迟）重试插入一次。
+		// 冲突：只认「活跃行」（pending/running）才算幂等命中。
+		//
+		// 唯一约束只在活跃期生效（uk_core_async_task_uniq_active），因此冲突但回查不到
+		// 活跃行只可能是「回查时那一行刚好在本事务外转终态」这一个并发窗口：
+		// 重试插入一次即可；仍冲突且仍查不到活跃行才判 ErrUniqKeyRace。
 		if row.UniqKey == nil {
 			// 没有幂等键却报冲突：只可能是主键撞车，无法回查。
 			return nil, false, asynctask.ErrUniqKeyRace
 		}
-		asyncTask, err = c.findByUniqKey(ctx, *row.UniqKey)
+		asyncTask, err = c.dbSrc.Store().GetActiveByUniqKey(ctx, *row.UniqKey)
 		if errors.Is(err, asynctask.ErrAsyncTaskNotFound) {
 			retried, rerr := c.insertAsyncTask(ctx, row, delayMs)
 			if rerr != nil {
 				return nil, false, rerr
 			}
-			if !retried {
-				// 仍冲突但回查不到 → 幂等键竞争。
-				asyncTask, err = c.findByUniqKey(ctx, *row.UniqKey)
-				if errors.Is(err, asynctask.ErrAsyncTaskNotFound) {
-					return nil, false, asynctask.ErrUniqKeyRace
-				}
+			if retried {
+				asyncTask, err = c.dbSrc.Store().GetAsyncTask(ctx, row.ID)
 				if err != nil {
 					return nil, false, err
 				}
 			} else {
-				asyncTask, err = c.dbSrc.Store().GetAsyncTask(ctx, row.ID)
+				// 仍冲突：回查活跃行；查不到 → 幂等键竞争。
+				asyncTask, err = c.dbSrc.Store().GetActiveByUniqKey(ctx, *row.UniqKey)
+				if errors.Is(err, asynctask.ErrAsyncTaskNotFound) {
+					return nil, false, asynctask.ErrUniqKeyRace
+				}
 				if err != nil {
 					return nil, false, err
 				}
@@ -246,6 +248,9 @@ func (c *Manager) buildSubmitRow(spec *asynctask.AsyncTaskSpec, prevStep int) (*
 		Priority:    int32(spec.Priority),
 		BizType:     spec.BizType,
 		BizID:       spec.BizID,
+		CompanyID:   spec.CompanyID,
+		SubjectKind: spec.SubjectKind,
+		SubjectID:   spec.SubjectID,
 		ChainID:     spec.ChainID,
 		Step:        int32(spec.Step),
 		PrevStep:    int32(prevStep), // 默认 -1（独立任务）；SubmitAfter 传上游 step
@@ -291,10 +296,12 @@ func (c *Manager) insertAsyncTask(ctx context.Context, row *sourcedb.CoreAsyncTa
 
 	sql := fmt.Sprintf(`INSERT %sINTO %s
 (id, created_at, updated_at, task_type, status, priority, payload, uniq_key,
- biz_type, biz_id, chain_id, step, prev_step, generation, attempt, max_attempts, timeout_ms, next_run_at,
+ biz_type, biz_id, company_id, subject_kind, subject_id,
+ chain_id, step, prev_step, generation, attempt, max_attempts, timeout_ms, next_run_at,
  worker_id, duration_ms, request_id, trace_id, labels)
 VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, ''), %s,
- ?, ?, ?, ?, ?, ?, ?, ?, ?,
+ ?, ?, ?, ?, ?,
+ ?, ?, ?, ?, ?, ?, ?,
  %s, '', 0, ?, '', NULLIF(?, ''))%s`,
 		prefix, sourcedb.CoreAsyncTaskTableName, c.dialect.EmptyKeyExpr(), nextRunExpr, suffix)
 
@@ -302,7 +309,8 @@ VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, ''), %s,
 		row.ID, row.CreatedAt, row.UpdatedAt, row.TaskType, row.Status, row.Priority,
 		payloadOrEmpty(row), // NULLIF(?, '')
 		row.UniqKey,
-		row.BizType, row.BizID, row.ChainID, row.Step, row.PrevStep, row.Generation, row.Attempt, row.MaxAttempts, row.TimeoutMs,
+		row.BizType, row.BizID, row.CompanyID, row.SubjectKind, row.SubjectID,
+		row.ChainID, row.Step, row.PrevStep, row.Generation, row.Attempt, row.MaxAttempts, row.TimeoutMs,
 		nextRunArg,
 		row.RequestID, row.Labels,
 	)
@@ -310,19 +318,6 @@ VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, ''), %s,
 		return false, res.Error
 	}
 	return res.RowsAffected > 0, nil
-}
-
-// findByUniqKey 按幂等键回查任务，不存在返回 ErrAsyncTaskNotFound。
-func (c *Manager) findByUniqKey(ctx context.Context, key string) (*asynctask.AsyncTask, error) {
-	var row sourcedb.CoreAsyncTask
-	err := c.db.WithContext(ctx).Where("uniq_key = ?", key).Take(&row).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, asynctask.ErrAsyncTaskNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-	return sourcedb.AsyncTaskRowToDomain(&row), nil
 }
 
 // SubmitAfter 提交「上游任务成功后才执行」的下一步（步骤化任务链）。
@@ -361,6 +356,21 @@ func (c *Manager) SubmitAfter(ctx context.Context, upstreamID string, spec *asyn
 // Get 按 ID 取任务。
 func (c *Manager) Get(ctx context.Context, id string) (*asynctask.AsyncTask, error) {
 	return c.dbSrc.Store().GetAsyncTask(ctx, id)
+}
+
+// GetByUniqKey 按幂等键取活跃期任务（pending/running），不存在返回 ErrAsyncTaskNotFound。
+//
+// 与 Submit 的幂等回查同一口径：只有活跃行算命中，终态行不算（终态后可同键重建）。
+func (c *Manager) GetByUniqKey(ctx context.Context, uniqKey string) (*asynctask.AsyncTask, error) {
+	return c.dbSrc.Store().GetActiveByUniqKey(ctx, uniqKey)
+}
+
+// GetLatestBySubject 按业务主体取最近一条任务，不存在返回 ErrAsyncTaskNotFound。
+//
+// taskType 为空表示不限类型。带类型时命中 idx_core_async_task_subject，不带类型退化为
+// 索引前缀 + filesort（结果集被主体限定，可接受）。
+func (c *Manager) GetLatestBySubject(ctx context.Context, kind, id, taskType string) (*asynctask.AsyncTask, error) {
+	return c.dbSrc.Store().GetLatestBySubject(ctx, kind, id, taskType)
 }
 
 // GetRuns 取任务及其跨重放的全部尝试记录。
@@ -436,35 +446,43 @@ WHERE id = ? AND status IN ('succeeded','failed','canceled','skipped')`,
 	return c.dbSrc.Store().GetAsyncTask(ctx, id)
 }
 
-// Stats 返回各状态的任务计数等统计。
+// Stats 返回各状态的任务计数等统计（全表）。
 func (c *Manager) Stats(ctx context.Context) (*Stats, error) {
-	var rows []struct {
-		Status string
-		Cnt    int64
-	}
-	if err := c.db.WithContext(ctx).Model(&sourcedb.CoreAsyncTask{}).
-		Select("status, count(*) AS cnt").Group("status").Scan(&rows).Error; err != nil {
+	st, err := c.StatsCond(ctx, nil)
+	if err != nil {
 		return nil, err
 	}
-	st := &Stats{}
-	for _, r := range rows {
-		switch asynctask.Status(r.Status) {
+	return &st, nil
+}
+
+// StatsCond 按条件统计各状态计数（cond 为 nil 表示全表）。
+//
+// 过滤口径与 List 共用同一份 applyTaskCond：租户/主体/类型/活跃期等条件在这里同样生效，
+// 调用方不必为了「某租户的任务分布」再手写一遍 SQL。
+func (c *Manager) StatsCond(ctx context.Context, cond *asynctask.AsyncTaskCond) (Stats, error) {
+	counts, err := c.dbSrc.Store().StatsByStatus(ctx, cond)
+	if err != nil {
+		return Stats{}, err
+	}
+	st := Stats{}
+	for status, n := range counts {
+		switch asynctask.Status(status) {
 		case asynctask.StatusPending:
-			st.Pending = r.Cnt
+			st.Pending = n
 		case asynctask.StatusRunning:
-			st.Running = r.Cnt
+			st.Running = n
 		case asynctask.StatusSucceeded:
-			st.Succeeded = r.Cnt
+			st.Succeeded = n
 		case asynctask.StatusFailed:
-			st.Failed = r.Cnt
+			st.Failed = n
 		case asynctask.StatusCanceled:
-			st.Canceled = r.Cnt
+			st.Canceled = n
 		case asynctask.StatusSkipped:
-			st.Skipped = r.Cnt
+			st.Skipped = n
 		case asynctask.StatusTimeout:
-			st.Timeout = r.Cnt
+			st.Timeout = n
 		}
-		st.Total += r.Cnt
+		st.Total += n
 	}
 	return st, nil
 }

@@ -17,7 +17,7 @@ asynctask                        契约内核：AsyncTask / AsyncTaskRun / Async
 ├── wire                         远程协议（端点路径常量 + JSON 类型，客户端/服务端共用一份，只依赖根包）
 ├── center                       远程中心服务端参考实现：Fetch / Heartbeat / Callback / Release（只依赖 manager，不含 HTTP）
 ├── manager                      任务中心门面：Submit/SubmitAfter/Get/GetRuns/List/ListRuns/Cancel/Replay/Stats、
-│                                类型启停、租约判活、Notifier 抽象、维护循环、SchemaModels/AutoMigrate
+│                                类型启停、租约判活、Notifier 抽象、维护循环、SchemaModels、DDL（asynctask/ddl）
 ├── worker                       执行运行时：每类型 1 个认领者 + N 个执行槽，执行期续租（只依赖根包）
 └── source
     ├── db                       DB Source：认领/续租/保存/回收/清理 + core_async_task* 全部 SQL
@@ -87,7 +87,7 @@ import (
 
 // ---- 提交侧（只投递）----
 func Submit(ctx context.Context, db *gorm.DB, payload []byte) error {
-	center, err := manager.New(&manager.Config{}, db) // 默认 AutoMigrate 建表
+	center, err := manager.New(&manager.Config{}, db) // 不建表：部署时执行 asynctask/ddl 的 DDL
 	if err != nil {
 		return err
 	}
@@ -124,7 +124,7 @@ func RunWorkers(ctx context.Context, db *gorm.DB) error {
 
 ```go
 func Start(ctx context.Context, db *gorm.DB, payload []byte, orderNo string) (*asynctask.AsyncTask, bool, error) {
-	center, err := manager.New(&manager.Config{LeaseTTL: 60 * time.Second}, db) // 默认 AutoMigrate 建表
+	center, err := manager.New(&manager.Config{LeaseTTL: 60 * time.Second}, db) // 不建表：部署时执行 asynctask/ddl 的 DDL
 	if err != nil {
 		return nil, false, err
 	}
@@ -244,17 +244,18 @@ if err != nil {
 import sourcedb "github.com/ygpkg/yg-go/asynctask/source/db"
 
 func New(cfg Config) (*Source, error) // Config{DB *gorm.DB, LeaseTTL, Backoff, WorkerID, FailFastChain}
-func (s *Source) Store() Store        // 只读查询（GetAsyncTask/ListAsyncTask/ListRun/...）
+func (s *Source) Store() Store        // 只读查询（GetAsyncTask/ListAsyncTask/GetActiveByUniqKey/GetLatestBySubject/StatsByStatus/...）
 // Source 仅实现 asynctask.Source：Fetch / Renew / Release / Save / Close；不含 Submit（提交走 manager）
 ```
 
 ### `manager`
 
-- `New(cfg *Config, db *gorm.DB, opts ...Option) (*Manager, error)`；`Start(ctx)`（维护循环）/ `Close`；`Submit` / `SubmitAfter`（步骤链）/ `Get` / `GetRuns` / `List` / `ListRuns` / `Cancel` / `Replay` / `Stats` / `Mode` / `Store` / `Source` / `FetchFor`。
+- `New(cfg *Config, db *gorm.DB, opts ...Option) (*Manager, error)`；`Start(ctx)`（维护循环）/ `Close`；`Submit` / `SubmitAfter`（步骤链）/ `Get` / `GetRuns` / `List` / `ListRuns` / `Cancel` / `Replay` / `Stats` / `StatsCond` / `GetByUniqKey` / `GetLatestBySubject` / `Mode` / `Store` / `Source` / `FetchFor`。
 - 类型级启停：`Disable(ctx, type)` / `Enable(ctx, type)` / `IsTypeEnabled` / `TypeGate(ttl)`。
 - 存活判定：`Registry()`（基于租约推导，零外部依赖）。
-- 建表：`SchemaModels() []any` / `AutoMigrate(db)`；`New` 默认建表，`WithoutAutoMigrate()` 关闭。
-- 选项：`WithoutAutoMigrate` / `WithNotifier` / `WithBackoff` / `WithBatchSize` / `WithLeaseTTL` / `WithRetention` / `WithPollInterval`（后者**已废弃不生效**，轮询由 `worker.WorkerConfig.PollInterval` 决定）。
+- 实体清单：`SchemaModels() []any`（只返回实体，不执行任何 DDL）。
+- 建表：**本包不建表**，DDL 见 `asynctask/ddl`（`Postgres()` / `MySQL()` / `SQLite()`，幂等可重放）。
+- 选项：`WithNotifier` / `WithBackoff` / `WithBatchSize` / `WithLeaseTTL` / `WithRetention` / `WithPollInterval`（后者**已废弃不生效**，轮询由 `worker.WorkerConfig.PollInterval` 决定）。
 - `Config` 关键字段：`LeaseTTL`(默认 60s) / `ReaperInterval`(30s) / `CleanupInterval`(1h) / `DefaultMaxAttempts`(3) / `DefaultTimeout`(30s) / `MaxPayloadBytes`(4096) / `Retention`(30d) / `FailFastChain` / `Backoff` / `BatchSize`(50) / `NotifierQueuePrefix`。
 
 ### `worker`
@@ -272,22 +273,39 @@ func (s *Source) Store() Store        // 只读查询（GetAsyncTask/ListAsyncTa
 
 ## 数据表
 
-`manager.New`（默认）或 `manager.AutoMigrate(db)` 建三张表（幂等）；`manager.WithoutAutoMigrate()` 关闭自动建表：
+**本包不建表**（`New` 不执行任何 DDL）。表结构真源是可评审的 SQL 文件，由应用的统一迁移流程执行一次：
+
+| 方言 | 文件 | 获取方式 |
+|---|---|---|
+| PostgreSQL 12+ | `asynctask/ddl/postgres.sql` | `ddl.Postgres()` |
+| MySQL 8.0.1+ | `asynctask/ddl/mysql.sql` | `ddl.MySQL()`（含生成列 `uniq_key_active`） |
+| SQLite 3（仅测试） | `asynctask/ddl/sqlite.sql` | `ddl.SQLite()`（与 PG 同语义：部分唯一索引） |
+
+三份 DDL 都幂等、可重放；`ddl.Apply(db)` 逐条执行（仅供测试/示例，生产请走迁移流程）。
+`ddl/` 下的对账测试会把 `SchemaModels()` 的列名/索引名与三份 DDL 双向比对，任何一侧多/少一个都红。
 
 | 表名 | 说明 |
 |---|---|
-| `core_async_task` | 任务实体（id、task_type、status、priority、payload、uniq_key、biz_type/biz_id、chain_id/step/prev_step、labels、generation/attempt/max_attempts、next_run_at/lease_until、各时间与 request id） |
+| `core_async_task` | 任务实体（id、task_type、status、priority、payload、uniq_key、biz_type/biz_id、**company_id/subject_kind/subject_id**、chain_id/step/prev_step、labels、generation/attempt/max_attempts、next_run_at/lease_until、各时间与 request id） |
 | `core_async_task_run` | 单次尝试记录（id、async_task_id、generation/attempt、status、failure_kind、起止、耗时、result、error、request id） |
 | `core_async_task_type` | 任务类型开关（id、task_type 唯一、enabled；**无行=启用**，fail-open） |
+
+幂等键的唯一性范围是**活跃期**而不是整行生命期：PG/SQLite 用部分唯一索引
+`uk_core_async_task_uniq_active (uniq_key) WHERE status IN ('pending','running')`，
+MySQL 用 STORED 生成列 `uniq_key_active` + 唯一键模拟。因此**终态（failed/succeeded/…）之后
+用同一个 `UniqKey` 可以重建新任务**；活跃期内重复提交仍命中既有任务。
 
 表名常量见 `source/db` 的 `CoreAsyncTaskTableName` / `CoreAsyncTaskRunTableName` / `CoreAsyncTaskTypeTableName`。
 
 ## 接入要点
 
+- **建表/升级**：`manager.New` 不会建表。新库请执行 `ddl.Postgres()` / `ddl.MySQL()`；
+  本改造之前（v1.27.5 及更早）建过表的库请执行设计文档 §9 的升级片段（加 3 列 + 2 索引、删旧全局唯一索引、建 `uk_core_async_task_uniq_active`）。
 - **注入写主库**：`manager.New` / `source/db.New` 传入的 `*gorm.DB` 必须是**写主库**；读写分离下注入从库会让认领读到延迟数据、幂等回查读不到刚插入的行。
 - **handler 必须幂等**：租约过期被接管、停机超时被接管都会重跑；用 `AsyncTask.ID` + `Generation` + `Attempt` 做幂等键。
 - **handler 必须响应 `ctx.Done()`**：超时/取消通过取消 ctx 表达；忽略它会在超时后继续跑完。
-- **`Submit` 三值语义**：`err == nil` 成功；`err == asynctask.ErrNotify` 已落库但通知没发出（**勿重试**，兜底轮询接手）；`submitted` 区分是否新建（幂等键命中时为既有任务）。
+- **`Submit` 三值语义**：`err == nil` 成功；`err == asynctask.ErrNotify` 已落库但通知没发出（**勿重试**，兜底轮询接手）；`submitted` 区分是否新建（幂等键命中**活跃行**时 false、返回既有任务；终态行不算命中）。
+- **一等维度**：租户与业务主体用 `AsyncTaskSpec.CompanyID / SubjectKind / SubjectID`（对应独立列与索引），不要再塞进 `Labels`；查列表/统计用 `AsyncTaskCond.CompanyID`（`*uint64`，0 是合法租户）/ `SubjectKind` / `SubjectID` / `ActiveOnly` / `AfterCreatedAt`+`AfterID`（keyset 分页）。
 - **两处 LeaseTTL 必须一致**：`worker.WorkerConfig.LeaseTTL` 与 `manager.Config.LeaseTTL` / `source/db.Config.LeaseTTL` 是同一个租约时长，Worker 侧小了会被误判失权，大了接管会变慢。
 - **记得 `manager.Start(ctx)`**：管理面进程要回收/清理就必须启动维护循环；只提交不管理的进程可以只 `New` + `Close`。
 - **不用 gormdao 软删除**：三张表无软删除语义，用 `gormdao` 接入时传 `WithoutSoftDelete()`。
@@ -301,7 +319,7 @@ func (s *Source) Store() Store        // 只读查询（GetAsyncTask/ListAsyncTa
 | 任务状态 | pending/running/success/failed/canceled/timeout | 同集合 + skipped + generation 重放 |
 | 每次尝试记录 | 无独立表 | `core_async_task_run` |
 | 重放/步骤链/类型启停 | 部分（Step/AppGroup） | 完整（Replay/SubmitAfter/TypeGate） |
-| 多租户 | 内置 CompanyID/Uin | 用 `Labels`（app_group/company_id/uin） |
+| 多租户 | 内置 CompanyID/Uin | 一等维度 `company_id` / `subject_kind` / `subject_id`（带索引） |
 | Redis 依赖 | **必需** | **不需要** |
 
 **怎么选**：
@@ -315,5 +333,5 @@ func (s *Source) Store() Store        // 只读查询（GetAsyncTask/ListAsyncTa
 本包移植自 [`github.com/morehao/golib`](https://github.com/morehao/golib) 的 `task/gasync`，原作者 morehao。
 
 - 源项目许可证：**MIT**；本仓 yg-go 为 **GPL-3.0**。MIT → GPL-3.0 兼容，可移植。
-- 移植改动：日志改用 yg-go `logs`（经包内 `asynctask.Logger` 适配，见 `logger.go`）；日志 key 常量改为包内常量（值仍为 `task.type`/`task.id`）；建表由 `manager.AutoMigrate` 直连 `gorm.AutoMigrate`（替代源 `internal/tablekit`）；不引入 asynq / miniredis / Redis 心跳子包。
+- 移植改动：日志改用 yg-go `logs`（经包内 `asynctask.Logger` 适配，见 `logger.go`）；日志 key 常量改为包内常量（值仍为 `task.type`/`task.id`）；建表改为包内 `asynctask/ddl` 的三方言 SQL（不执行 DDL、不再 AutoMigrate）；不引入 asynq / miniredis / Redis 心跳子包。
 - 表名沿用 `core_async_task` / `core_async_task_run` / `core_async_task_type`（与旧 `core_task` 语义独立、不冲突）。

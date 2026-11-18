@@ -48,6 +48,11 @@ type AsyncTask struct {
 	UniqKey  string // 空串表示无幂等键
 	BizType  string
 	BizID    string
+	// CompanyID 租户 ID（0 = 系统/无租户）。一等维度，走独立列与索引，不进 Labels。
+	CompanyID uint64
+	// SubjectKind / SubjectID 业务主体（如 work/<uuid>）：通用「按主体取最近一条/列表」的维度。
+	SubjectKind string
+	SubjectID   string
 	// ChainID 任务链 ID（空串=独立任务）。同一条业务链的多个 step 共享同一 ChainID。
 	ChainID string
 	// Step 步骤序号，从 0 开始；独立任务恒为 0。
@@ -66,7 +71,8 @@ type AsyncTask struct {
 	Duration    time.Duration
 	LastError   string
 	Result      []byte
-	// Labels 通用业务维度（如 app_group/company_id/uin），序列化为 JSON 落 labels 列。
+	// Labels 开放业务维度（如 app_group/uin），序列化为 JSON 落 labels 列（无索引）。
+	// 租户与业务主体已是一等维度（CompanyID / SubjectKind / SubjectID），不要塞进 Labels。
 	Labels    map[string]string
 	RequestID string
 	TraceID   string
@@ -134,14 +140,19 @@ type AsyncTaskSpec struct {
 	Timeout     time.Duration // 可选，见「默认值优先级」
 	RunAt       time.Time     // 可选，绝对时刻（调用方时钟）；与 Delay 互斥
 	Delay       time.Duration // 可选，相对延迟（DB 时钟）；与 RunAt 互斥
-	UniqKey     string        // 可选，唯一性范围 = 该行存在期间（受 Retention 影响）
+	UniqKey     string        // 可选，唯一性范围 = 活跃期（pending/running）；终态后同键可重建
 	BizType     string
 	BizID       string
+	// CompanyID 可选：租户 ID（0 = 系统/无租户）。
+	CompanyID uint64
+	// SubjectKind / SubjectID 可选：业务主体类型与 ID（字符串化，如 "work" / "<uuid>"）。
+	SubjectKind string
+	SubjectID   string
 	// ChainID 可选：指定任务链；为空时独立任务（SubmitAfter 会自动继承上游 ChainID）。
 	ChainID string
 	// Step 可选：步骤序号，默认 0。
 	Step int
-	// Labels 可选：通用业务维度键值（如 app_group/company_id/uin），落 labels 列，可被 AsyncTaskCond 精确过滤。
+	// Labels 可选：开放业务维度键值（如 app_group/uin），落 labels 列，可被 AsyncTaskCond 精确过滤。
 	Labels    map[string]string
 	RequestID string // 可选，覆盖从 ctx 取的 request id
 }
@@ -155,6 +166,15 @@ type AsyncTaskCond struct {
 	BizID          string
 	// ChainID 按任务链过滤（空=不过滤）。
 	ChainID string
+	// CompanyID 按租户过滤（nil=不过滤；0 是合法租户，不能用零值判断）。
+	CompanyID *uint64
+	// SubjectKind / SubjectID 按业务主体过滤（空=不过滤）。
+	SubjectKind string
+	SubjectID   string
+	// UniqKey 按幂等键过滤（空=不过滤）。
+	UniqKey string
+	// ActiveOnly 只返回活跃期（pending/running）的任务。
+	ActiveOnly bool
 	// Labels 按 label 精确匹配（AND 语义；空=不过滤）。
 	Labels map[string]string
 	// CreatedAfter / CreatedBefore 创建时间区间（nil=不限）。
@@ -162,6 +182,10 @@ type AsyncTaskCond struct {
 	CreatedBefore *time.Time
 	// OrderBy 排序；白名单 created_at/updated_at/priority/status，asc/desc；默认 "created_at desc"。
 	OrderBy string
+	// AfterCreatedAt / AfterID keyset 分页游标：只返回排在游标之后的行，
+	// 排序方向跟随 OrderBy（默认 created_at desc）。与 Page 并存，深页请优先用它。
+	AfterCreatedAt *time.Time
+	AfterID        string
 }
 
 // AsyncTaskRunCond 尝试列表查询条件（manager 使用；根包只定义结构）。

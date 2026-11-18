@@ -3,8 +3,6 @@ package center_test
 import (
 	"context"
 	"errors"
-	"fmt"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -12,29 +10,14 @@ import (
 	"github.com/ygpkg/yg-go/asynctask/center"
 	"github.com/ygpkg/yg-go/asynctask/manager"
 	"github.com/ygpkg/yg-go/asynctask/wire"
-	"gorm.io/driver/sqlite"
+	"github.com/ygpkg/yg-go/internal/testdb"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
-// sqliteSeq 为每个用例生成唯一的内存库名，避免用例间共享库串扰。
-var sqliteSeq atomic.Int64
-
-// newCenter 构造 sqlite 内存库上的中心门面。
+// newCenter 构造 sqlite 内存库（已按 ddl.SQLite() 建表）上的中心门面。
 func newCenter(t *testing.T) (*center.Center, *manager.Manager, *gorm.DB) {
 	t.Helper()
-	name := fmt.Sprintf("file:center-%d?mode=memory&cache=shared", sqliteSeq.Add(1))
-	db, err := gorm.Open(sqlite.Open(name), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
-	})
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	t.Cleanup(func() {
-		if sqlDB, err := db.DB(); err == nil {
-			_ = sqlDB.Close()
-		}
-	})
+	db := testdb.OpenSQLite(t)
 	// 退避置为 1ms：用例要在毫秒级观察到「失败 → 回 pending → 重新可认领」。
 	m, err := manager.New(&manager.Config{
 		Backoff: func(int) time.Duration { return time.Millisecond },
