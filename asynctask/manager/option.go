@@ -33,27 +33,15 @@ type Option interface {
 }
 
 // newOptions 是构造期选项载体：内嵌 Config（保持「选项写进 Config」的既有语义），
-// 另加只对构造函数有意义的开关（autoMigrate）与不可配置的外部依赖（notifier）。
+// 另加不可配置的外部依赖（notifier）。
 type newOptions struct {
 	*Config
-	autoMigrate bool
-	notifier    Notifier
+	notifier Notifier
 }
 
 type optionFunc func(*newOptions)
 
 func (f optionFunc) apply(o *newOptions) { f(o) }
-
-// WithoutAutoMigrate 关闭构造函数里的自动建表。
-//
-// 适用于两类部署：
-//   - 共库：DDL 由统一发布流程执行一次，服务侧不该各自 ALTER；
-//   - 运行时账号无 DDL 权限：建表由专用迁移账号完成。
-//
-// 只影响构造函数的隐式建表；显式调用 AutoMigrate 永远执行。
-func WithoutAutoMigrate() Option {
-	return optionFunc(func(o *newOptions) { o.autoMigrate = false })
-}
 
 // WithNotifier 注入通知器（poll+notify 形态）。未注入时为纯 poll 形态。
 func WithNotifier(n Notifier) Option {

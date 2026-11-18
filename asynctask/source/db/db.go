@@ -34,8 +34,8 @@ type Source = source
 
 // New 构造一个 DB Source。DB 为 nil 返回 asynctask.ErrNilDB 包装错误。
 //
-// 注意：本函数不建表。建表由 manager.New 或显式 AutoMigrate 负责（本包不拥有迁移入口，
-// 避免两处 DDL 源头；表结构定义随 model.go 一并位于本包，SchemaModels 由 manager 转发）。
+// 注意：本函数不建表。表结构真源是 asynctask/ddl 的 SQL 文件，由应用的迁移流程执行一次；
+// 本包与 manager 都不拥有 DDL 入口（避免多处 DDL 源头），SchemaModels 由 manager 转发。
 func New(cfg Config) (*Source, error) {
 	if cfg.DB == nil {
 		return nil, asynctask.ErrNilDB

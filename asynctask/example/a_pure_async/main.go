@@ -5,7 +5,7 @@
 //   - 执行侧只依赖 source/db + worker：不构造 Manager，也不引任何管理面。
 //
 // 本示例为了能独立跑通，把两侧放在同一个进程里顺序演示；实际使用时它们通常分属两个进程/服务。
-// 建表由 manager.New 默认 AutoMigrate 负责；执行侧 source/db.New 不建表。
+// 本包不建表：示例里用 ddl.Apply 建一次（生产请在部署流程里执行 ddl.Postgres()/MySQL()）；执行侧 source/db.New 不建表。
 //
 // 运行（demo_db 用 sqlite 内存库，无需外部依赖）：
 //
@@ -25,6 +25,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 
 	"github.com/ygpkg/yg-go/asynctask"
+	"github.com/ygpkg/yg-go/asynctask/ddl"
 	"github.com/ygpkg/yg-go/asynctask/manager"
 	sourcedb "github.com/ygpkg/yg-go/asynctask/source/db"
 	"github.com/ygpkg/yg-go/asynctask/worker"
@@ -38,7 +39,7 @@ type EmailPayload struct {
 
 const taskType = "email:send"
 
-// openDB 打开一个 sqlite 内存库做 demo（生产用你的写主库 *gorm.DB）。
+// openDB 打开一个 sqlite 内存库做 demo（生产用你的写主库 *gorm.DB），并执行 asynctask 的 DDL。
 // 用唯一的 file: 名 + cache=shared 保证内存库在同一连接池内可见。
 func openDB() *gorm.DB {
 	db, err := gorm.Open(sqlite.Open("file:example_a?mode=memory&cache=shared"), &gorm.Config{
@@ -47,12 +48,15 @@ func openDB() *gorm.DB {
 	if err != nil {
 		log.Fatalf("open sqlite: %v", err)
 	}
+	if err := ddl.Apply(db); err != nil {
+		log.Fatalf("apply asynctask ddl: %v", err)
+	}
 	return db
 }
 
 // submitSide 是「提交侧」：只需要 manager，不引 worker。
 func submitSide(ctx context.Context, db *gorm.DB, p EmailPayload) (*asynctask.AsyncTask, error) {
-	center, err := manager.New(&manager.Config{}, db) // 默认 AutoMigrate 建表
+	center, err := manager.New(&manager.Config{}, db) // 不再建表，表由 openDB 的 ddl.Apply 建好
 	if err != nil {
 		return nil, err
 	}

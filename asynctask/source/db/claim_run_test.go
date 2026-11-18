@@ -10,13 +10,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// newLeaseTestSource 构造一个 sqlite 内存库 + Source（AutoMigrate 三表）。
+// newLeaseTestSource 构造一个 sqlite 内存库（已按 ddl.SQLite() 建表）+ Source。
 func newLeaseTestSource(t *testing.T) (*source, *gorm.DB) {
 	t.Helper()
-	gdb := openTestDB(t, true)
-	if err := gdb.AutoMigrate(&CoreAsyncTask{}, &CoreAsyncTaskRun{}, &CoreAsyncTaskType{}); err != nil {
-		t.Fatalf("migrate: %v", err)
-	}
+	gdb := openTestDB(t)
 	src, err := New(Config{DB: gdb, LeaseTTL: 60 * time.Second, WorkerID: "w-test"})
 	if err != nil {
 		t.Fatalf("new source: %v", err)

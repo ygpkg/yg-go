@@ -12,10 +12,14 @@ const (
 
 // CoreAsyncTask 是有状态的任务实体，对应表 core_async_task。
 //
-// 与契约「数据模型」字段表逐列对齐：
+// 与契约「数据模型」字段表逐列对齐；表结构真源是 asynctask/ddl 的 SQL 文件，本结构体
+// 只负责读写映射（ddl 对账测试会双向比对列名与索引名）：
 //   - 时间列不写 type:datetime(3)（写了 PG 会生成非法类型）；
 //   - 计数列用 int32 → MySQL int（Go int 会映射成 bigint），timeout_ms/duration_ms 显式 int64；
-//   - uniq_key 用 *string：空即 NULL，不参与唯一约束；
+//   - uniq_key 用 *string：空即 NULL，不参与唯一约束；唯一性只在活跃期
+//     （DDL 侧的 uk_core_async_task_uniq_active：PG/SQLite 用部分唯一索引，
+//     MySQL 用生成列 uniq_key_active），所以这里**不加** uniqueIndex tag——
+//     加了会让任何 AutoMigrate 重建出「全局唯一」，把终态后重建的语义钉死；
 //   - 无软删除（不做 gorm.DeletedAt）；
 //   - 索引名一律带表前缀（PG 索引名 schema 级唯一）。
 type CoreAsyncTask struct {
@@ -31,9 +35,15 @@ type CoreAsyncTask struct {
 	// 索引顺序与之完全一致才能免掉 filesort。
 	Priority int32   `gorm:"column:priority;not null;default:0;index:idx_core_async_task_claim,priority:3,sort:desc;comment:优先级"`
 	Payload  string  `gorm:"column:payload;type:text;comment:任务入参"`
-	UniqKey  *string `gorm:"column:uniq_key;type:varchar(128);uniqueIndex:uk_core_async_task_uniq_key;comment:幂等键"`
+	UniqKey  *string `gorm:"column:uniq_key;type:varchar(128);comment:幂等键（仅活跃期唯一）"`
 	BizType  string  `gorm:"column:biz_type;type:varchar(64);not null;default:'';index:idx_core_async_task_biz_type_biz_id,priority:1;comment:业务类型"`
 	BizID    string  `gorm:"column:biz_id;type:varchar(64);not null;default:'';index:idx_core_async_task_biz_type_biz_id,priority:2;comment:业务 ID"`
+
+	// 一等维度（C2）：租户与业务主体。原先只能塞进 labels（text、无索引，只能全表扫），
+	// 现在进独立列并各带索引；新代码禁止再读 labels 里的 company_id。
+	CompanyID   uint64 `gorm:"column:company_id;not null;default:0;index:idx_core_async_task_company_status_created,priority:1;comment:租户 ID（0=系统/无租户）"`
+	SubjectKind string `gorm:"column:subject_kind;type:varchar(64);not null;default:'';index:idx_core_async_task_subject,priority:1;comment:业务主体类型"`
+	SubjectID   string `gorm:"column:subject_id;type:varchar(64);not null;default:'';index:idx_core_async_task_subject,priority:2;comment:业务主体 ID"`
 
 	// 任务链（步骤化）。独立任务：chain_id=''、step=0、prev_step=-1。
 	ChainID  string `gorm:"column:chain_id;type:varchar(36);not null;default:'';index:idx_core_async_task_chain_id_step,priority:1;comment:任务链 ID（空=独立任务）"`
@@ -56,7 +66,8 @@ type CoreAsyncTask struct {
 	Result     string `gorm:"column:result;type:text;comment:结果快照"`
 	RequestID  string `gorm:"column:request_id;type:varchar(64);not null;default:'';comment:请求 ID"`
 	TraceID    string `gorm:"column:trace_id;type:varchar(64);not null;default:'';comment:TraceID"`
-	// Labels 通用业务维度（JSON 对象，如 {"app_group":"x","company_id":"1"}）；可空。
+	// Labels 开放业务维度（JSON 对象，如 {"app_group":"x"}）；可空、无索引。
+	// 一等维度（租户/业务主体）走 company_id / subject_kind / subject_id 三列，不要再塞进这里。
 	Labels string `gorm:"column:labels;type:text;comment:业务维度标签（JSON）"`
 }
 

@@ -11,7 +11,7 @@ import (
 	sourcedb "github.com/ygpkg/yg-go/asynctask/source/db"
 )
 
-// newTestManager 用内部 sqlite 驱动开内存库并构造 Manager（New 会 AutoMigrate）。
+// newTestManager 用 sqlite 内存库（已按 ddl.SQLite() 建表）构造 Manager。
 func newTestManager(t *testing.T) *Manager {
 	t.Helper()
 	m, err := New(nil, openTestDB(t))
