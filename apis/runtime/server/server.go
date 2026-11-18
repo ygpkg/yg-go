@@ -148,10 +148,6 @@ func (svr *Router) router() {
 	svr.eng.Use(middleware.LoginStatus())
 	svr.eng.Use(middleware.AcceptLanguage())
 	svr.eng.Use(svr.Inject)
-	// IdentityFields 必须是框架中间件的最后一环：svr.Inject 之前的 companyid/uin
-	// 还没被 app 的 auth injector 写进 idmap，放早了读出来恒为 0 且不报错。
-	// opts 里的业务中间件在 router() 之后追加，所以仍排在它后面。
-	svr.eng.Use(middleware.IdentityFields())
 
 	svr.eng.NoRoute(func(c *gin.Context) {
 		c.String(http.StatusNotFound, "The incorrect API route.")
