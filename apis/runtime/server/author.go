@@ -2,7 +2,7 @@ package server
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/ygpkg/yg-go/apis/runtime"
+	"github.com/ygpkg/yg-go/apis/constants"
 	"github.com/ygpkg/yg-go/apis/runtime/auth"
 	"github.com/ygpkg/yg-go/logs"
 )
@@ -29,8 +29,15 @@ func (ai *authInjectors) Default(injector auth.InjectorFunc) {
 }
 
 func (ai *authInjectors) Inject(ctx *gin.Context) {
-	ls := runtime.LoginStatus(ctx)
-	if ls.State != auth.StateSucc {
+	// 登录态中间件可能被 WithoutMiddleware(server.LoginStatus) 关掉（账号体系完全自研的服务），
+	// 此时没有 LoginStatus 可读：直接跳过注入器，避免 runtime.LoginStatus 的 MustGet panic。
+	// 注入器的唯一职责就是给 LoginStatus 填 idmap，没有登录态时无事可做。
+	value, ok := ctx.Get(constants.CtxKeyLoginStatus)
+	if !ok {
+		return
+	}
+	ls, ok := value.(*auth.LoginStatus)
+	if !ok || ls.State != auth.StateSucc {
 		return
 	}
 
