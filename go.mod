@@ -1,8 +1,6 @@
 module github.com/ygpkg/yg-go
 
-go 1.23.0
-
-toolchain go1.23.7
+go 1.25.0
 
 require (
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.726
@@ -28,6 +26,7 @@ require (
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/redis/go-redis/v9 v9.7.1
 	github.com/robfig/cron/v3 v3.0.0
+	github.com/sashabaranov/go-openai v1.41.2
 	github.com/satori/go.uuid v1.2.0
 	github.com/silenceper/wechat/v2 v2.1.6
 	github.com/stretchr/testify v1.10.0
@@ -135,7 +134,6 @@ require (
 	github.com/prometheus/common v0.62.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rs/xid v1.6.0 // indirect
-	github.com/sashabaranov/go-openai v1.41.2 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
