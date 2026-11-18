@@ -1,6 +1,6 @@
 module github.com/ygpkg/yg-go
 
-go 1.25.0
+go 1.27.4
 
 require (
 	github.com/aliyun/alibaba-cloud-sdk-go v1.62.726
