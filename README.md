@@ -30,7 +30,7 @@
 * `notify` 通知相关的工具, 邮件、短信和微信
 * `pool` 池相关的工具，可用于资源池
 * `random` 随机相关的工具
-* `settings` 程序设置相关的工具，获取数据库中的设置和远程API的设置
+* `settings` 程序设置相关的工具，获取数据库中的设置和远程API的设置（公共函数均以 `ctx context.Context` 为首个参数，便于日志/链路追踪）
 * `shell` shell相关的工具
 * `tests` 测试相关的工具
 * `types` 补充的通用数据结构

@@ -24,7 +24,7 @@ func LicenseCheck(whitelist ...string) gin.HandlerFunc {
 			}
 		}
 
-		license, getLicenseErr := settings.GetValue("license", "enable")
+		license, getLicenseErr := settings.GetValue(ctx, "license", "enable")
 		if getLicenseErr != nil {
 			logs.ErrorContextf(ctx, "[LicenseCheck] get license err: %s", getLicenseErr)
 			ctx.AbortWithStatusJSON(http.StatusOK, gin.H{

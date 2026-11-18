@@ -1,6 +1,7 @@
 package httptools
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -81,7 +82,8 @@ func ProxySocks5FromSetting(cli *http.Client, group, key string) error {
 // ProxyConfigFromSetting get proxy config from settings
 func ProxyConfigFromSetting(group, key string) (*config.ProxyConfig, error) {
 	opt := &config.ProxyConfig{}
-	err := settings.GetYaml(group, key, opt)
+	// 该方法无请求上下文，使用 Background 加载配置。
+	err := settings.GetYaml(context.Background(), group, key, opt)
 	if err != nil {
 		logs.Errorf("ProxyConfigFromSetting: get proxy config failed, %s", err)
 		return nil, err

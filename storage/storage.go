@@ -128,7 +128,8 @@ func NewStorage(purpose string) (Storager, error) {
 		err error
 		key = SettingPrefix + purpose
 	)
-	err = settings.GetYaml(settings.SettingGroupCore, key, &cfg)
+	// NewStorage 无请求上下文，使用 Background 加载配置。
+	err = settings.GetYaml(context.Background(), settings.SettingGroupCore, key, &cfg)
 	if err != nil {
 		logs.Errorf("get storage config error: %v", err)
 		return nil, err

@@ -1,6 +1,7 @@
 package sms
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ygpkg/yg-go/config"
@@ -32,7 +33,8 @@ func InitDB() error {
 // SendVerifyCode 发送验证码
 func SendVerifyCode(group, key, phone, code, outid string) error {
 	cfg := &config.SMSConfig{}
-	err := settings.GetYaml(group, key, cfg)
+	// 该方法无请求上下文，使用 Background 加载配置。
+	err := settings.GetYaml(context.Background(), group, key, cfg)
 	if err != nil {
 		return err
 	}

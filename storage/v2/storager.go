@@ -58,7 +58,7 @@ func LoadStorager(purpose string) (Storager, error) {
 func NewStorage(purpose string) (Storager, error) {
 	var cfg config.StorageConfig
 	key := SettingPrefix + purpose
-	err := settings.GetYaml(settings.SettingGroupCore, key, &cfg)
+	err := settings.GetYaml(context.Background(), settings.SettingGroupCore, key, &cfg)
 	if err != nil {
 		logs.Errorf("get storage config error: %v", err)
 		return nil, err

@@ -42,7 +42,8 @@ type Uploader struct {
 
 func getUploadProvider(group, key string) (*config.StorageConfig, iUploader, error) {
 	var cfg config.StorageConfig
-	err := settings.GetYaml(group, key, &cfg)
+	// 兼容旧签名：该方法无请求上下文，使用 Background 加载配置。
+	err := settings.GetYaml(context.Background(), group, key, &cfg)
 	if err != nil {
 		logs.Errorf("get uploader storage config error: %v", err)
 		return nil, nil, err
