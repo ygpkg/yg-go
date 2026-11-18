@@ -22,3 +22,6 @@
 go.work
 .history
 .vscode
+
+# 过程性文档/临时产物（agent 工作区）
+.dsh/
