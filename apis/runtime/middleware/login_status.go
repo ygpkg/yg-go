@@ -11,6 +11,20 @@ import (
 	"github.com/ygpkg/yg-go/logs"
 )
 
+// applyLoginStatus 把解析结果落到请求上。
+//
+// 两个地方都要写：gin key（供 ctx.GetUint 之类的老读法）与 LoginStatus.idmap
+// （供 runtime.Uin / runtime.CompanyID）。**只写 gin key 会让 runtime.Uin 恒为 0**——
+// idmap 只有各 app 的 injector 会填，没有 injector 的服务就永远读不到 claim 里的 uin。
+// 这是 v1.23.80 那次改动的回归点，单独提出来是为了能被用例直接钉住。
+func applyLoginStatus(ctx *gin.Context, ls *auth.LoginStatus) {
+	ctx.Set(constants.CtxKeyLoginStatus, ls)
+	if ls.Claim != nil && ls.Claim.Uin > 0 {
+		ctx.Set(constants.CtxKeyUin, ls.Claim.Uin)
+		ls.SetID(constants.CtxKeyUin, ls.Claim.Uin)
+	}
+}
+
 // LoginStatus 注入用户登录状态
 func LoginStatus() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
@@ -19,10 +33,7 @@ func LoginStatus() gin.HandlerFunc {
 			ls      = &auth.LoginStatus{}
 		)
 		defer func() {
-			ctx.Set(constants.CtxKeyLoginStatus, ls)
-			if ls.Claim != nil && ls.Claim.Uin > 0 {
-				ctx.Set(constants.CtxKeyUin, ls.Claim.Uin)
-			}
+			applyLoginStatus(ctx, ls)
 			// logs.Debugf("login status: %+v", ls)
 		}()
 		if authstr == "" {

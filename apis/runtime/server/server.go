@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -37,6 +38,10 @@ type Router struct {
 	routeGroups map[string]*gin.RouterGroup
 
 	deployMode string
+
+	// loggerOpts 由 WithLoggerOptions 收集，在首个请求时被懒构造进中间件
+	// （opts 是在 router() 之后才 apply 的，那时两件中间件已经装进引擎）。
+	loggerOpts []middleware.LoggerOption
 
 	*authInjectors
 }
@@ -71,6 +76,17 @@ func WithPrefixes(prefixes []string) RouterOption {
 func WithDeployMode(deployMode string) RouterOption {
 	return func(svr *Router) {
 		svr.deployMode = deployMode
+	}
+}
+
+// WithLoggerOptions 配置框架自带的访问日志与字段写入中间件。
+//
+// 一个选项都不传时，日志输出与历史版本逐字一致（不新增字段、不改响应头）。
+// 需要身份字段（companyid/uin）、业务维度或 X-Request-Id 回写时在这里显式打开，
+// app 侧不必再自己挂日志中间件。
+func WithLoggerOptions(opts ...middleware.LoggerOption) RouterOption {
+	return func(svr *Router) {
+		svr.loggerOpts = append(svr.loggerOpts, opts...)
 	}
 }
 
@@ -143,15 +159,53 @@ func (svr *Router) GinEngine() *gin.Engine {
 func (svr *Router) router() {
 	svr.eng.Use(middleware.CORS())
 	svr.eng.Use(middleware.CustomerHeader())
-	svr.eng.Use(middleware.Logger(".Ping", "metrics"))
+	svr.eng.Use(svr.accessLogger())
 	svr.eng.Use(middleware.Recovery())
 	svr.eng.Use(middleware.LoginStatus())
 	svr.eng.Use(middleware.AcceptLanguage())
 	svr.eng.Use(svr.Inject)
+	// 字段写入点：必须在 Inject 之后（idmap 那时才填好），且早于路由处理（业务日志才带得上）。
+	svr.eng.Use(svr.contextFields())
 
 	svr.eng.NoRoute(func(c *gin.Context) {
 		c.String(http.StatusNotFound, "The incorrect API route.")
 	})
+}
+
+// accessLogger 返回访问日志中间件。
+//
+// 为什么要懒构造：`NewRouter` 先 `router()` 装框架中间件、再 apply opts，而
+// `WithLoggerOptions` 是 opts 之一——装机时选项还没到。首个请求时构造一次即可，
+// 之后复用同一个 handler（sync.Once，无锁热路径）。
+func (svr *Router) accessLogger() gin.HandlerFunc {
+	var (
+		once sync.Once
+		h    gin.HandlerFunc
+	)
+	return func(ctx *gin.Context) {
+		once.Do(func() { h = middleware.LoggerWithOptions(svr.loggerOptions()...) })
+		h(ctx)
+	}
+}
+
+// contextFields 返回字段写入中间件，同样是懒构造。
+func (svr *Router) contextFields() gin.HandlerFunc {
+	var (
+		once sync.Once
+		h    gin.HandlerFunc
+	)
+	return func(ctx *gin.Context) {
+		once.Do(func() { h = middleware.ContextFields(svr.loggerOptions()...) })
+		h(ctx)
+	}
+}
+
+// loggerOptions 合并默认白名单与调用方选项（调后方可覆盖白名单）。
+func (svr *Router) loggerOptions() []middleware.LoggerOption {
+	opts := make([]middleware.LoggerOption, 0, len(svr.loggerOpts)+1)
+	opts = append(opts, middleware.WithWhitelist(".Ping", "metrics"))
+	opts = append(opts, svr.loggerOpts...)
+	return opts
 }
 
 // Any .
