@@ -37,6 +37,6 @@ func TestSafeID(t *testing.T) {
 }
 
 func TestUUID(t *testing.T) {
-	t.Logf(hex.EncodeToString(uuid.Must(uuid.NewV4(), nil).Bytes()))
+	t.Log(hex.EncodeToString(uuid.Must(uuid.NewV4(), nil).Bytes()))
 	t.Log(uuid.Must(uuid.NewV4(), nil).String())
 }

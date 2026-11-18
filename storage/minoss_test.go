@@ -27,7 +27,7 @@ func TestNewMinBucketClient(t *testing.T) {
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
 		fmt.Println(err)
-		t.Logf(err.Error())
+		t.Log(err.Error())
 		//t.Fail()
 
 	}
@@ -47,12 +47,12 @@ func TestMinBucketClient_UploadFile(t *testing.T) {
 	}
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
-		t.Logf(err.Error())
+		t.Log(err.Error())
 	}
 	content := []byte("this is a test")
 	path := "test/a/test.txt"
 	if err := mc.Save(context.Background(), &FileInfo{StoragePath: path, Size: int64(len(content))}, bytes.NewBuffer(content)); err != nil {
-		t.Logf(err.Error())
+		t.Log(err.Error())
 	}
 }
 
@@ -69,12 +69,12 @@ func TestMinBucketClient_GetPresignedURL(t *testing.T) {
 	}
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
-		t.Logf(err.Error())
+		t.Log(err.Error())
 	}
 	path := "test/a/test.txt"
 	url, err := mc.GetPresignedURL(http.MethodGet, path)
 	if err != nil {
-		t.Logf(err.Error())
+		t.Log(err.Error())
 	}
 	fmt.Println(url)
 }
@@ -92,12 +92,12 @@ func TestMinBucketClient_ReadFile(t *testing.T) {
 	}
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
-		t.Logf(err.Error())
+		t.Log(err.Error())
 	}
 	path := "test/a/test.txt"
 	file, err := mc.ReadFile(path)
 	if err != nil {
-		t.Logf(err.Error())
+		t.Log(err.Error())
 	}
 	data, _ := io.ReadAll(file)
 	fmt.Println(string(data))
@@ -116,12 +116,12 @@ func TestMinBucketClient_DeleteFile(t *testing.T) {
 	}
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
-		t.Logf(err.Error())
+		t.Log(err.Error())
 	}
 	path := "test/a/test.txt"
 	err = mc.DeleteFile(path)
 	if err != nil {
-		t.Logf(err.Error())
+		t.Log(err.Error())
 	}
 }
 
@@ -138,11 +138,11 @@ func TestMinBucketClient_CopyDir(t *testing.T) {
 	}
 	mc, err := NewMinFs(defaultCfg, config.StorageOption{})
 	if err != nil {
-		t.Logf(err.Error())
+		t.Log(err.Error())
 	}
 	path := "test/a"
 	err = mc.CopyDir(path, "test/b")
 	if err != nil {
-		t.Logf(err.Error())
+		t.Log(err.Error())
 	}
 }
