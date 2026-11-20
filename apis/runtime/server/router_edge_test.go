@@ -11,7 +11,7 @@ import (
 
 // 本文件补齐评审指出的边界契约：Router 方法集黑名单、Any 跨方法重复检测、
 // 路径矩阵与 gin fullPath 等价、前缀 path.Clean、三层中间件顺序、Run 后注册守卫、
-// WithPrefixGroups 正向语义。
+// WithPrefixSpecs 正向语义。
 
 // TestRegistrarHasNoRegistrationMethods 逐方法断言 Router 上不存在注册入口与旧符号。
 //
@@ -31,7 +31,7 @@ func TestRegistrarHasNoRegistrationMethods(t *testing.T) {
 		t.Fatal("Router must not expose Prefix field")
 	}
 	// 反向保护：这些入口必须还在（防止误删）。
-	for _, method := range []string{"Scope", "All", "Routes", "LogRoutes", "GinEngine", "Run"} {
+	for _, method := range []string{"RouterGroup", "All", "Routes", "LogRoutes", "GinEngine", "Run"} {
 		if _, ok := routerType.MethodByName(method); !ok {
 			t.Fatalf("Router lost required method %q", method)
 		}
@@ -70,7 +70,7 @@ func TestAnyCrossMethodDuplicatePanics(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			svr := NewRouter(WithPrefixes("/v3"))
-			scope := svr.Scope("/v3")
+			scope := svr.RouterGroup("/v3")
 			testCase.first(scope)
 			msg := recoverPanic(t, func() { testCase.second(scope) })
 			requireContains(t, msg, "duplicate route", testCase.key)
@@ -81,7 +81,7 @@ func TestAnyCrossMethodDuplicatePanics(t *testing.T) {
 // TestAnyDispatchesAllMethods 验证 Any 注册的路由对多个方法都可达（而不只是能注册成功）。
 func TestAnyDispatchesAllMethods(t *testing.T) {
 	svr := NewRouter(WithPrefixes("/v3"))
-	svr.Scope("/v3").Any("/any.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "ok") })
+	svr.RouterGroup("/v3").Any("/any.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "ok") })
 	for _, method := range []string{http.MethodGet, http.MethodPut, http.MethodDelete, http.MethodPatch} {
 		rec := doRequest(svr, method, "/v3/any.probe", nil, nil)
 		if rec.Code != http.StatusOK {
@@ -98,7 +98,7 @@ func TestPathMatrixMatchesGin(t *testing.T) {
 	}
 	for _, action := range actions {
 		svr := NewRouter(WithPrefixes("/v3"))
-		svr.Scope("/v3").P(action, func(ctx *gin.Context) {})
+		svr.RouterGroup("/v3").P(action, func(ctx *gin.Context) {})
 		routes := svr.Routes()
 		if len(routes) != 1 {
 			t.Fatalf("action %q: Routes() len=%d", action, len(routes))
@@ -116,13 +116,13 @@ func TestPathMatrixMatchesGin(t *testing.T) {
 }
 
 // TestNormalizePrefixClean 覆盖非规范前缀：`//` 与尾斜杠归一，`.`/`..` 段直接拒绝，
-// 保证 Scope 查表与真实 fullPath 不分叉，也不会把拼错的前缀静默折叠成根前缀。
+// 保证 RouterGroup 查表与真实 fullPath 不分叉，也不会把拼错的前缀静默折叠成根前缀。
 func TestNormalizePrefixClean(t *testing.T) {
 	svr := NewRouter(WithPrefixes("/v3//x", "/v3/", "//"))
 	if want := []string{"/v3/x", "/v3", "/"}; !reflect.DeepEqual(svr.prefixes, want) {
 		t.Fatalf("prefixes = %v, want %v", svr.prefixes, want)
 	}
-	svr.Scope("/v3/x").P("/clean.probe", func(ctx *gin.Context) {})
+	svr.RouterGroup("/v3/x").P("/clean.probe", func(ctx *gin.Context) {})
 	if got := svr.Routes()[0].Prefix; got != "/v3/x" {
 		t.Fatalf("route prefix = %q, want /v3/x", got)
 	}
@@ -130,7 +130,7 @@ func TestNormalizePrefixClean(t *testing.T) {
 		t.Fatalf("cleaned prefix route status = %d, want 200", rec.Code)
 	}
 	// 根前缀可正常注册与访问。
-	svr.Scope("/").G("/root.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "root") })
+	svr.RouterGroup("/").G("/root.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "root") })
 	if rec := doRequest(svr, http.MethodGet, "/root.probe", nil, nil); rec.Code != http.StatusOK {
 		t.Fatalf("root prefix route status = %d, want 200", rec.Code)
 	}
@@ -162,9 +162,9 @@ func TestThreeLayerMiddlewareOrder(t *testing.T) {
 	svr := NewRouter(
 		WithPrefixes("/v3"),
 		WithMiddleware(appendOrder("engine")),
-		WithPrefixGroup("/v3", appendOrder("prefix")),
+		WithPrefix("/v3", appendOrder("prefix")),
 	)
-	svr.Scope("/v3").PWith([]gin.HandlerFunc{appendOrder("route")}, "/order.probe",
+	svr.RouterGroup("/v3").PWith([]gin.HandlerFunc{appendOrder("route")}, "/order.probe",
 		func(ctx *gin.Context) { ctx.String(http.StatusOK, "ok") })
 	rec := doRequest(svr, http.MethodPost, "/v3/order.probe", nil, nil)
 	if got := rec.Header().Get("X-Order"); got != "engine,prefix,route" {
@@ -185,28 +185,28 @@ func TestRunAfterRegistrationPanics(t *testing.T) {
 	t.Cleanup(func() { _ = listener.Close() })
 
 	msg := recoverPanic(t, func() {
-		svr.Scope("/v3").P("/late.register", func(ctx *gin.Context) {})
+		svr.RouterGroup("/v3").P("/late.register", func(ctx *gin.Context) {})
 	})
 	requireContains(t, msg, "before Run")
 }
 
-// TestWithPrefixGroupsPositive 覆盖批量声明的正向语义：保序 + 各前缀中间件只对自己生效。
-func TestWithPrefixGroupsPositive(t *testing.T) {
+// TestWithPrefixSpecsPositive 覆盖批量声明的正向语义：保序 + 各前缀中间件只对自己生效。
+func TestWithPrefixSpecsPositive(t *testing.T) {
 	marker := func(name string) gin.HandlerFunc {
 		return func(ctx *gin.Context) {
 			ctx.Header("X-Prefix-Group", name)
 			ctx.Next()
 		}
 	}
-	svr := NewRouter(WithPrefixGroups(
-		PrefixGroup{Prefix: "/v2", Middlewares: []gin.HandlerFunc{marker("v2")}},
-		PrefixGroup{Prefix: "/v3/"},
+	svr := NewRouter(WithPrefixSpecs(
+		PrefixSpec{Prefix: "/v2", Middlewares: []gin.HandlerFunc{marker("v2")}},
+		PrefixSpec{Prefix: "/v3/"},
 	))
 	if want := []string{"/v2", "/v3"}; !reflect.DeepEqual(svr.prefixes, want) {
 		t.Fatalf("prefixes = %v, want %v", svr.prefixes, want)
 	}
-	svr.Scope("/v2").G("/group.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "ok") })
-	svr.Scope("/v3").G("/group.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "ok") })
+	svr.RouterGroup("/v2").G("/group.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "ok") })
+	svr.RouterGroup("/v3").G("/group.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "ok") })
 
 	if got := doRequest(svr, http.MethodGet, "/v2/group.probe", nil, nil).Header().Get("X-Prefix-Group"); got != "v2" {
 		t.Fatalf("/v2 marker = %q, want v2", got)

@@ -74,7 +74,7 @@ func TestMappingTable(t *testing.T) {
 			build: func(t *testing.T) *Router {
 				t.Helper()
 				svr := NewRouter(WithPrefixes("/v3"))
-				svr.Scope("/v3").P("/user/login", handler)
+				svr.RouterGroup("/v3").P("/user/login", handler)
 				return svr
 			},
 			want: []routeKey{
@@ -99,7 +99,7 @@ func TestMappingTable(t *testing.T) {
 			build: func(t *testing.T) *Router {
 				t.Helper()
 				svr := NewRouter(WithPrefixes("/v3"))
-				svr.Scope("/v3").P("/user/login", handler)
+				svr.RouterGroup("/v3").P("/user/login", handler)
 				svr.GinEngine().GET("/healthz", func(ctx *gin.Context) { ctx.String(http.StatusOK, "probe-ok") })
 				return svr
 			},
@@ -119,7 +119,7 @@ func TestMappingTable(t *testing.T) {
 			build: func(t *testing.T) *Router {
 				t.Helper()
 				svr := NewRouter(WithPrefixes("/v3"))
-				svr.Scope("/v3").P("auth.Logout", gated, handler)
+				svr.RouterGroup("/v3").P("auth.Logout", gated, handler)
 				return svr
 			},
 			want: []routeKey{
@@ -132,7 +132,7 @@ func TestMappingTable(t *testing.T) {
 			build: func(t *testing.T) *Router {
 				t.Helper()
 				svr := NewRouter(WithPrefixes("/v3"))
-				svr.Scope("/v3").PWith([]gin.HandlerFunc{gated}, "auth.Logout", handler)
+				svr.RouterGroup("/v3").PWith([]gin.HandlerFunc{gated}, "auth.Logout", handler)
 				return svr
 			},
 			want: []routeKey{
@@ -145,7 +145,7 @@ func TestMappingTable(t *testing.T) {
 			build: func(t *testing.T) *Router {
 				t.Helper()
 				svr := NewRouter(WithPrefixes("/v3"))
-				svr.Scope("/v3").PRequireLogin("user.Profile", handler)
+				svr.RouterGroup("/v3").PRequireLogin("user.Profile", handler)
 				return svr
 			},
 			want: []routeKey{
@@ -190,9 +190,9 @@ func TestMappingTable(t *testing.T) {
 	// 两种 hdrs 写法（隐式塞中间件 / 显式 PWith）必须完全等价。
 	t.Run("hdrs middleware and PWith are equivalent", func(t *testing.T) {
 		implicit := NewRouter(WithPrefixes("/v3"))
-		implicit.Scope("/v3").P("auth.Logout", gated, handler)
+		implicit.RouterGroup("/v3").P("auth.Logout", gated, handler)
 		explicit := NewRouter(WithPrefixes("/v3"))
-		explicit.Scope("/v3").PWith([]gin.HandlerFunc{gated}, "auth.Logout", handler)
+		explicit.RouterGroup("/v3").PWith([]gin.HandlerFunc{gated}, "auth.Logout", handler)
 
 		if got, want := snapshotRoutes(explicit), snapshotRoutes(implicit); len(got) != 1 || len(want) != 1 || got[0] != want[0] {
 			t.Fatalf("Routes() differ: implicit=%+v explicit=%+v", want, got)
@@ -219,7 +219,7 @@ func TestProbeNotInRoutes(t *testing.T) {
 	}
 
 	// 探针不进索引，因此不与业务路由的重复检测互相干扰。
-	svr.Scope("/v3").G("/user/detail", func(ctx *gin.Context) { ctx.String(http.StatusOK, "detail") })
+	svr.RouterGroup("/v3").G("/user/detail", func(ctx *gin.Context) { ctx.String(http.StatusOK, "detail") })
 	if got := snapshotRoutes(svr); len(got) != 1 || got[0] != (routeKey{Method: http.MethodGet, Path: "/v3/user/detail", Prefix: "/v3"}) {
 		t.Fatalf("Routes() = %+v, want only GET /v3/user/detail", got)
 	}
@@ -265,7 +265,7 @@ func TestHandlerEquivalence(t *testing.T) {
 	})
 
 	svr := NewRouter(WithPrefixes("/v3"))
-	scope := svr.Scope("/v3")
+	scope := svr.RouterGroup("/v3")
 	scope.P("/api.echo", apiEcho)
 	scope.P("/api.message", apiMessage)
 	scope.P("/api.errcode", apiErrCode)

@@ -44,7 +44,7 @@ func DefaultAuthPolicy() AuthPolicy {
 //	    server.WithoutMiddleware(server.LoginStatus), // 不再解析 yg-go token
 //	    server.WithAuthPolicy(server.NewAuthPolicy(myGate, myAdminGate)),
 //	)
-//	svr.Scope("/api/v1").PRequireLogin("file.Upload", upload)
+//	svr.RouterGroup("/api/v1").PRequireLogin("file.Upload", upload)
 //
 // 这样 PRequireLogin 不再依赖 runtime.LoginStatus，也就不会出现 MustGet panic。
 func NewAuthPolicy(login, employee gin.HandlerFunc) AuthPolicy {

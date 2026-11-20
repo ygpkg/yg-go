@@ -12,19 +12,19 @@ import (
 	"github.com/ygpkg/yg-go/apis/runtime/middleware"
 )
 
-// 本文件固化 v1.27「作用域投递」模型的对外契约：
-// 注册入口唯一（Scope / All()）、前缀精确集合且保序、广播必须显式、装配期 panic 语义、
-// Routes() 四元组、文档与中间件按作用域生效。
+// 本文件固化 v1.27「路由组投递」模型的对外契约：
+// 注册入口唯一（RouterGroup / All()）、前缀精确集合且保序、广播必须显式、装配期 panic 语义、
+// Routes() 四元组、文档与中间件按路由组生效。
 // 断言只依赖公开 API 与同包可见的装配结果，全部离线执行。
 
-// TestRegistrarInterface 覆盖验收「注册必须带作用域」：Router 自身不再是注册入口，
-// Scope 与 AllScope 实现同一个 Registrar，模块路由函数只依赖该接口即可被投给任一作用域。
+// TestRegistrarInterface 覆盖验收「注册必须带路由组」：Router 自身不再是注册入口，
+// RouterGroup 与 AllGroups 实现同一个 Registrar，模块路由函数只依赖该接口即可被投给任一前缀。
 func TestRegistrarInterface(t *testing.T) {
 	// 编译期断言：两个投递入口实现同一接口。
-	var _ Registrar = (*Scope)(nil)
-	var _ Registrar = (*AllScope)(nil)
+	var _ Registrar = (*RouterGroup)(nil)
+	var _ Registrar = (*AllGroups)(nil)
 
-	// 模拟下游模块函数：签名只收 Registrar，不知道自己被投给了哪个作用域。
+	// 模拟下游模块函数：签名只收 Registrar，不知道自己被投给了哪个路由组。
 	// 方法名与 1.23 线保持一致（含三个鉴权糖），迁移时模块函数体不用改。
 	Routers := func(r Registrar) {
 		r.P("/registrar.post", func(*gin.Context) {})
@@ -40,22 +40,22 @@ func TestRegistrarInterface(t *testing.T) {
 
 	t.Run("Router has no registration methods", func(t *testing.T) {
 		svr := NewRouter(WithPrefixes("/v3"))
-		// Router 不实现 Registrar：注册只能发生在 Scope/AllScope 上，不存在隐式广播入口。
+		// Router 不实现 Registrar：注册只能发生在 RouterGroup/AllGroups 上，不存在隐式广播入口。
 		if _, ok := interface{}(svr).(Registrar); ok {
-			t.Fatal("Router must not implement Registrar, registration entry must be Scope/AllScope only")
+			t.Fatal("Router must not implement Registrar, registration entry must be RouterGroup/AllGroups only")
 		}
 	})
 
 	t.Run("scope", func(t *testing.T) {
 		svr := NewRouter(WithPrefixes("/v3", "/v2"))
-		Routers(svr.Scope("/v3"))
+		Routers(svr.RouterGroup("/v3"))
 		routes := svr.Routes()
 		if len(routes) != 10 {
-			t.Fatalf("Scope should register 10 routes (8 actions + 2 docs), got %d: %+v", len(routes), snapshotRoutes(svr))
+			t.Fatalf("RouterGroup should register 10 routes (8 actions + 2 docs), got %d: %+v", len(routes), snapshotRoutes(svr))
 		}
 		for _, route := range routes {
 			if route.Prefix != "/v3" {
-				t.Fatalf("Scope(/v3) leaked a route to prefix %q: %+v", route.Prefix, route)
+				t.Fatalf("RouterGroup(/v3) leaked a route to prefix %q: %+v", route.Prefix, route)
 			}
 		}
 	})
@@ -84,10 +84,10 @@ func TestPrefixesExact(t *testing.T) {
 	if want := []string{"/v3"}; !reflect.DeepEqual(svr.prefixes, want) {
 		t.Fatalf("declared prefixes = %v, want %v", svr.prefixes, want)
 	}
-	if len(svr.routeGroups) != 1 {
-		t.Fatalf("route groups = %d, want 1 (only /v3)", len(svr.routeGroups))
+	if len(svr.ginGroups) != 1 {
+		t.Fatalf("route groups = %d, want 1 (only /v3)", len(svr.ginGroups))
 	}
-	svr.Scope("/v3").P("/user/login", func(*gin.Context) {})
+	svr.RouterGroup("/v3").P("/user/login", func(*gin.Context) {})
 	assertRouteSnapshot(t, svr, []routeKey{
 		{Method: http.MethodPost, Path: "/v3/user/login", Prefix: "/v3"},
 	})
@@ -101,7 +101,7 @@ func TestPrefixesExact(t *testing.T) {
 	if want := []string{"/v3"}; !reflect.DeepEqual(normalized.prefixes, want) {
 		t.Fatalf("normalized prefixes = %v, want %v", normalized.prefixes, want)
 	}
-	normalized.Scope("/v3/").G("/user/detail", func(*gin.Context) {})
+	normalized.RouterGroup("/v3/").G("/user/detail", func(*gin.Context) {})
 	assertRouteSnapshot(t, normalized, []routeKey{
 		{Method: http.MethodGet, Path: "/v3/user/detail", Prefix: "/v3"},
 	})
@@ -152,11 +152,11 @@ func TestEmptyPrefixesPanics(t *testing.T) {
 // TestUndeclaredPrefixPanics 覆盖验收「未声明前缀早失败」：panic 消息给出可用前缀清单。
 func TestUndeclaredPrefixPanics(t *testing.T) {
 	svr := NewRouter(WithPrefixes("/v3", "/v2"))
-	msg := recoverPanic(t, func() { svr.Scope("/nope") })
+	msg := recoverPanic(t, func() { svr.RouterGroup("/nope") })
 	requireContains(t, msg, "undeclared prefix", "available prefixes", "/v3", "/v2")
 
 	// 归一化之后依然匹配不上，同样早失败。
-	msg = recoverPanic(t, func() { svr.Scope(" nope/ ") })
+	msg = recoverPanic(t, func() { svr.RouterGroup(" nope/ ") })
 	requireContains(t, msg, "undeclared prefix")
 }
 
@@ -187,10 +187,10 @@ func TestAllBroadcast(t *testing.T) {
 	}
 }
 
-// TestScopeSinglePrefix 覆盖验收「单前缀投递」：Scope("/v2").P 只产生 1 条，其余前缀 404。
-func TestScopeSinglePrefix(t *testing.T) {
+// TestRouterGroupSinglePrefix 覆盖验收「单前缀投递」：RouterGroup("/v2").P 只产生 1 条，其余前缀 404。
+func TestRouterGroupSinglePrefix(t *testing.T) {
 	svr := NewRouter(WithPrefixes("/v3", "/v2", "/v4"))
-	svr.Scope("/v2").P("/user/login", func(ctx *gin.Context) { ctx.String(http.StatusOK, "v2-login") })
+	svr.RouterGroup("/v2").P("/user/login", func(ctx *gin.Context) { ctx.String(http.StatusOK, "v2-login") })
 
 	assertRouteSnapshot(t, svr, []routeKey{
 		{Method: http.MethodPost, Path: "/v2/user/login", Prefix: "/v2"},
@@ -212,10 +212,10 @@ var sourcePattern = regexp.MustCompile(`[^\s,"]+\.go:\d+`)
 // TestDuplicateRoutePanics 覆盖验收「重复注册早失败」：消息含 path 与两个不同的注册来源。
 func TestDuplicateRoutePanics(t *testing.T) {
 	svr := NewRouter(WithPrefixes("/v3"))
-	svr.Scope("/v3").P("/user/login", func(*gin.Context) {})
+	svr.RouterGroup("/v3").P("/user/login", func(*gin.Context) {})
 
 	msg := recoverPanic(t, func() {
-		svr.Scope("/v3").P("/user/login", func(*gin.Context) {})
+		svr.RouterGroup("/v3").P("/user/login", func(*gin.Context) {})
 	})
 	requireContains(t, msg, "duplicate route", "POST /v3/user/login")
 
@@ -234,8 +234,8 @@ func TestDuplicateRoutePanics(t *testing.T) {
 
 	// 不同 method、同 path 不算重复：重复检测的键包含 method。
 	svr2 := NewRouter(WithPrefixes("/v3"))
-	svr2.Scope("/v3").P("/user/login", func(*gin.Context) {})
-	svr2.Scope("/v3").G("/user/login", func(*gin.Context) {})
+	svr2.RouterGroup("/v3").P("/user/login", func(*gin.Context) {})
+	svr2.RouterGroup("/v3").G("/user/login", func(*gin.Context) {})
 	assertRouteSnapshot(t, svr2, []routeKey{
 		{Method: http.MethodGet, Path: "/v3/user/login", Prefix: "/v3"},
 		{Method: http.MethodPost, Path: "/v3/user/login", Prefix: "/v3"},
@@ -246,7 +246,7 @@ func TestDuplicateRoutePanics(t *testing.T) {
 // Path 与 gin 实际 fullPath 一致，且 Routes() 返回副本。
 func TestRoutes(t *testing.T) {
 	svr := NewRouter(WithPrefixes("/v3", "/v2"))
-	scope := svr.Scope("/v3")
+	scope := svr.RouterGroup("/v3")
 	scope.G("/user/detail", func(*gin.Context) {})
 	scope.P("/user/login", func(*gin.Context) {})
 
@@ -286,8 +286,8 @@ func TestRoutes(t *testing.T) {
 	}
 }
 
-// TestDocsPerScope 覆盖验收「文档按作用域」：Scope.Docs 只挂该前缀；All().Docs 每个前缀各 2 条。
-func TestDocsPerScope(t *testing.T) {
+// TestDocsPerRouterGroup 覆盖验收「文档按路由组」：RouterGroup.Docs 只挂该前缀；All().Docs 每个前缀各 2 条。
+func TestDocsPerRouterGroup(t *testing.T) {
 	docsRoutes := func(prefix, model string) []routeKey {
 		return []routeKey{
 			{Method: http.MethodGet, Path: prefix + "/" + model + ".docs/*any", Prefix: prefix},
@@ -296,7 +296,7 @@ func TestDocsPerScope(t *testing.T) {
 	}
 
 	single := NewRouter(WithPrefixes("/v3", "/v2"))
-	single.Scope("/v3").Docs("app")
+	single.RouterGroup("/v3").Docs("app")
 	assertRouteSnapshot(t, single, docsRoutes("/v3", "app"))
 	// 未挂载的前缀没有文档路由，访问 404。
 	if rec := doRequest(single, http.MethodGet, "/v2/app.redocs", nil, nil); rec.Code != http.StatusNotFound {
@@ -319,13 +319,13 @@ func TestPrefixMiddleware(t *testing.T) {
 	}
 	handler := func(ctx *gin.Context) { ctx.String(http.StatusOK, "who") }
 
-	svr := NewRouter(WithPrefixes("/v3"), WithPrefixGroup("/v2", marker("v2")))
+	svr := NewRouter(WithPrefixes("/v3"), WithPrefix("/v2", marker("v2")))
 	if want := []string{"/v3", "/v2"}; !reflect.DeepEqual(svr.prefixes, want) {
 		t.Fatalf("prefixes = %v, want %v", svr.prefixes, want)
 	}
-	svr.Scope("/v3").G("/who", handler)
-	svr.Scope("/v2").G("/who", handler)
-	svr.Scope("/v2").G("/other", handler)
+	svr.RouterGroup("/v3").G("/who", handler)
+	svr.RouterGroup("/v2").G("/who", handler)
+	svr.RouterGroup("/v2").G("/other", handler)
 
 	for _, path := range []string{"/v2/who", "/v2/other"} {
 		rec := doRequest(svr, http.MethodGet, path, nil, nil)
@@ -356,8 +356,8 @@ func TestRouteMiddleware(t *testing.T) {
 	handler := func(ctx *gin.Context) { ctx.String(http.StatusOK, "route-ok") }
 
 	svr := NewRouter(WithPrefixes("/v3"))
-	svr.Scope("/v3").PWith([]gin.HandlerFunc{routeMW("1"), routeMW("2")}, "/user/logout", handler)
-	svr.Scope("/v3").P("/user/login", handler)
+	svr.RouterGroup("/v3").PWith([]gin.HandlerFunc{routeMW("1"), routeMW("2")}, "/user/logout", handler)
+	svr.RouterGroup("/v3").P("/user/login", handler)
 	assertRouteSnapshot(t, svr, []routeKey{
 		{Method: http.MethodPost, Path: "/v3/user/login", Prefix: "/v3"},
 		{Method: http.MethodPost, Path: "/v3/user/logout", Prefix: "/v3"},
@@ -380,21 +380,21 @@ func TestRouteMiddleware(t *testing.T) {
 // TestAuthSugar 覆盖「保留 1.23 风格鉴权糖」：
 // PRequireLogin / PRequireEmployee / GRequireLogin 必须与
 // PWith/GWith + AuthMiddleWare/AuthMiddleWareEmployee 完全等价（Routes() 快照 + 实际行为），
-// 这样既有模块路由函数迁移时调用风格保持不变；AllScope 上按声明顺序广播。
+// 这样既有模块路由函数迁移时调用风格保持不变；AllGroups 上按声明顺序广播。
 func TestAuthSugar(t *testing.T) {
 	handler := func(ctx *gin.Context) { ctx.String(http.StatusOK, "sugar-ok") }
 	// API Key 分支让 LoginStatus 进入 StateSucc、Role=RoleAPI，无需 JWT/settings。
 	apiKeyAuth := map[string]string{"Authorization": auth.AuthBearer + auth.AuthAPIKeyPrefix + "test"}
 
 	sugar := NewRouter(WithPrefixes("/v3"))
-	sugar.Scope("/v3").PRequireLogin("/user.profile", handler)
-	sugar.Scope("/v3").PRequireEmployee("/user.employee", handler)
-	sugar.Scope("/v3").GRequireLogin("/user.session", handler)
+	sugar.RouterGroup("/v3").PRequireLogin("/user.profile", handler)
+	sugar.RouterGroup("/v3").PRequireEmployee("/user.employee", handler)
+	sugar.RouterGroup("/v3").GRequireLogin("/user.session", handler)
 
 	explicit := NewRouter(WithPrefixes("/v3"))
-	explicit.Scope("/v3").PWith([]gin.HandlerFunc{middleware.AuthMiddleWare}, "/user.profile", handler)
-	explicit.Scope("/v3").PWith([]gin.HandlerFunc{middleware.AuthMiddleWareEmployee}, "/user.employee", handler)
-	explicit.Scope("/v3").GWith([]gin.HandlerFunc{middleware.AuthMiddleWare}, "/user.session", handler)
+	explicit.RouterGroup("/v3").PWith([]gin.HandlerFunc{middleware.AuthMiddleWare}, "/user.profile", handler)
+	explicit.RouterGroup("/v3").PWith([]gin.HandlerFunc{middleware.AuthMiddleWareEmployee}, "/user.employee", handler)
+	explicit.RouterGroup("/v3").GWith([]gin.HandlerFunc{middleware.AuthMiddleWare}, "/user.session", handler)
 
 	if got, want := snapshotRoutes(sugar), snapshotRoutes(explicit); !reflect.DeepEqual(got, want) {
 		t.Fatalf("sugar Routes() = %+v, want explicit PWith/GWith = %+v", got, want)
@@ -430,7 +430,7 @@ func TestAuthSugar(t *testing.T) {
 		t.Fatalf("PRequireEmployee must reject RoleAPI principal, got status=%d body=%q", rec.Code, rec.Body.String())
 	}
 
-	// AllScope 上的三个糖：每次注册按声明顺序遍历全部前缀（一条路由先投满所有前缀，再投下一条）。
+	// AllGroups 上的三个糖：每次注册按声明顺序遍历全部前缀（一条路由先投满所有前缀，再投下一条）。
 	all := NewRouter(WithPrefixes("/v3", "/v4"))
 	all.All().PRequireLogin("/user.profile", handler)
 	all.All().PRequireEmployee("/user.employee", handler)
@@ -445,7 +445,7 @@ func TestAuthSugar(t *testing.T) {
 		{Method: http.MethodGet, Path: "/v4/user.session", Prefix: "/v4"},
 	}
 	if len(routes) != len(wantOrder) {
-		t.Fatalf("AllScope auth sugar registered %d routes, want %d", len(routes), len(wantOrder))
+		t.Fatalf("AllGroups auth sugar registered %d routes, want %d", len(routes), len(wantOrder))
 	}
 	for i, want := range wantOrder {
 		got := routes[i]
@@ -466,8 +466,8 @@ func TestSealedOptionsPanic(t *testing.T) {
 		opt  RouterOption
 	}{
 		{"WithPrefixes", WithPrefixes("/x")},
-		{"WithPrefixGroup", WithPrefixGroup("/x")},
-		{"WithPrefixGroups", WithPrefixGroups(PrefixGroup{Prefix: "/x"})},
+		{"WithPrefix", WithPrefix("/x")},
+		{"WithPrefixSpecs", WithPrefixSpecs(PrefixSpec{Prefix: "/x"})},
 		{"WithMiddleware", WithMiddleware(func(*gin.Context) {})},
 		{"WithoutMiddleware", WithoutMiddleware(CORS)},
 		{"WithMiddlewareImpl", WithMiddlewareImpl(Recovery, func(*gin.Context) {})},

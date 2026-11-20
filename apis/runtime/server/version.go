@@ -2,10 +2,10 @@ package server
 
 // 接口版本前缀常量。
 //
-// 取值是**归一化形式**（前导斜杠、无尾斜杠），与 WithPrefixes / Scope / RouteInfo.Prefix 使用同一口径：
+// 取值是**归一化形式**（前导斜杠、无尾斜杠），与 WithPrefixes / RouterGroup / RouteInfo.Prefix 使用同一口径：
 //
 //	svr := server.NewRouter(server.WithPrefixes(server.PrefixAPIV3, server.PrefixAPIV4))
-//	v3, v4 := svr.Scope(server.PrefixAPIV3), svr.Scope(server.PrefixAPIV4)
+//	v3, v4 := svr.RouterGroup(server.PrefixAPIV3), svr.RouterGroup(server.PrefixAPIV4)
 //
 //	svr.All().P("/common.ping", ping)
 //	for _, route := range svr.Routes() {

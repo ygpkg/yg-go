@@ -7,7 +7,7 @@ import (
 )
 
 // TestVersionPrefixConstants 钉住版本前缀常量的口径：
-// 归一化形式（前导斜杠、无尾斜杠），可直接用于 WithPrefixes / Scope / Routes() 比较。
+// 归一化形式（前导斜杠、无尾斜杠），可直接用于 WithPrefixes / RouterGroup / Routes() 比较。
 func TestVersionPrefixConstants(t *testing.T) {
 	cases := []struct {
 		name string
@@ -36,8 +36,8 @@ func TestVersionPrefixConstants(t *testing.T) {
 		t.Fatalf("prefixes = %v, want [%s %s]", svr.prefixes, PrefixAPIV3, PrefixAPIV4)
 	}
 
-	// Scope 用常量取作用域，RouteInfo.Prefix 与常量逐字相等（都无尾斜杠）。
-	v3 := svr.Scope(PrefixAPIV3)
+	// RouterGroup 用常量取前缀，RouteInfo.Prefix 与常量逐字相等（都无尾斜杠）。
+	v3 := svr.RouterGroup(PrefixAPIV3)
 	v3.P("/user.login", func(*gin.Context) {})
 	routes := svr.Routes()
 	if len(routes) != 1 || routes[0].Prefix != PrefixAPIV3 || routes[0].Path != PrefixAPIV3+"/user.login" {
@@ -51,6 +51,6 @@ func TestVersionPrefixConstants(t *testing.T) {
 	}
 
 	// 未声明的版本常量不能用于注册。
-	msg := recoverPanic(t, func() { svr.Scope(PrefixAPIV5) })
+	msg := recoverPanic(t, func() { svr.RouterGroup(PrefixAPIV5) })
 	requireContains(t, msg, "undeclared prefix", PrefixAPIV5)
 }
