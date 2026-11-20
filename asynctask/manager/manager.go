@@ -65,11 +65,12 @@ func New(cfg *Config, gormDB *gorm.DB, opts ...Option) (*Manager, error) {
 	workerID := "manager-" + genUUID()
 
 	dbSrc, err := sourcedb.New(sourcedb.Config{
-		DB:            gormDB,
-		LeaseTTL:      o.Config.LeaseTTL,
-		Backoff:       o.Config.Backoff,
-		WorkerID:      workerID,
-		FailFastChain: o.Config.FailFastChain,
+		DB:             gormDB,
+		LeaseTTL:       o.Config.LeaseTTL,
+		Backoff:        o.Config.Backoff,
+		WorkerID:       workerID,
+		FailFastChain:  o.Config.FailFastChain,
+		MaxResultBytes: o.Config.MaxResultBytes,
 	})
 	if err != nil {
 		return nil, err
@@ -121,6 +122,9 @@ func applyConfigDefaults(c *Config) {
 	if c.MaxPayloadBytes == 0 {
 		c.MaxPayloadBytes = d.MaxPayloadBytes
 	}
+	if c.MaxResultBytes == 0 {
+		c.MaxResultBytes = d.MaxResultBytes
+	}
 	if c.Backoff == nil {
 		c.Backoff = d.Backoff
 	}
@@ -142,6 +146,9 @@ func validateConfig(c *Config) error {
 	}
 	if c.MaxPayloadBytes <= 0 {
 		return fmt.Errorf("%w: MaxPayloadBytes %d <= 0", asynctask.ErrInvalidConfig, c.MaxPayloadBytes)
+	}
+	if c.MaxResultBytes <= 0 {
+		return fmt.Errorf("%w: MaxResultBytes %d <= 0", asynctask.ErrInvalidConfig, c.MaxResultBytes)
 	}
 	if c.DefaultMaxAttempts <= 0 {
 		return fmt.Errorf("%w: DefaultMaxAttempts %d <= 0", asynctask.ErrInvalidConfig, c.DefaultMaxAttempts)

@@ -243,7 +243,7 @@ if err != nil {
 ```go
 import sourcedb "github.com/ygpkg/yg-go/asynctask/source/db"
 
-func New(cfg Config) (*Source, error) // Config{DB *gorm.DB, LeaseTTL, Backoff, WorkerID, FailFastChain}
+func New(cfg Config) (*Source, error) // Config{DB *gorm.DB, LeaseTTL, Backoff, WorkerID, FailFastChain, MaxResultBytes}
 func (s *Source) Store() Store        // 只读查询（GetAsyncTask/ListAsyncTask/GetActiveByUniqKey/GetLatestBySubject/StatsByStatus/...）
 // Source 仅实现 asynctask.Source：Fetch / Renew / Release / Save / Close；不含 Submit（提交走 manager）
 ```
@@ -256,7 +256,7 @@ func (s *Source) Store() Store        // 只读查询（GetAsyncTask/ListAsyncTa
 - 实体清单：`SchemaModels() []any`（只返回实体，不执行任何 DDL）。
 - 建表：**本包不建表**，DDL 见 `asynctask/ddl`（`Postgres()` / `MySQL()` / `SQLite()`，幂等可重放）。
 - 选项：`WithNotifier` / `WithBackoff` / `WithBatchSize` / `WithLeaseTTL` / `WithRetention` / `WithPollInterval`（后者**已废弃不生效**，轮询由 `worker.WorkerConfig.PollInterval` 决定）。
-- `Config` 关键字段：`LeaseTTL`(默认 60s) / `ReaperInterval`(30s) / `CleanupInterval`(1h) / `DefaultMaxAttempts`(3) / `DefaultTimeout`(30s) / `MaxPayloadBytes`(4096) / `Retention`(30d) / `FailFastChain` / `Backoff` / `BatchSize`(50) / `NotifierQueuePrefix`。
+- `Config` 关键字段：`LeaseTTL`(默认 60s) / `ReaperInterval`(30s) / `CleanupInterval`(1h) / `DefaultMaxAttempts`(3) / `DefaultTimeout`(30s) / `MaxPayloadBytes`(4096) / `MaxResultBytes`(4096，结果快照截断上限，超限按前缀截断不报错) / `Retention`(30d) / `FailFastChain` / `Backoff` / `BatchSize`(50) / `NotifierQueuePrefix`。
 
 ### `worker`
 

@@ -295,3 +295,27 @@ func TestStoreReturns(t *testing.T) {
 		t.Fatal("Store() nil")
 	}
 }
+
+// TestMaxResultBytesConfig 守结果快照上限的配置口径：默认 4096（兼容），
+// 可显式调大（16 KiB），非法值（<=0）在构造期报 ErrInvalidConfig。
+func TestMaxResultBytesConfig(t *testing.T) {
+	m, err := New(&Config{MaxPayloadBytes: 1 << 20}, openTestDB(t))
+	if err != nil {
+		t.Fatalf("New(default): %v", err)
+	}
+	if m.cfg.MaxResultBytes != 4096 {
+		t.Fatalf("默认 MaxResultBytes = %d, want 4096", m.cfg.MaxResultBytes)
+	}
+
+	big, err := New(&Config{MaxResultBytes: 16 << 10}, openTestDB(t))
+	if err != nil {
+		t.Fatalf("New(16KiB): %v", err)
+	}
+	if big.cfg.MaxResultBytes != 16<<10 {
+		t.Fatalf("显式 MaxResultBytes = %d, want %d", big.cfg.MaxResultBytes, 16<<10)
+	}
+
+	if _, err := New(&Config{MaxResultBytes: -1}, openTestDB(t)); !errors.Is(err, asynctask.ErrInvalidConfig) {
+		t.Fatalf("New(MaxResultBytes=-1) err = %v, want ErrInvalidConfig", err)
+	}
+}

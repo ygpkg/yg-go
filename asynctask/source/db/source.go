@@ -27,6 +27,8 @@ type source struct {
 	workerID string
 	// failFastChain 为 true 时，某 step 失败终态后同 chain 后续 step 置 canceled。
 	failFastChain bool
+	// maxResultBytes 是结果快照的截断上限（来自 Config.MaxResultBytes，默认 4096）。
+	maxResultBytes int
 }
 
 // 编译期断言：source 满足 asynctask.Source。
@@ -221,7 +223,7 @@ SET status = ?, finished_at = %s, lease_until = NULL, worker_id = '',
     duration_ms = duration_ms + ?, last_error = ?, result = ?
 WHERE id = ? AND worker_id = ? AND status = 'running' AND generation = ? AND attempt = ?`,
 		CoreAsyncTaskTableName, nowExpr)
-	res := tx.Exec(sql, string(status), r.Duration.Milliseconds(), errMsg, resultText(r.Payload),
+	res := tx.Exec(sql, string(status), r.Duration.Milliseconds(), errMsg, s.resultText(r.Payload),
 		task.ID, task.WorkerID, task.Generation, task.Attempt)
 	if res.Error != nil {
 		return res.Error
@@ -276,7 +278,7 @@ func (s *source) finishRun(tx *gormDB, task *asynctask.AsyncTask, r asynctask.Re
 SET status = ?, failure_kind = ?, finished_at = %s, duration_ms = ?, result = ?, error_msg = ?
 WHERE async_task_id = ? AND generation = ? AND attempt = ?`,
 		CoreAsyncTaskRunTableName, nowExpr)
-	res := tx.Exec(upd, status, failure, r.Duration.Milliseconds(), resultText(r.Payload), errMsg,
+	res := tx.Exec(upd, status, failure, r.Duration.Milliseconds(), s.resultText(r.Payload), errMsg,
 		task.ID, task.Generation, task.Attempt)
 	if res.Error != nil {
 		return res.Error
@@ -293,7 +295,7 @@ VALUES (?, %s, ?, ?, ?, ?, ?, ?, %s, %s, ?, ?, ?, ?, ?)%s`,
 		s.dialect.beforeExpr(), nowExpr, suffix)
 	return tx.Exec(ins,
 		genUUID(), task.ID, task.Generation, task.Attempt, status, failure, task.WorkerID,
-		s.dialect.beforeArg(r.Duration), r.Duration.Milliseconds(), resultText(r.Payload), errMsg,
+		s.dialect.beforeArg(r.Duration), r.Duration.Milliseconds(), s.resultText(r.Payload), errMsg,
 		task.RequestID, task.TraceID,
 	).Error
 }
@@ -312,12 +314,19 @@ func runStatusOf(o asynctask.Outcome) string {
 	}
 }
 
-// resultText 结果快照文本化（>4KB 截断）。
-func resultText(b []byte) any {
+// resultText 把结果快照文本化；超过本 Source 的 MaxResultBytes（默认 4 KiB）按前缀截断。
+//
+// 截断不是错误：result 是业务快照，不是回调载荷。需要完整结果的调用方应走回调/外置文件，
+// 调大 MaxResultBytes 只解决「快照够读」，不解决「半截 JSON 解析失败」。
+func (s *source) resultText(b []byte) any {
 	if len(b) == 0 {
 		return nil
 	}
-	return truncate(string(b), 4096)
+	limit := DefaultMaxResultBytes
+	if s != nil && s.maxResultBytes > 0 {
+		limit = s.maxResultBytes
+	}
+	return truncate(string(b), limit)
 }
 
 // truncate 按字节上限截断字符串（保留前缀）。
