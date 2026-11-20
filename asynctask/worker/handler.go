@@ -26,6 +26,40 @@ type handlerFunc func(ctx context.Context, t *asynctask.AsyncTask) error
 
 func (f handlerFunc) Execute(ctx context.Context, t *asynctask.AsyncTask) error { return f(ctx, t) }
 
+// ResultHandler 是「带结果」的执行契约：一次调用同时给出结果快照与错误。
+//
+// 为什么需要它（而不是只靠 ResultProvider）：Handler 是**每类型单实例、被多个执行槽共享**的，
+// 无参的 TakeResult() 在并发 >1 时无法判断「这是谁的结果」。ResultHandler 把结果绑定到本次
+// 调用，天然并发安全，是多并发场景的推荐契约。
+type ResultHandler interface {
+	// ExecuteResult 执行任务并返回本次结果快照（建议 JSON）；错误语义与 Handler.Execute 一致。
+	ExecuteResult(ctx context.Context, task *asynctask.AsyncTask) ([]byte, error)
+}
+
+// resultHandlerAdapter 让 ResultHandler 能通过 Register 注册：Execute 只保留错误，
+// 结果由 worker 在 safeExecute 里按 ResultHandler 身份单独取（适配器自身也实现该接口）。
+type resultHandlerAdapter struct{ ResultHandler }
+
+func (a resultHandlerAdapter) Execute(ctx context.Context, t *asynctask.AsyncTask) error {
+	_, err := a.ExecuteResult(ctx, t)
+	return err
+}
+
+// ResultProvider 是可选接口：Execute 返回后，worker 从它取本次执行的「结果快照」
+// （序列化后的业务结果），写进 core_async_task.result，供管理面查询与重放参考。
+//
+// 为什么是可选接口而不是改 Handler：Handler 是稳定契约，改签名会让所有既有实现编译失败；
+// 而结果快照是「有则更好」的能力——不实现即保持原行为（result 为空）。
+//
+// 注意：只在 Execute 成功时被调用；失败/超时/失权时不取，避免把半成品当结果落库。
+//
+// 并发注意：该接口没有 task 参数，实现方无法判断「是谁的结果」；只在每类型并发=1
+// （或有其它串行保证）时可用。并发 >1 请改用 ResultHandler。
+type ResultProvider interface {
+	// TakeResult 返回本次执行的结果快照（建议 JSON）；返回 nil/空表示没有结果。
+	TakeResult() []byte
+}
+
 // Lifecycle 是可选钩子，实现几个算几个。
 type Lifecycle interface {
 	BeforeExecute(ctx context.Context, task *asynctask.AsyncTask) error
@@ -139,13 +173,14 @@ func (w *Worker) process(taskType string, task *asynctask.AsyncTask) {
 	timeout := w.execTimeout(task)
 	execCtx, cancelTimeout := context.WithTimeout(execCtx, timeout)
 
-	_, err, panicked := safeExecute(execCtx, h, task)
+	resultPayload, err, panicked := safeExecute(execCtx, h, task)
 	// 必须在 cancel 之前读：cancel 之后 Err() 恒为 Canceled，超时会被误判。
 	execErr := execCtx.Err()
 	cancelTimeout()
 	cancelExec()
 
 	res := asynctask.Result{
+		Payload:  resultPayload,
 		Duration: time.Since(start),
 		Err:      err,
 	}
@@ -289,8 +324,26 @@ func safeExecute(ctx context.Context, h Handler, task *asynctask.AsyncTask) (pay
 			panicked = true
 		}
 	}()
+	// 优先「带结果」契约：结果与本次调用绑定，并发安全。
+	if rh, ok := h.(ResultHandler); ok {
+		payload, err = rh.ExecuteResult(ctx, task)
+		return payload, err, false
+	}
 	err = h.Execute(ctx, task)
-	return nil, err, false
+	return payloadOf(h, err), err, false
+}
+
+// payloadOf 只在执行成功时向 ResultProvider 取结果快照。
+//
+// 失败时刻意不取：半成品结果被当成功结果落库，比没有结果更难排查。
+func payloadOf(h Handler, err error) []byte {
+	if err != nil {
+		return nil
+	}
+	if rp, ok := h.(ResultProvider); ok {
+		return rp.TakeResult()
+	}
+	return nil
 }
 
 func topStackFrame(stack []byte) string {
