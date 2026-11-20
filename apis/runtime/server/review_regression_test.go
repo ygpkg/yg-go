@@ -20,7 +20,7 @@ import (
 //     交错访问两个实例的静态资源不能 404。
 func TestDocsRedocURLAndIndependentAssets(t *testing.T) {
 	svr := NewRouter(WithPrefixes("/v3"))
-	scope := svr.Scope("/v3")
+	scope := svr.RouterGroup("/v3")
 	scope.Docs("app")
 	scope.Docs("biz")
 
@@ -51,7 +51,7 @@ func TestDocsRedocURLAndIndependentAssets(t *testing.T) {
 // 防止未来从 anyRouteMethods 里漏掉方法（如 TRACE/CONNECT）而测试仍绿。
 func TestAnyRegistersNineMethodKeys(t *testing.T) {
 	svr := NewRouter(WithPrefixes("/v3"))
-	svr.Scope("/v3").Any("/any.probe", func(ctx *gin.Context) {})
+	svr.RouterGroup("/v3").Any("/any.probe", func(ctx *gin.Context) {})
 	for _, method := range anyRouteMethods {
 		key := method + " /v3/any.probe"
 		if _, ok := svr.routes[key]; !ok {
@@ -100,7 +100,7 @@ func TestRegistrationPanicSurface(t *testing.T) {
 			name: "nil route middleware",
 			fn: func() {
 				svr := NewRouter(WithPrefixes("/v3"))
-				svr.Scope("/v3").PWith([]gin.HandlerFunc{nil}, "/x", handler)
+				svr.RouterGroup("/v3").PWith([]gin.HandlerFunc{nil}, "/x", handler)
 			},
 			wantContains: []string{"route middleware", "must not be nil"},
 		},
@@ -108,7 +108,7 @@ func TestRegistrationPanicSurface(t *testing.T) {
 			name: "nil handler",
 			fn: func() {
 				svr := NewRouter(WithPrefixes("/v3"))
-				svr.Scope("/v3").P("/x", nil)
+				svr.RouterGroup("/v3").P("/x", nil)
 			},
 			wantContains: []string{"handler must not be nil"},
 		},

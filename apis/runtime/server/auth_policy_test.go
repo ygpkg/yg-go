@@ -39,7 +39,7 @@ func TestAuthPolicyCustomGuard(t *testing.T) {
 		WithoutMiddleware(LoginStatus),
 		WithAuthPolicy(NewAuthPolicy(loginGate, employeeGate)),
 	)
-	scope := svr.Scope("/api/v1")
+	scope := svr.RouterGroup("/api/v1")
 	scope.PRequireLogin("/file.upload", handler)
 	scope.PRequireEmployee("/admin.export", handler)
 	scope.GRequireLogin("/user.session", handler)
@@ -100,8 +100,8 @@ func TestAuthPolicyPerPrefix(t *testing.T) {
 		)),
 	)
 	// 同一 path 在 v3/v4 各自用各自的账号体系与实现。
-	svr.Scope("/v3").PRequireLogin("/user.profile", handler)
-	svr.Scope("/v4").PRequireLogin("/user.profile", handler)
+	svr.RouterGroup("/v3").PRequireLogin("/user.profile", handler)
+	svr.RouterGroup("/v4").PRequireLogin("/user.profile", handler)
 
 	cases := []struct {
 		name   string
@@ -135,8 +135,8 @@ func TestAuthPolicyDefaults(t *testing.T) {
 	handler := func(ctx *gin.Context) { ctx.String(http.StatusOK, "default-ok") }
 
 	svr := NewRouter(WithPrefixes("/v3"), WithAuthPolicy(NewAuthPolicy(nil, nil)))
-	svr.Scope("/v3").PRequireLogin("/user.profile", handler)
-	svr.Scope("/v3").PRequireEmployee("/admin.profile", handler)
+	svr.RouterGroup("/v3").PRequireLogin("/user.profile", handler)
+	svr.RouterGroup("/v3").PRequireEmployee("/admin.profile", handler)
 
 	for _, path := range []string{"/v3/user.profile", "/v3/admin.profile"} {
 		rec := doRequest(svr, http.MethodPost, path, nil, nil)
@@ -171,7 +171,7 @@ func TestAuthPolicyOptionPanics(t *testing.T) {
 func TestAuthPolicyDefaultWithoutLoginStatus(t *testing.T) {
 	handler := func(ctx *gin.Context) { ctx.String(http.StatusOK, "should-not-reach") }
 	svr := NewRouter(WithPrefixes("/v3"), WithoutMiddleware(LoginStatus))
-	scope := svr.Scope("/v3")
+	scope := svr.RouterGroup("/v3")
 	scope.PRequireLogin("/login.probe", handler)
 	scope.PRequireEmployee("/employee.probe", handler)
 
@@ -217,7 +217,7 @@ func TestAuthPolicyNilGuardPanics(t *testing.T) {
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
 			svr := NewRouter(WithPrefixes("/v3"), WithAuthPolicy(testCase.policy))
-			scope := svr.Scope("/v3")
+			scope := svr.RouterGroup("/v3")
 			msg := recoverPanic(t, func() {
 				if testCase.action == "login" {
 					scope.PRequireLogin("/x", func(ctx *gin.Context) {})

@@ -1,16 +1,20 @@
 # apis/runtime/server
 
-yg-go 下游服务共用的 HTTP 装配层：**在构造期声明前缀，通过作用域注册路由，并按三层编排中间件**。
+yg-go 下游服务共用的 HTTP 装配层：**在构造期声明前缀，通过路由组投递注册，并按三层编排中间件**。
 
-> 版本前提：自 **v1.27.5** 起本包是破坏式 API（注册入口从 `Router` 收敛到作用域、中间件链从硬编码改为可编排的内置条目）。
+> 版本前提：自 **v1.27.5** 起本包是破坏式 API（注册入口从 `Router` 收敛到路由组、中间件链从硬编码改为可编排的内置条目）。
 > 从 1.23 线迁移的服务先看 [从 v1.23 线迁移](#从-v123-线迁移)。
+
+> **命名调整**：`Scope`→`RouterGroup`、`Router.Scope`→`Router.RouterGroup`、`AllScope`→`AllGroups`、
+> `PrefixGroup`→`PrefixSpec`、`WithPrefixGroup(s)`→`WithPrefix`/`WithPrefixSpecs`。只改名字与文件归属，
+> 查表/广播/启动期 panic 的语义完全不变。
 
 ## 目录
 
 - [一分钟上手](#一分钟上手)
 - [核心模型（三条规则）](#核心模型三条规则)
 - [前缀声明](#前缀声明)
-- [作用域注册](#作用域注册)
+- [路由组注册](#路由组注册)
 - [多版本接口并存](#多版本接口并存)
 - [注册 API 一览](#注册-api-一览)
 - [handler 的四种签名](#handler-的四种签名)
@@ -39,8 +43,8 @@ func main() {
 	// 1. 构造：前缀在构造期声明，精确集合（不再有构造参数前缀，也没有默认前缀）
 	svr := server.NewRouter(server.WithPrefixes(server.PrefixAPIV3, server.PrefixAPIV4))
 
-	// 2. 注册：先把作用域取成变量，再在变量上注册（推荐写法，读起来与 1.23 线一致）
-	v3 := svr.Scope(server.PrefixAPIV3)
+	// 2. 注册：先把路由组取成变量，再在变量上注册（推荐写法，读起来与 1.23 线一致）
+	v3 := svr.RouterGroup(server.PrefixAPIV3)
 	v3.P("/user/login", login)
 	// 或者：显式广播到全部已声明前缀（必须写出来）
 	svr.All().G("/common/ping", ping)
@@ -62,10 +66,10 @@ func ping(ctx *gin.Context)  { ctx.String(200, "pong") }
 
 ## 核心模型（三条规则）
 
-1. **前缀只有一个来源**：`NewRouter` 的 option 里声明（`WithPrefixes` / `WithPrefixGroup(s)`），精确集合。
+1. **前缀只有一个来源**：`NewRouter` 的 option 里声明（`WithPrefixes` / `WithPrefix` / `WithPrefixSpecs`），精确集合。
    `"/v2"`、`"/v2/"`、`"v2"` 会被归一化为同一个前缀 `/v2`，`path.Clean` 折叠内部 `//`（`/v3//x`→`/v3/x`、`//`→`/`），按声明顺序去重、注册；含 `.`/`..` 段的前缀会直接 panic（不静默折叠成根前缀）。未声明的前缀不能注册。
-2. **注册必须落在作用域上**：`Router` 自身**没有任何注册方法**。
-   `svr.Scope(prefix)` 投单个前缀，`svr.All()` 广播到全部前缀——「广播」只能是显式选择。
+2. **注册必须落在路由组上**：`Router` 自身**没有任何注册方法**。
+   `svr.RouterGroup(prefix)` 投单个前缀，`svr.All()` 广播到全部前缀——「广播」只能是显式选择。
 3. **装配错误一律启动期 panic**：空前缀集合、未声明前缀、重复注册、非法中间件锚点，都在 `Run` 之前炸掉，
    不会带着半装配的路由表上线，也不会在运行期变成 404。
 
@@ -81,21 +85,21 @@ svr := server.NewRouter(server.WithPrefixes(server.PrefixAPIV3, server.PrefixAPI
 ```go
 svr := server.NewRouter(
 	server.WithPrefixes(server.PrefixAPIV3),
-	server.WithPrefixGroup(server.PrefixAPIV4, middleware.AuthMiddleWare),
+	server.WithPrefix(server.PrefixAPIV4, middleware.AuthMiddleWare),
 )
 ```
 
 批量声明：
 
 ```go
-svr := server.NewRouter(server.WithPrefixGroups(
-	server.PrefixGroup{Prefix: server.PrefixAPIV3},
-	server.PrefixGroup{Prefix: server.PrefixAPIV4, Middlewares: []gin.HandlerFunc{traceMiddleware}},
+svr := server.NewRouter(server.WithPrefixSpecs(
+	server.PrefixSpec{Prefix: server.PrefixAPIV3},
+	server.PrefixSpec{Prefix: server.PrefixAPIV4, Middlewares: []gin.HandlerFunc{traceMiddleware}},
 ))
 ```
 
 **版本前缀常量**：`server.PrefixAPIV1` ~ `server.PrefixAPIV5`，取值是归一化形式（`/v1`…`/v5`，无尾斜杠），
-与 `WithPrefixes` / `Scope` / `Routes().Prefix` 同一口径，可直接比较：
+与 `WithPrefixes` / `RouterGroup` / `Routes().Prefix` 同一口径，可直接比较：
 
 ```go
 for _, route := range svr.Routes() {
@@ -111,21 +115,21 @@ for _, route := range svr.Routes() {
 - 归一化后形如 `/v3`（无尾斜杠）；根路径为 `/`。
 - 空字符串前缀会 panic；一个前缀都没声明也会 panic。
 
-## 作用域注册
+## 路由组注册
 
 ```go
-// 推荐：先把作用域取成变量，再在变量上注册
-v2 := svr.Scope("/v2")
+// 推荐：先把路由组取成变量，再在变量上注册
+v2 := svr.RouterGroup("/v2")
 v2.P("/user/login", login) // 只投 /v2，其余前缀访问该路径是 404
 
 all := svr.All()
 all.P("/common/ping", ping) // 广播到全部已声明前缀，按声明顺序
 ```
 
-> 链式 `svr.Scope("/v3").P(...)` 也能用，但只适合一次注册的临时场合。正式装配请把 scope / all 绑定成变量
+> 链式 `svr.RouterGroup("/v3").P(...)` 也能用，但只适合一次注册的临时场合。正式装配请把路由组 / 广播入口绑定成变量
 > （或作为 `Registrar` 传给模块函数）：一处取、多处注册，意图更清楚，也不会重复查前缀。
 
-模块路由函数只依赖 `Registrar` 接口（`Scope` 与 `AllScope` 都实现），由装配方决定投给谁：
+模块路由函数只依赖 `Registrar` 接口（`RouterGroup` 与 `AllGroups` 都实现），由装配方决定投给谁：
 
 ```go
 // 模块侧
@@ -136,16 +140,16 @@ func Routers(r server.Registrar, deps *Deps) {
 }
 
 // 装配侧：同一份模块代码可以选择投递范围
-v3 := svr.Scope("/v3")
+v3 := svr.RouterGroup("/v3")
 Routers(v3, deps)        // 只投 v3
 Routers(svr.All(), deps) // 广播
 ```
 
-部分前缀同构（如 V3 有 A、B，V4 有 A、C）不需要广播，逐个 scope 注册即可：
+部分前缀同构（如 V3 有 A、B，V4 有 A、C）不需要广播，逐个路由组注册即可：
 
 ```go
 // 承接上文 svr
-v3, v4 := svr.Scope("/v3"), svr.Scope("/v4")
+v3, v4 := svr.RouterGroup("/v3"), svr.RouterGroup("/v4")
 v3.P("/a", handlerA)
 v3.P("/b", handlerB)
 v4.P("/a", handlerA)
@@ -164,7 +168,7 @@ svr := server.NewRouter(server.WithPrefixes("/v3", "/v4"))
 
 ```go
 // 承接上文已创建的 svr
-v3, v4 = svr.Scope("/v3"), svr.Scope("/v4")
+v3, v4 = svr.RouterGroup("/v3"), svr.RouterGroup("/v4")
 all := svr.All()
 ```
 
@@ -177,7 +181,7 @@ all := svr.All()
 ### 同一 path 在两个版本用不同实现（灰度 / 重写）
 
 ```go
-v3, v4 = svr.Scope("/v3"), svr.Scope("/v4")
+v3, v4 = svr.RouterGroup("/v3"), svr.RouterGroup("/v4")
 v3.P("/user.login", legacyLogin) // 老实现
 v4.P("/user.login", newLogin)    // 新实现
 ```
@@ -199,16 +203,16 @@ v4.P("/c", handlerC)
 
 ### 版本级差异
 
-- 前缀级中间件：`server.WithPrefixGroup("/v4", mws...)`
+- 前缀级中间件：`server.WithPrefix("/v4", mws...)`
 - 版本级账号体系/鉴权：`server.WithPrefixAuthPolicy("/v4", policy)`（见下一节）
 - 文档：`v4.Docs("app")` 与 `v3.Docs("app")` 各自挂载；只想对外承诺 v4，就只给 v4 挂
-- 前缀级路由写在同一处时，用局部变量区分：`v3, v4 := svr.Scope("/v3"), svr.Scope("/v4")`
+- 前缀级路由写在同一处时，用局部变量区分：`v3, v4 := svr.RouterGroup("/v3"), svr.RouterGroup("/v4")`
 
 ### 版本下线
 
-- 迁移期：新旧前缀并存，按接口逐个把注册从旧 scope 挪到新 scope（或复制一条新实现）；
-- 确认旧版本无流量后，**删除该 scope 上的注册**即可，路径自然变成 404；
-- 不要用「删除 `WithPrefixes` 里某个前缀」来下线：该前缀一旦未声明，所有 `Scope(旧前缀)` 都会在启动期 panic，部署直接失败。
+- 迁移期：新旧前缀并存，按接口逐个把注册从旧路由组挪到新路由组（或复制一条新实现）；
+- 确认旧版本无流量后，**删除该路由组上的注册**即可，路径自然变成 404；
+- 不要用「删除 `WithPrefixes` 里某个前缀」来下线：该前缀一旦未声明，所有 `RouterGroup(旧前缀)` 都会在启动期 panic，部署直接失败。
 
 ### 对账与排查
 
@@ -234,11 +238,11 @@ log.Printf("routes per prefix: %v", counts)
 
 - 访问未声明的版本（如 `/v5/...`）走默认 `NoRoute`：404 + `The incorrect API route.`，不是 500。
 - 前缀归一化：`/v3` 与 `/v3/` 是同一个前缀；`Routes().Prefix` 返回归一化后的 `/v3`。
-- 不要用「一个 handler 里判断版本号」来代替两个 scope 的分别注册：版本分支一旦进业务代码，路由清单与文档就再也对不上。
+- 不要用「一个 handler 里判断版本号」来代替两个路由组的分别注册：版本分支一旦进业务代码，路由清单与文档就再也对不上。
 
 ## 注册 API 一览
 
-| 方法（`Scope` / `AllScope` / `Registrar`） | 说明 |
+| 方法（`RouterGroup` / `AllGroups` / `Registrar`） | 说明 |
 |---|---|
 | `P(action, hdrs...)` | 注册 POST 路由 |
 | `G(action, hdrs...)` | 注册 GET 路由 |
@@ -248,10 +252,10 @@ log.Printf("routes per prefix: %v", counts)
 | `PRequireLogin(action, hdrs...)` | 纯糖：`PWith([]gin.HandlerFunc{AuthPolicy.Login()}, ...)`，默认即 `middleware.AuthMiddleWare` |
 | `PRequireEmployee(action, hdrs...)` | 纯糖：`PWith([]gin.HandlerFunc{AuthPolicy.Employee()}, ...)`，默认即 `middleware.AuthMiddleWareEmployee` |
 | `GRequireLogin(action, hdrs...)` | 纯糖：`GWith([]gin.HandlerFunc{AuthPolicy.Login()}, ...)` |
-| `Docs(model)` | 把 swagger / redoc 挂到该作用域，见[文档路由](#文档路由swagger--redoc) |
+| `Docs(model)` | 把 swagger / redoc 挂到该路由组，见[文档路由](#文档路由swagger--redoc) |
 
 `hdrs ...interface{}` 的语义与 1.23 线一致：可以混排 handler 与 `gin.HandlerFunc`，按传入顺序成为 handler 链。
-把中间件塞进 `hdrs`（`scope.P("/x", gated, handler)`）与显式用 `PWith` 等价。
+把中间件塞进 `hdrs`（`rg.P("/x", gated, handler)`）与显式用 `PWith` 等价。
 
 ## handler 的四种签名
 
@@ -277,7 +281,7 @@ func UserLogin(ctx *gin.Context, in *UserLoginReq, out *UserLoginResp) error {
 	return nil
 }
 
-v3 := svr.Scope("/v3")
+v3 := svr.RouterGroup("/v3")
 v3.P("/user/login", UserLogin)
 ```
 
@@ -381,10 +385,10 @@ WARN middleware "cors" disabled: 浏览器端跨域请求全部失败
 
 ```go
 // 前缀级：只作用于该前缀下的全部路由
-svr := server.NewRouter(server.WithPrefixGroup("/v4", middleware.AuthMiddleWare))
+svr := server.NewRouter(server.WithPrefix("/v4", middleware.AuthMiddleWare))
 
 // 路由级：只作用于这一条路由，中间件排在 handler 之前
-v4 := svr.Scope("/v4")
+v4 := svr.RouterGroup("/v4")
 v4.PWith([]gin.HandlerFunc{rateLimit, audit}, "/order/create", createOrder)
 
 // 1.23 风格的鉴权糖（与 PWith 等价的薄糖，可混用）
@@ -433,7 +437,7 @@ svr.AuthInject("yygu", accountmds.InjectLoginStatus)
 svr.AuthInject("dotpen", accountmds.InjectLoginStatus)
 svr.Default(accountmds.InjectLoginStatus)
 
-v3 := svr.Scope("/v3")
+v3 := svr.RouterGroup("/v3")
 v3.PRequireLogin("forest.ListForest", forestctl.ListForest)
 v3.PRequireLogin("forest.GetForest", mds.HasForestUsePerm, forestctl.GetForest)
 v3.PRequireEmployee("admin.ListUsers", adminctl.ListUsers)
@@ -493,7 +497,7 @@ svr := server.NewRouter(
 	server.WithAuthPolicy(server.NewAuthPolicy(myGate, myAdminGate)),
 )
 
-api := svr.Scope("/api/v1")
+api := svr.RouterGroup("/api/v1")
 api.PRequireLogin("file.Upload", upload)
 api.PRequireEmployee("admin.Export", export)
 ```
@@ -513,7 +517,7 @@ svr := server.NewRouter(
 	server.WithAuthPolicy(legacyPolicy),                    // 全局：老账号体系
 	server.WithPrefixAuthPolicy("/v4", sessionPolicy),      // /v4 换成新身份网关
 )
-v3, v4 := svr.Scope("/v3"), svr.Scope("/v4")
+v3, v4 := svr.RouterGroup("/v3"), svr.RouterGroup("/v4")
 v3.PRequireLogin("/user.profile", legacyHandler)
 v4.PRequireLogin("/user.profile", newHandler)
 ```
@@ -563,11 +567,11 @@ func (v4Policy) Employee() gin.HandlerFunc {
 // 3) 装配：全局策略保持默认（v3 用），只给 /v4 换解析中间件与 guard。
 svr := server.NewRouter(
     server.WithPrefixes("/v3", "/v4"),
-    server.WithPrefixGroup("/v4", v4SessionResolver(verifier)), // 只对 /v4 生效
+    server.WithPrefix("/v4", v4SessionResolver(verifier)), // 只对 /v4 生效
     server.WithPrefixAuthPolicy("/v4", v4Policy{}),             // 只影响 /v4 的三个糖
 )
 
-v3, v4 := svr.Scope("/v3"), svr.Scope("/v4")
+v3, v4 := svr.RouterGroup("/v3"), svr.RouterGroup("/v4")
 v3.PRequireLogin("/user.profile", legacyProfile) // 默认策略：读 yg-go LoginStatus
 v4.PRequireLogin("/user.profile", newProfile)    // v4Policy：读新网关会话
 ```
@@ -587,7 +591,7 @@ v4.PRequireLogin("/user.profile", newProfile)    // v4Policy：读新网关会�
 - v4 的 handler 不要调用 `runtime.LoginStatus`，改为从自己的 ctx 取会话；要记录自有身份维度，
   用 `WithMiddleware(middleware.RequestLogFields(...))` 尾插。
 - 同一份模块函数可以被两个版本共用（签名收 `Registrar`），版本差异只体现在装配：
-  `Routers(svr.Scope("/v3"), deps)` 与 `Routers(svr.Scope("/v4"), deps)`。
+  `Routers(svr.RouterGroup("/v3"), deps)` 与 `Routers(svr.RouterGroup("/v4"), deps)`。
 - 验证方式：`httptest` 分别打 `/v3/user.profile` 与 `/v4/user.profile`，断言两套拒绝形态与放行路径；
   `Routes()` 里同一 path 出现两条、`Prefix` 不同。
 
@@ -624,8 +628,8 @@ func (p whitelistPolicy) guard(requireEmployee bool) gin.HandlerFunc {
 `PRequireLogin`/`PWith` 的 `hdrs` 会按顺序排在 guard 之后：
 
 ```go
-scope.PRequireLogin("color.CreatePalette", requireIdentity, idempotency, writeLimit, createPalette)
-scope.PWith([]gin.HandlerFunc{requireIdentity}, "user.Profile", profile)
+rg.PRequireLogin("color.CreatePalette", requireIdentity, idempotency, writeLimit, createPalette)
+rg.PWith([]gin.HandlerFunc{requireIdentity}, "user.Profile", profile)
 ```
 
 这也是 canvas2 的既有形态：登录态由框架 guard 判，业务判据留路由级，才能保证「凭证未绑定空间」
@@ -644,12 +648,12 @@ scope.PWith([]gin.HandlerFunc{requireIdentity}, "user.Profile", profile)
 
 ## 文档路由（swagger / redoc）
 
-文档**按作用域挂载**，不再自动铺满全部前缀：
+文档**按路由组挂载**，不再自动铺满全部前缀：
 
 ```go
 svr.All().Docs("app") // 每个已声明前缀各挂两条：/{prefix}/app.docs/*any、/{prefix}/app.redocs
 
-v4 := svr.Scope("/v4")
+v4 := svr.RouterGroup("/v4")
 v4.Docs("app") // 只挂 /v4，其他前缀访问文档是 404
 ```
 
@@ -692,7 +696,7 @@ svr.GinEngine().NoRoute(func(ctx *gin.Context) { ctx.String(404, "not found") })
 |---|---|
 | 一个前缀都没声明（含 `WithPrefixes()` 空参数） | `no prefix declared` |
 | 前缀是空字符串 | `prefix must not be blank` |
-| `Scope` 用了未声明的前缀 | `undeclared prefix` + `available prefixes` |
+| `RouterGroup` 用了未声明的前缀 | `undeclared prefix` + `available prefixes` |
 | 同 method + 同 path 在同一前缀二次注册 | `duplicate route` + 两个 `file:line` |
 | `WithMiddlewareBefore` 锚点不存在 / 是 `server.Recovery` / 已被关闭 | `unknown middleware` / `must stay first` / `disabled by WithoutMiddleware` |
 | 同一条目既 `WithoutMiddleware` 又 `WithMiddlewareImpl` | `disabled by WithoutMiddleware` + `WithMiddlewareImpl` |
@@ -716,17 +720,17 @@ svr.GinEngine().NoRoute(func(ctx *gin.Context) { ctx.String(404, "not found") })
 |---|---|
 | `NewRouter(apiPrefix, opts...)` | `NewRouter(WithPrefixes("/v3", ...), opts...)` |
 | `WithPrefixes([]string{V3, V4})`（与构造参数取并集） | `WithPrefixes(V3, V4)`（精确集合） |
-| `svr.P/G/Any(...)`（隐式广播） | `v4 := svr.Scope(V4); v4.P(...)` 或 `svr.All().P(...)` |
-| `svr.PRequireLogin(...)` | `scope.PRequireLogin(...)`（同名糖，底层 guard 可用 `AuthPolicy` 替换）或 `scope.PWith(...)` |
-| `svr.PRequireEmployee(...)` | `scope.PRequireEmployee(...)` 或 `scope.PWith([...]AuthMiddleWareEmployee, ...)` |
-| `svr.GRequireLogin(...)` | `scope.GRequireLogin(...)` 或 `scope.GWith([...]AuthMiddleWare, ...)` |
-| `svr.HandleDoc("app")` | `svr.All().Docs("app")` 或 `v3 := svr.Scope(V3); v3.Docs("app")` |
+| `svr.P/G/Any(...)`（隐式广播） | `v4 := svr.RouterGroup(V4); v4.P(...)` 或 `svr.All().P(...)` |
+| `svr.PRequireLogin(...)` | `rg.PRequireLogin(...)`（同名糖，底层 guard 可用 `AuthPolicy` 替换）或 `rg.PWith(...)` |
+| `svr.PRequireEmployee(...)` | `rg.PRequireEmployee(...)` 或 `rg.PWith([...]AuthMiddleWareEmployee, ...)` |
+| `svr.GRequireLogin(...)` | `rg.GRequireLogin(...)` 或 `rg.GWith([...]AuthMiddleWare, ...)` |
+| `svr.HandleDoc("app")` | `svr.All().Docs("app")` 或 `v3 := svr.RouterGroup(V3); v3.Docs("app")` |
 | `svr.ListAllRouters()` | `svr.Routes()` / `svr.LogRoutes()` |
 | `WithDeployMode(mode)` | 删除（原本只写不读）；部署差异用中间件或各自 option 表达 |
 | `server.PrefixAPIV3` / `PrefixAPIDefault` | 版本常量保留为 `server.PrefixAPIV1` ~ `PrefixAPIV5`（归一化、无尾斜杠）；注意 `PrefixAPIV3` 的值由 `"/v3/"` 变为 `"/v3"`，旧代码 `PrefixAPIV3 + "account"` 会拼成 `/v3account`，要补斜杠；`PrefixAPIDefault` 删除（不再有默认前缀语义） |
 | `server.MethodFunc` | 无对应公开符号（handler 适配收进内部 `register/adaptHandlers`）；直接传 handler 即可 |
 | `svr.Prefix`（读字段） | 6 处读取点所在模块都是单前缀 app，直接用 `server.PrefixAPIVx` / 服务自己的常量；但这些模块所属的 app 里有**多前缀 app**（dotpen/dottask、corekg/corekg），注册多版本时必须显式 `All()`，不能靠读单一前缀推导广播 |
-| `func Routers(svr *server.Router)` | 纯注册的模块函数改成 `func Routers(r server.Registrar)`（调用点传 `scope` 或 `svr.All()`）；仍需要 `AuthInject` / `GinEngine()`（含 `eng.ContextWithFallback` 这类引擎级设置）的模块保留 `*server.Router`，内部 `eng := svr.Scope(prefix)` 后再注册；`HandleDoc` 已由 `Registrar.Docs` 取代，不需要为它保留 Router |
+| `func Routers(svr *server.Router)` | 纯注册的模块函数改成 `func Routers(r server.Registrar)`（调用点传路由组或 `svr.All()`）；仍需要 `AuthInject` / `GinEngine()`（含 `eng.ContextWithFallback` 这类引擎级设置）的模块保留 `*server.Router`，内部 `eng := svr.RouterGroup(prefix)` 后再注册；`HandleDoc` 已由 `Registrar.Docs` 取代，不需要为它保留 Router |
 | `middleware.Logger(".Ping", "metrics")`（直接调用） | 改选项签名：`middleware.Logger(middleware.WithLoggerWhitelist(".Ping", "metrics"))`（白名单配置统一走 middleware 选项；1.23 的 Router 也没有该 option） |
 | `middleware.CORS()`（直接调用） | 默认行为不变；按场景用 `middleware.WithCORSAllowOrigins/AllowHeaders/ExposeHeaders/...`，需完整控制时 `server.WithMiddlewareImpl(server.CORS, cors.New(cfg))` |
 | `eng.GinEngine().GET(...)` 探针 / `NoRoute` | 不变（逃生口） |
@@ -739,7 +743,7 @@ svr.GinEngine().NoRoute(func(ctx *gin.Context) { ctx.String(404, "not found") })
 -svr := server.NewRouter(server.PrefixAPIDefault, server.WithPrefixes([]string{"/v3/", "/v4/"}))
 -Routers(svr)
 +svr := server.NewRouter(server.WithPrefixes(server.PrefixAPIV3, server.PrefixAPIV4))
-+Routers(svr.Scope(server.PrefixAPIV4))
++Routers(svr.RouterGroup(server.PrefixAPIV4))
 
 // 多前缀广播
 -svr.P("/user/login", login)
@@ -755,12 +759,12 @@ svr.GinEngine().NoRoute(func(ctx *gin.Context) { ctx.String(404, "not found") })
 1. **工具链**：yg-go v1.27.x 的 `go.mod` 是 `go 1.27.4`，消费方 `go 1.23/1.24` 必须同批升级（`go mod tidy` / `go build -mod=mod` 会把消费方 `go` 指令抬到 1.27.4；普通 `go build` 会提示需要更新 `go.mod`）；Dockerfile/CI 镜像同步。
 2. **vendor**：有 vendor 的仓要 `go mod vendor` 重新生成（server 包文件数与 `modules.txt` 会变），建议单独一个提交。
 3. **`NewRouter`**：全部改成 `NewRouter(WithPrefixes(prefix, ...), opts...)`；测试里的构造点同样要改。
-4. **`HandleDoc`**：改成 `svr.All().Docs(model)`（单前缀 app）或 `scope.Docs(model)`。
+4. **`HandleDoc`**：改成 `svr.All().Docs(model)`（单前缀 app）或 `rg.Docs(model)`。
 5. **`Router.Prefix` 读取**（四家共 6 处，读取点所在模块均为单前缀）：换成服务自己的前缀常量；其中 dotpen/dottask、corekg/corekg 是**多前缀 app**，注册必须显式 `All()`，不能靠读单一前缀推导广播。
 6. **`WithDeployMode`**：纯删除（旧实现只写不读）。
 7. **对账**：迁移前后都用 `GinEngine().Routes()` 导出 `method,path` 集合做 diff（1.23 线没有 `Routes()`；且新 `Routes()` 不含 `GinEngine()` 直挂的探针/静态/NoRoute/引擎子组，单用它会把这类路由误报成丢失）。`Routes()` 只用于业务路由对账。
-8. **盘点**：`rg` 要带 `--no-ignore`（CoreKG-oss 的 `.gitignore` 含 `cmd/`，否则会漏掉生产入口）。
-9. **注册 receiver 命名**：canvas2 的两处 layerguard 按 receiver 名 `eng` 做 AST 扫描；推荐「参数改名 `eng`→`svr`、`eng := svr.Scope(prefix)`」的食谱，注册行与守卫都不用改。
+8. **盘点**：ripgrep 要带 `--no-ignore`（CoreKG-oss 的 `.gitignore` 含 `cmd/`，否则会漏掉生产入口）。
+9. **注册 receiver 命名**：canvas2 的两处 layerguard 按 receiver 名 `eng` 做 AST 扫描；推荐「参数改名 `eng`→`svr`、`eng := svr.RouterGroup(prefix)`」的食谱，注册行与守卫都不用改。
 10. **已知观测变化**：`Recovery` 提前到链首后，panic 请求不再进访问日志/`request_latency_seconds`（见「常见坑」）。
 
 **迁移必查**：1.23 线里靠「构造参数自动并入」拿到的前缀，必须在 `WithPrefixes` 里显式写出——这类写法迁移后会编译通过但少一个前缀。
@@ -769,12 +773,12 @@ svr.GinEngine().NoRoute(func(ctx *gin.Context) { ctx.String(404, "not found") })
 ## 常见坑
 
 1. **忘记声明前缀** → 构造期 panic（`no prefix declared`）。没有默认前缀。
-2. **`Scope` 拼错前缀** → 构造/注册期 panic，消息里带可用前缀清单；不会懒创建。
-3. **同一前缀重复注册同一 method+path** → panic 并给出两个注册来源。不同前缀之间同 path 不冲突（这正是作用域模型）。
-4. **多前缀服务习惯性写死一个前缀** → 想全量就 `All()`，想部分重叠就逐个 `Scope` 注册，不要再用 1.23 的「构造参数并集」思路。
+2. **`RouterGroup` 拼错前缀** → 构造/注册期 panic，消息里带可用前缀清单；不会懒创建。
+3. **同一前缀重复注册同一 method+path** → panic 并给出两个注册来源。不同前缀之间同 path 不冲突（这正是路由组模型）。
+4. **多前缀服务习惯性写死一个前缀** → 想全量就 `All()`，想部分重叠就逐个 `RouterGroup` 注册，不要再用 1.23 的「构造参数并集」思路。
 5. **`WithMiddleware` 不是「想插哪就插哪」**：它是链尾（晚于 `IdentityFields`）；要插在某内置项之前用 `WithMiddlewareBefore`。
 6. **中间件必须在构造期装**：`NewRouter` 之后不能再应用 option（panic `sealed`），这是为了避免「后挂中间件对已有路由不生效」的时序陷阱。
-7. **探针别用 `Scope`**：会进 `Routes()` 并参与重复检测；探针/静态/`NoRoute` 走 `GinEngine()`。
+7. **探针别用 `RouterGroup`**：会进 `Routes()` 并参与重复检测；探针/静态/`NoRoute` 走 `GinEngine()`。
 8. **注册要在 `Run` 之前、单线程完成**：`Run` 之后再注册会在注册点 panic（`server: route registration must happen before Run: <method> <path>`），并发注册会让路由索引产生数据竞争。
    `Run` 本身只起 goroutine 就返回，主流程要用 `lifecycle.Std().WaitExit()`（或自己的阻塞逻辑）撑住进程。
 9. **`server.Recovery` 在链首带来的观测差异**：panic 请求不会进访问日志，也不会进 `request_latency_seconds`

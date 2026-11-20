@@ -134,7 +134,7 @@ func TestTailInsertAfterIdentityFields(t *testing.T) {
 		WithMiddlewareBefore(Logger, bufferLoggerMiddleware(buf)),
 		WithMiddleware(tail),
 	)
-	svr.Scope("/v3").G("/tail.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "tail-ok") })
+	svr.RouterGroup("/v3").G("/tail.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "tail-ok") })
 
 	handlers := svr.GinEngine().Handlers
 	// 链 = 8 个内置项 + 1 个 WithMiddlewareBefore 插入项（日志捕获）+ 1 个 WithMiddleware 尾插项。
@@ -172,13 +172,13 @@ func TestDisableBuiltin(t *testing.T) {
 	origin := map[string]string{"Origin": "https://frontend.example"}
 
 	enabled := NewRouter(WithPrefixes("/v3"))
-	enabled.Scope("/v3").G("/cors.probe", handler)
+	enabled.RouterGroup("/v3").G("/cors.probe", handler)
 	if got := doRequest(enabled, http.MethodGet, "/v3/cors.probe", origin, nil).Header().Get("Access-Control-Allow-Origin"); got != "*" {
 		t.Fatalf("default chain should emit CORS header, got %q", got)
 	}
 
 	disabled := NewRouter(WithPrefixes("/v3"), WithoutMiddleware(CORS))
-	disabled.Scope("/v3").G("/cors.probe", handler)
+	disabled.RouterGroup("/v3").G("/cors.probe", handler)
 	if got := doRequest(disabled, http.MethodGet, "/v3/cors.probe", origin, nil).Header().Get("Access-Control-Allow-Origin"); got != "" {
 		t.Fatalf("WithoutMiddleware(CORS) should drop CORS header, got %q", got)
 	}
@@ -208,7 +208,7 @@ func TestMiddlewareImplReplaces(t *testing.T) {
 		ctx.Next()
 	}
 	svr := NewRouter(WithPrefixes("/v3"), WithMiddlewareImpl(Recovery, custom))
-	svr.Scope("/v3").G("/impl.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "impl-ok") })
+	svr.RouterGroup("/v3").G("/impl.probe", func(ctx *gin.Context) { ctx.String(http.StatusOK, "impl-ok") })
 
 	handlers := svr.GinEngine().Handlers
 	if len(handlers) != len(svr.mw.builtNames()) {
@@ -311,7 +311,7 @@ func TestLoggerWhitelistOption(t *testing.T) {
 			WithMiddlewareBefore(Logger, bufferLoggerMiddleware(buf)),
 			WithMiddlewareImpl(Logger, middleware.Logger(opts...)),
 		)
-		v3 := svr.Scope("/v3")
+		v3 := svr.RouterGroup("/v3")
 		v3.G("/healthz", handler)
 		v3.G("/user/detail", handler)
 		v3.G("/canvas.Ping", handler) // 默认白名单的后缀命中路径
@@ -345,7 +345,7 @@ func TestLoggerWhitelistOption(t *testing.T) {
 		svr := NewRouter(WithPrefixes("/v3"),
 			WithMiddlewareBefore(Logger, bufferLoggerMiddleware(buf)),
 		)
-		v3 := svr.Scope("/v3")
+		v3 := svr.RouterGroup("/v3")
 		v3.G("/canvas.Ping", handler)
 		v3.G("/user/detail", handler)
 		if hit(t, svr, buf, "/v3/canvas.Ping") {
