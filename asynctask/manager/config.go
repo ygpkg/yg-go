@@ -31,7 +31,11 @@ type Config struct {
 	DefaultMaxAttempts int           // 默认 3（任务未显式指定时）
 	DefaultTimeout     time.Duration // 默认 30s（任务未显式指定时）
 	MaxPayloadBytes    int           // 默认 4096（超过报 ErrPayloadTooLarge，不截断）
-	Retention          time.Duration // 默认 30 天（终态记录保留时长；0 不清理）
+	// MaxResultBytes 结果快照（core_async_task.result）字节上限，默认 4096。
+	// 超限按前缀截断、不报错；需要更完整快照的调用方显式调大（如 16 KiB），
+	// 并自行保证 result 编码不超预算（本项不做校验，只决定截断位置）。
+	MaxResultBytes int
+	Retention      time.Duration // 默认 30 天（终态记录保留时长；0 不清理）
 	// FailFastChain 为 true 时，任务链某 step 进入失败终态后，同 chain 的后续 step 一并置 canceled，
 	// 避免后续步骤因前序永不 succeeded 而永久 pending 积压。默认 false（不级联，保持独立任务语义）。
 	FailFastChain       bool
@@ -51,6 +55,7 @@ func defaultConfig() *Config {
 		DefaultMaxAttempts:   3,
 		DefaultTimeout:       30 * time.Second,
 		MaxPayloadBytes:      4096,
+		MaxResultBytes:       4096,
 		Retention:            30 * 24 * time.Hour,
 		Backoff:              DefaultBackoff,
 		NotifierQueuePrefix:  "gasync",

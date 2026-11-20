@@ -27,7 +27,18 @@ type Config struct {
 	WorkerID string
 	// FailFastChain 为 true 时，任务链某 step 失败终态后同 chain 后续 step 置 canceled。
 	FailFastChain bool
+	// MaxResultBytes 结果快照（core_async_task.result 与 core_async_task_run.result）的
+	// 字节上限，默认 DefaultMaxResultBytes（4096）。
+	//
+	// 超限按前缀截断、不报错（保留历史行为，避免改变既有调用方的存储语义）。
+	// result 是业务快照、不是回调载荷：需要更完整诊断的调用方显式调大（如 16 KiB），
+	// 并在写入前自行校验编码后的字节数，不要指望这里兜底或报错。
+	MaxResultBytes int
 }
+
+// DefaultMaxResultBytes 是 Config.MaxResultBytes 的默认值（4096 字节，即 4 KiB），
+// 与本包此前的硬编码截断口径一致：不传 MaxResultBytes 的调用方行为完全不变。
+const DefaultMaxResultBytes = 4096
 
 // Source 导出类型别名，便于调用方持有具体类型；其方法集满足 asynctask.Source。
 type Source = source
@@ -49,14 +60,18 @@ func New(cfg Config) (*Source, error) {
 	if cfg.WorkerID == "" {
 		cfg.WorkerID = "asynctask-db-" + genUUID()
 	}
+	if cfg.MaxResultBytes <= 0 {
+		cfg.MaxResultBytes = DefaultMaxResultBytes
+	}
 	dialect := DetectDialect(cfg.DB.Dialector.Name())
 	return &source{
-		store:         newStore(cfg.DB, dialect, cfg.LeaseTTL),
-		db:            cfg.DB,
-		dialect:       dialect,
-		backoff:       cfg.Backoff,
-		workerID:      cfg.WorkerID,
-		failFastChain: cfg.FailFastChain,
+		store:          newStore(cfg.DB, dialect, cfg.LeaseTTL),
+		db:             cfg.DB,
+		dialect:        dialect,
+		backoff:        cfg.Backoff,
+		workerID:       cfg.WorkerID,
+		failFastChain:  cfg.FailFastChain,
+		maxResultBytes: cfg.MaxResultBytes,
 	}, nil
 }
 
