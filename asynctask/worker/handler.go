@@ -76,34 +76,93 @@ var (
 	ErrSkip = errors.New("asynctask: skip this task")
 	// ErrNoRetry 立即 failed，不消耗剩余次数（Execute 返回）。
 	ErrNoRetry = errors.New("asynctask: do not retry")
+	// ErrPause 请求「主动让出」：本次执行结算后退回 pending 等下一次执行，
+	// **不消耗失败重试额度**（设计 §9.2 / §9.3 Y3）。
+	//
+	// 与 ErrSkip 的区别：skip 是终态（不再执行），pause 只是让出（稍后继续）；
+	// 与 ErrNoRetry 的区别：那是不再重试的失败，pause 不算失败。
+	// 需要携带让出原因/恢复延时时返回 *PauseError（它 Unwrap 到本哨兵）。
+	ErrPause = errors.New("asynctask: pause requested")
 )
+
+// PauseError 携带一次暂停的恢复参数；handler 返回它等价于返回 ErrPause。
+type PauseError struct {
+	// RetryAfter 是最早可再次认领的延时；<=0 表示立即可领取（只让出算力不等待）。
+	RetryAfter time.Duration
+	// Reason 是让出原因（落到任务行 last_error，便于排障）。
+	Reason string
+}
+
+// Error 实现 error。
+func (e *PauseError) Error() string {
+	if e == nil {
+		return ErrPause.Error()
+	}
+	if e.Reason == "" {
+		return ErrPause.Error()
+	}
+	return ErrPause.Error() + ": " + e.Reason
+}
+
+// Unwrap 让 errors.Is(err, ErrPause) 对 *PauseError 成立。
+func (e *PauseError) Unwrap() error { return ErrPause }
+
+// Pause 构造一个暂停请求（retryAfter<=0 表示立即可再次认领）。
+//
+// 用法：handler 在「已提交可恢复断点、需要让出资源且预算仍有余额」时
+// `return worker.Pause(0, "yield after checkpoint")`。
+func Pause(retryAfter time.Duration, reason string) error {
+	return &PauseError{RetryAfter: retryAfter, Reason: reason}
+}
+
+// PauseLifecycle 是可选钩子：handler 请求暂停时，worker 在**结算事务内**调用 OnPause。
+//
+// 为什么单独一个接口而不是扩 Lifecycle：Lifecycle 是既有稳定契约，加方法会让所有实现编译失败；
+// 而「暂停结算」是新增能力，只给需要的 handler 实现即可。
+//
+// 语义：OnPause 与 OnSuccess/OnRetry 一样在 Source 的事务内被调用（本地形态下
+// TxFromContext(ctx) 非 nil），下游据此在同一事务里按「实际耗时」结算阶段预留额。
+// 返回错误会让整个结算回滚（任务仍 running，租约到期后由回收器按预留额结算）。
+type PauseLifecycle interface {
+	OnPause(ctx context.Context, task *asynctask.AsyncTask, reason string) error
+}
 
 // buildCallback 按 outcome 构造交回 Source 的 EnsureFunc；把本次失败原因注入闭包。
 //
-// 说明：「失败是否可重试」最终由 Source 判定（次数是否用尽、ErrNoRetry 等）。worker 只能
+// 说明：「失败是否可重试」最终由 Source 判定（失败额度是否用尽、ErrNoRetry 等）。worker 只能
 // 基于错误语义给出初判：ErrNoRetry / panic 视为不可重试（选 OnFailure），timeout /
-// handler_error 视为可重试（选 OnRetry）。Source 在事务内、且仅在仍持有时调用该回调。
-func (w *Worker) buildCallback(h Handler, task *asynctask.AsyncTask, outcome asynctask.Outcome, kind asynctask.FailureKind, cause error) asynctask.EnsureFunc {
-	if outcome == asynctask.OutcomeSkipped {
+// handler_error 视为可重试（选 OnRetry），pause 选 OnPause（PauseLifecycle）。
+// Source 在事务内、且仅在仍持有时调用该回调。
+func (w *Worker) buildCallback(h Handler, task *asynctask.AsyncTask, res asynctask.Result) asynctask.EnsureFunc {
+	if res.Outcome == asynctask.OutcomeSkipped {
 		return nil
+	}
+	if res.Outcome == asynctask.OutcomePaused {
+		// 暂停的结算钩子：与其它 outcome 一样在 Source 事务内执行。
+		pl, ok := h.(PauseLifecycle)
+		if !ok {
+			return nil
+		}
+		reason := res.PauseReason
+		return func(ctx context.Context) error { return pl.OnPause(ctx, task, reason) }
 	}
 	lc := asLifecycle(h)
 	if lc == nil {
 		return nil
 	}
 
-	switch outcome {
+	switch res.Outcome {
 	case asynctask.OutcomeSucceeded:
 		return func(ctx context.Context) error { return lc.OnSuccess(ctx, task) }
 	case asynctask.OutcomeCanceled:
 		return func(ctx context.Context) error { return lc.OnCanceled(ctx, task) }
 	case asynctask.OutcomeFailed:
-		// 失败能否重试：panic / ErrNoRetry / 次数用尽一律不可重试；其余选 OnRetry。
+		// 失败能否重试：panic / ErrNoRetry / 失败额度用尽一律不可重试；其余选 OnRetry。
 		// 最终是否重试仍由 Source 判定，这里只决定 worker 交给 Source 的默认回调。
-		if kind == asynctask.FailurePanic || errors.Is(cause, ErrNoRetry) || !task.HasRemainingAttempts() {
-			return func(ctx context.Context) error { return lc.OnFailure(ctx, task, cause) }
+		if res.Failure == asynctask.FailurePanic || errors.Is(res.Err, ErrNoRetry) || !task.HasRemainingAttempts() {
+			return func(ctx context.Context) error { return lc.OnFailure(ctx, task, res.Err) }
 		}
-		return func(ctx context.Context) error { return lc.OnRetry(ctx, task, cause) }
+		return func(ctx context.Context) error { return lc.OnRetry(ctx, task, res.Err) }
 	}
 	return nil
 }
@@ -153,15 +212,30 @@ func (w *Worker) process(taskType string, task *asynctask.AsyncTask) {
 				Err:      err,
 				Duration: time.Since(start),
 			}
-			w.saveResult(task, res, w.buildCallback(h, task, res.Outcome, res.Failure, err))
+			w.saveResult(task, res, w.buildCallback(h, task, res))
 			w.emit("failed", task, attempt, time.Since(start), err)
 			return
 		}
 	}
 
-	// execCtx 是本次执行的取消源：超时、停机、续租失权都通过它传递。
+	// execCtx 是本次执行的取消源：超时、停机、续租失权、取消通知都通过它传递。
 	execCtx, cancelExec := context.WithCancel(w.baseCtx)
 	defer cancelExec()
+
+	// 本地活跃执行表：登记 (任务 id, generation, attempt) → 取消函数。
+	// 取消通知与定时补查都靠这张表找到「本进程正在跑的这次执行」；
+	// 键里带 generation+attempt 是为了让晚到的旧取消匹配不到新执行。
+	regKey := cancelKey{taskID: task.ID, generation: task.Generation, attempt: task.Attempt}
+	var canceledBySignal atomic.Bool
+	regCancel := func() {
+		canceledBySignal.Store(true)
+		cancelExec()
+	}
+	w.registerActive(regKey, task, regCancel)
+	// 登记后无条件复查一次任务状态（Source 实现 asynctask.StatusReader 时；未实现则内部直接返回）：
+	// 代价是每次执行多一次按主键的状态查询，换来的是补上「取消事务先提交、执行后登记」的竞态——
+	// 通知早于本次登记到达会落空，这里再查一次兜住。取消补查定时器是另一层兜底。
+	w.recheckOnRegister(execCtx, task)
 
 	var leaseLost atomic.Bool
 	stopRenew := w.startRenew(execCtx, func() {
@@ -178,6 +252,7 @@ func (w *Worker) process(taskType string, task *asynctask.AsyncTask) {
 	execErr := execCtx.Err()
 	cancelTimeout()
 	cancelExec()
+	w.unregisterActive(regKey)
 
 	res := asynctask.Result{
 		Payload:  resultPayload,
@@ -191,6 +266,15 @@ func (w *Worker) process(taskType string, task *asynctask.AsyncTask) {
 	case leaseLost.Load():
 		res.Outcome = asynctask.OutcomeCanceled
 		res.Failure = asynctask.FailureLeaseExpired
+	case errors.Is(err, ErrPause):
+		// 主动让出：结算后回 pending，不消耗失败额度（设计 §9.2 / §9.3 Y3）。
+		res.Outcome = asynctask.OutcomePaused
+		res.Failure = asynctask.FailurePaused
+		applyPauseRequest(&res, err)
+	case canceledBySignal.Load():
+		// 取消通知命中：任务已被 Cancel 置为 canceled，Save 会因为失权被拦下，这里只如实记录结局。
+		res.Outcome = asynctask.OutcomeCanceled
+		res.Failure = asynctask.FailureCanceled
 	case err == nil:
 		res.Outcome = asynctask.OutcomeSucceeded
 	case errors.Is(err, ErrNoRetry):
@@ -223,16 +307,37 @@ func (w *Worker) process(taskType string, task *asynctask.AsyncTask) {
 		return
 	}
 
-	w.saveResult(task, res, w.buildCallback(h, task, res.Outcome, res.Failure, err))
+	w.saveResult(task, res, w.buildCallback(h, task, res))
 
 	switch res.Outcome {
 	case asynctask.OutcomeSucceeded:
 		w.emit("succeeded", task, attempt, res.Duration, nil)
 	case asynctask.OutcomeCanceled:
 		w.emit("canceled", task, attempt, res.Duration, err)
+	case asynctask.OutcomePaused:
+		w.emit("paused", task, attempt, res.Duration, err)
 	default:
 		w.emit("failed", task, attempt, res.Duration, err)
 	}
+}
+
+// applyPauseRequest 把 *PauseError 的恢复参数搬进 Result（普通 ErrPause 用默认值）。
+//
+// RetryAfter 换算成绝对时刻 PauseUntil：Source 直接写 next_run_at，
+// 应用时钟与 DB 时钟的偏差只影响「多久之后再跑」，不影响正确性。
+func applyPauseRequest(res *asynctask.Result, cause error) {
+	if res == nil {
+		return
+	}
+	var pe *PauseError
+	if errors.As(cause, &pe) && pe != nil {
+		res.PauseReason = pe.Reason
+		if pe.RetryAfter > 0 {
+			res.PauseUntil = time.Now().Add(pe.RetryAfter)
+		}
+		return
+	}
+	res.PauseReason = ErrPause.Error()
 }
 
 // startRenew 在任务执行期间周期性续租，返回停止函数。

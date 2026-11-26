@@ -50,10 +50,14 @@ type CoreAsyncTask struct {
 	Step     int32  `gorm:"column:step;not null;default:0;index:idx_core_async_task_chain_id_step,priority:2;comment:步骤序号"`
 	PrevStep int32  `gorm:"column:prev_step;not null;default:-1;comment:前序步骤序号（-1=首步）"`
 
-	Generation  int32 `gorm:"column:generation;not null;default:1;comment:重放轮次"`
-	Attempt     int32 `gorm:"column:attempt;not null;default:0;comment:本轮已尝试次数"`
-	MaxAttempts int32 `gorm:"column:max_attempts;not null;default:3;comment:本轮最大尝试次数"`
-	TimeoutMs   int64 `gorm:"column:timeout_ms;not null;default:0;comment:单次执行超时毫秒"`
+	Generation int32 `gorm:"column:generation;not null;default:1;comment:重放轮次"`
+	// Attempt 单调执行序号：每次认领 +1，一次执行一行 run（(id,generation,attempt) 唯一）。
+	Attempt int32 `gorm:"column:attempt;not null;default:0;comment:本轮执行序号（单调）"`
+	// FailureCount 可重试失败次数（准入条件）：暂停不加、可重试失败与失权回收各 +1。
+	// 与 attempt 分开是为了让「主动让出」不消耗失败额度，同时保住 run 的唯一标识。
+	FailureCount int32 `gorm:"column:failure_count;not null;default:0;comment:可重试失败次数"`
+	MaxAttempts  int32 `gorm:"column:max_attempts;not null;default:3;comment:本轮最大失败重试次数"`
+	TimeoutMs    int64 `gorm:"column:timeout_ms;not null;default:0;comment:单次执行超时毫秒"`
 
 	NextRunAt  time.Time  `gorm:"column:next_run_at;not null;index:idx_core_async_task_claim,priority:4;comment:最早可认领时间"`
 	LeaseUntil *time.Time `gorm:"column:lease_until;index:idx_core_async_task_status_lease_until,priority:2;comment:租约到期时间"`

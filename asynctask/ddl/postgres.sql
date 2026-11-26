@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS core_async_task (
   prev_step     integer      NOT NULL DEFAULT -1,
   generation    integer      NOT NULL DEFAULT 1,
   attempt       integer      NOT NULL DEFAULT 0,
+  failure_count integer      NOT NULL DEFAULT 0,
   max_attempts  integer      NOT NULL DEFAULT 3,
   timeout_ms    bigint       NOT NULL DEFAULT 0,
   next_run_at   timestamptz  NOT NULL,
@@ -33,6 +34,12 @@ CREATE TABLE IF NOT EXISTS core_async_task (
   labels        text,
   PRIMARY KEY (id)
 );
+
+-- 增量升级（v1.27.12，执行身份与预算）：已有库补 failure_count 列。
+-- PG 支持 ADD COLUMN IF NOT EXISTS，可反复重放；MySQL 8 / SQLite 无该语法，
+-- 它们的补列方式见 asynctask/README.md「v1.27.12 起新增列 failure_count」的升级片段。
+-- 必须放在 CREATE TABLE 之后：新库先建表（已含该列），再 ALTER 为空操作。
+ALTER TABLE core_async_task ADD COLUMN IF NOT EXISTS failure_count integer NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_core_async_task_claim
   ON core_async_task (task_type, status, priority DESC, next_run_at);

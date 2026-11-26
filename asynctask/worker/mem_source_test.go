@@ -102,11 +102,13 @@ func (m *memSource) Save(ctx context.Context, task *asynctask.AsyncTask, r async
 		Err:         r.Err,
 		Payload:     r,
 	})
-	// 模拟 Source 的重试决策：仅当 outcome=failed 且仍可重试时把任务重新入队。
+	// 模拟 Source 的重试决策：仅当 outcome=failed 且仍有失败额度时把任务重新入队。
+	// 重试同时让 attempt+1（下一次认领会推进执行序号）与 failure_count+1（本次失败计费）。
 	requeue := false
-	if r.Outcome == asynctask.OutcomeFailed && m.retryUpperBound > 0 && hasAttemptsLeft(task) {
+	if r.Outcome == asynctask.OutcomeFailed && m.retryUpperBound > 0 && task.HasRemainingAttempts() {
 		m.retryUpperBound--
 		task.Attempt++
+		task.FailureCount++
 		requeue = true
 	}
 	m.mu.Unlock()
@@ -125,14 +127,6 @@ func (m *memSource) Save(ctx context.Context, task *asynctask.AsyncTask, r async
 	return nil
 }
 
-// hasAttemptsLeft：MaxAttempts<=0 视为不设上限。
-func hasAttemptsLeft(task *asynctask.AsyncTask) bool {
-	if task.MaxAttempts <= 0 {
-		return true
-	}
-	return task.Attempt < task.MaxAttempts
-}
-
 // recordHookCallback 根据 outcome 归类被调用的钩子（worker 只传一个回调，故此处按 outcome 记录）。
 func (m *memSource) recordHookCallback(outcome asynctask.Outcome) {
 	name := string(outcome)
@@ -143,6 +137,8 @@ func (m *memSource) recordHookCallback(outcome asynctask.Outcome) {
 		name = "on_canceled"
 	case asynctask.OutcomeFailed:
 		name = "on_failure_or_retry" // worker 决定的那个回调；具体由 handler 侧区分
+	case asynctask.OutcomePaused:
+		name = "on_pause"
 	}
 	m.mu.Lock()
 	m.callbacks++

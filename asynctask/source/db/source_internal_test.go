@@ -40,7 +40,7 @@ func TestSource_LostLease_DirectFinishAsyncTaskRowsAffected(t *testing.T) {
 	stale := *task // 持有旧 worker_id 的任务视图
 	before := stale.Status
 
-	if err := src.finishAsyncTask(gdb, &stale, asynctask.StatusSucceeded, asynctask.Result{}, src.dialect.NowValueExpr()); err != nil {
+	if err := src.finishAsyncTask(gdb, &stale, asynctask.StatusSucceeded, asynctask.Result{}, src.dialect.NowValueExpr(), 0); err != nil {
 		if !errors.Is(err, asynctask.ErrLeaseLost) {
 			t.Fatalf("finishAsyncTask err = %v, want ErrLeaseLost", err)
 		}

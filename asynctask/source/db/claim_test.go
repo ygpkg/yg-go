@@ -97,23 +97,28 @@ func TestClaimEmpty(t *testing.T) {
 	}
 }
 
-// TestClaimAttemptsExhausted 次数已用尽（attempt>=max_attempts）即使到点也不认领。
-func TestClaimAttemptsExhausted(t *testing.T) {
+// TestClaimFailureQuotaExhausted 失败额度已用尽（failure_count>=max_attempts）即使到点也不认领。
+//
+// 准入看 failure_count 而不是 attempt：attempt 是单调执行序号（暂停同样会让它 +1），
+// 拿它做准入会把「主动让出」算成失败。这里刻意让 attempt 大于 max_attempts，
+// 证明挡住认领的是 failure_count。
+func TestClaimFailureQuotaExhausted(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
 	insertAsyncTask(t, s, &CoreAsyncTask{
-		TaskType:    "invoice",
-		Status:      "pending",
-		NextRunAt:   time.Now().Add(-time.Minute),
-		Attempt:     3,
-		MaxAttempts: 3,
+		TaskType:     "invoice",
+		Status:       "pending",
+		NextRunAt:    time.Now().Add(-time.Minute),
+		Attempt:      5,
+		FailureCount: 3,
+		MaxAttempts:  3,
 	})
 	rows, err := s.claimBatch(ctx, "invoice", "w1", 10)
 	if err != nil {
 		t.Fatalf("claim: %v", err)
 	}
 	if len(rows) != 0 {
-		t.Fatalf("claimed = %+v, want none (attempts exhausted)", rows)
+		t.Fatalf("claimed = %+v, want none (failure quota exhausted)", rows)
 	}
 }
 

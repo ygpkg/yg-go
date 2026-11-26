@@ -23,6 +23,11 @@ const (
 	StatusCanceled  Status = "canceled"
 	StatusSkipped   Status = "skipped" // BeforeExecute 返回 ErrSkip
 	StatusTimeout   Status = "timeout" // 执行超时（独立状态；兼容旧的 failed+failure_kind=timeout）
+	// StatusPaused 是**只在 core_async_task_run 上出现**的状态：本次执行主动让出（结算完成、
+	// 任务已回 pending），本次尝试不是失败、也不消耗失败重试额度。
+	//
+	// 任务实体（core_async_task）永远不会取这个值：暂停后它的状态是 pending。
+	StatusPaused Status = "paused"
 )
 
 // FailureKind 与 Status 正交：状态说「结束成什么样」，分类说「为什么」。
@@ -36,6 +41,8 @@ const (
 	FailureCanceled     FailureKind = "canceled"
 	FailureLeaseExpired FailureKind = "lease_expired"
 	FailureSkipped      FailureKind = "skipped"
+	// FailurePaused 是「主动让出」的分类（配合 StatusPaused 使用）。
+	FailurePaused FailureKind = "paused"
 )
 
 // AsyncTask 是一条有状态的任务实体，对应表 core_async_task。
@@ -58,19 +65,30 @@ type AsyncTask struct {
 	// Step 步骤序号，从 0 开始；独立任务恒为 0。
 	Step int
 	// PrevStep 前序步骤序号；-1 表示无前序（首步/独立任务）。认领要求前序 step 已 succeeded。
-	PrevStep    int
-	Generation  int // 重放轮次，从 1 开始
-	Attempt     int // 本轮已尝试次数
-	MaxAttempts int
-	Timeout     time.Duration
-	NextRunAt   time.Time
-	LeaseUntil  *time.Time
-	WorkerID    string
-	StartedAt   *time.Time
-	FinishedAt  *time.Time
-	Duration    time.Duration
-	LastError   string
-	Result      []byte
+	PrevStep   int
+	Generation int // 重放轮次，从 1 开始
+	// Attempt 是本轮**单调递增的执行序号**：每次认领 +1，一次执行对应一行
+	// core_async_task_run（(id, generation, attempt) 唯一），也是租约隔离与「晚到结果/晚到取消
+	// 认不认得出自己」的定位依据。
+	//
+	// 它**不是**失败重试计数：主动暂停也会 +1（因为暂停同样是一次独立的 run），
+	// 但不会消耗重试额度。判「还能不能让任务再跑」请看 FailureCount / MaxAttempts。
+	Attempt int
+	// FailureCount 是本轮的可重试失败次数（只在「可重试失败 / 失权回收」时 +1；暂停不加）。
+	//
+	// 准入条件是 FailureCount < MaxAttempts：这样暂停（让出）不会被算作失败，
+	// 而真正失败仍受 MaxAttempts 约束。存量行由升级片段回填成 attempt 以保持旧口径。
+	FailureCount int
+	MaxAttempts  int
+	Timeout      time.Duration
+	NextRunAt    time.Time
+	LeaseUntil   *time.Time
+	WorkerID     string
+	StartedAt    *time.Time
+	FinishedAt   *time.Time
+	Duration     time.Duration
+	LastError    string
+	Result       []byte
 	// Labels 开放业务维度（如 app_group/uin），序列化为 JSON 落 labels 列（无索引）。
 	// 租户与业务主体已是一等维度（CompanyID / SubjectKind / SubjectID），不要塞进 Labels。
 	Labels    map[string]string
@@ -91,12 +109,28 @@ func (t *AsyncTask) Bind(v any) error {
 	return json.Unmarshal(t.Payload, v)
 }
 
-// HasRemainingAttempts 表示本轮是否还有剩余重试次数（MaxAttempts<=0 视为不设上限）。
+// HasRemainingAttempts 表示「本次失败之后」本轮是否还能再重试（MaxAttempts<=0 视为不设上限）。
+//
+// 判据是 FailureCount 而不是 Attempt：暂停后的下一次执行不再消耗失败额度，
+// 所以 attempt 会大于 max_attempts 而你仍可能持有剩余重试额度。
+// 实现与 Source 的「最后一次失败直接终结」判定一致（见 source/db 的 Save）：
+// 本次是第 FailureCount+1 次失败，只有它仍小于 MaxAttempts 才允许回退重试。
 func (t *AsyncTask) HasRemainingAttempts() bool {
 	if t.MaxAttempts <= 0 {
 		return true
 	}
-	return t.Attempt < t.MaxAttempts
+	return t.FailureCount+1 < t.MaxAttempts
+}
+
+// Claimable 表示本任务当前是否还满足「可被认领」的失败额度条件（FailureCount < MaxAttempts）。
+//
+// 与认领 SQL 的谓词同口径（见 source/db 的 claimSelectAndFlip）。暂停不改变 FailureCount，
+// 因此暂停后的任务仍是 Claimable=true。
+func (t *AsyncTask) Claimable() bool {
+	if t.MaxAttempts <= 0 {
+		return true
+	}
+	return t.FailureCount < t.MaxAttempts
 }
 
 // IsStuck 判断任务是否卡住：running 且租约已过期（now 之后无可续租的归属）。
@@ -133,9 +167,12 @@ type AsyncTaskRun struct {
 
 // AsyncTaskSpec 是提交任务时的参数。显式值落库非 0，其余在 Fetch 时按「AsyncTaskSpec > HandlerOption > 配置默认」解析。
 type AsyncTaskSpec struct {
-	Type        string        // 必填
-	Payload     []byte        // 可选，上限 MaxPayloadBytes
-	Priority    int           // 可选，默认 0
+	Type     string // 必填
+	Payload  []byte // 可选，上限 MaxPayloadBytes
+	Priority int    // 可选，默认 0
+	// MaxAttempts 是**可重试失败次数的上限**（不是执行次数上限）：暂停（主动让出）不计入。
+	// <=0（未显式指定）表示用配置默认值 DefaultMaxAttempts（默认 3，配置校验要求它 >0）；
+	// 平台侧不会出现 max_attempts = 0 的行。
 	MaxAttempts int           // 可选，见「默认值优先级」
 	Timeout     time.Duration // 可选，见「默认值优先级」
 	RunAt       time.Time     // 可选，绝对时刻（调用方时钟）；与 Delay 互斥

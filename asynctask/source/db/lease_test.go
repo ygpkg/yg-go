@@ -128,7 +128,7 @@ func TestReapIdempotent(t *testing.T) {
 	// 一个次数用尽且租约过期的 running 任务 → 判死。
 	past := time.Now().Add(-time.Minute)
 	deadID := insertAsyncTask(t, s, &CoreAsyncTask{
-		TaskType: "invoice", Status: "running", Attempt: 3, MaxAttempts: 3,
+		TaskType: "invoice", Status: "running", Attempt: 3, FailureCount: 3, MaxAttempts: 3,
 		NextRunAt: time.Now().Add(-time.Hour), LeaseUntil: &past, WorkerID: "w1",
 	})
 	runs1, tasks1, err := s.reap(ctx, 100)

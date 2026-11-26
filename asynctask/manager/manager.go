@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -71,6 +72,7 @@ func New(cfg *Config, gormDB *gorm.DB, opts ...Option) (*Manager, error) {
 		WorkerID:       workerID,
 		FailFastChain:  o.Config.FailFastChain,
 		MaxResultBytes: o.Config.MaxResultBytes,
+		ReclaimHook:    o.Config.ReclaimHook,
 	})
 	if err != nil {
 		return nil, err
@@ -401,8 +403,15 @@ func (c *Manager) ListRuns(ctx context.Context, cond *asynctask.AsyncTaskRunCond
 	return c.dbSrc.Store().ListRun(ctx, cond)
 }
 
-// Cancel 取消一条任务：pending 立即、running 靠续租发现（≤1 个续租周期）。
+// Cancel 取消一条任务：pending 立即、running 靠续租或取消通知发现。
 // 返回是否发生了状态翻转。已终态幂等返回 (false, nil)。
+//
+// 配了 Config.CancelNotifyChannel 且方言是 PostgreSQL 时，「翻转状态」与「pg_notify 取消通知」
+// 在**同一个事务**里（设计 §9.1）：
+//   - 通知带 (task_id, generation, attempt)：执行侧据此只取消「被取消的那次执行」，
+//     晚到的通知匹配不到新一次执行，因此不会杀掉用户取消后又重放/重投的任务；
+//   - 通知只负责快，正确性仍由续租失权与补查兜底：通知发不出去（或事务回滚）时，
+//     任务状态也没什么可丢的——状态与通知同生共死。
 func (c *Manager) Cancel(ctx context.Context, id string) (canceled bool, err error) {
 	asyncTask, err := c.dbSrc.Store().GetAsyncTask(ctx, id)
 	if err != nil {
@@ -412,17 +421,61 @@ func (c *Manager) Cancel(ctx context.Context, id string) (canceled bool, err err
 		// 已终态：幂等，不翻转为 canceled。
 		return false, nil
 	}
-	// pending → 立即翻转 canceled；running → 同样置 canceled，执行侧靠续租发现失权。
+	// pending → 立即翻转 canceled；running → 同样置 canceled，执行侧靠续租/通知发现失权。
 	now := c.dialect.NowValueExpr()
 	// 清 worker_id/lease_until：否则执行侧晚到的 Save 仍能通过租约校验（清空后必然失权，
 	// Save 返回 ErrLeaseLost 且不跑钩子），判活查询也不会把已取消的任务算作在线。
 	sql := fmt.Sprintf(`UPDATE %s SET status = 'canceled', finished_at = %s, lease_until = NULL, worker_id = ''
 WHERE id = ? AND status IN ('pending','running')`, sourcedb.CoreAsyncTaskTableName, now)
-	res := c.db.WithContext(ctx).Exec(sql, id)
-	if res.Error != nil {
-		return false, res.Error
+
+	if !c.cancelNotifyEnabled() {
+		res := c.db.WithContext(ctx).Exec(sql, id)
+		if res.Error != nil {
+			return false, res.Error
+		}
+		return res.RowsAffected > 0, nil
 	}
-	return res.RowsAffected > 0, nil
+
+	// 带通知的路径：状态翻转 + pg_notify 必须同事务，否则「通知先到、状态还没翻」会让
+	// 执行侧补查到 running 而放过这次取消。
+	payload := asynctask.CancelSignal{
+		TaskID:     id,
+		Generation: asyncTask.Generation,
+		Attempt:    asyncTask.Attempt,
+	}.Encode()
+	err = c.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		res := tx.Exec(sql, id)
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return nil
+		}
+		canceled = true
+		return tx.Exec("SELECT pg_notify(?, ?)", c.cfg.CancelNotifyChannel, payload).Error
+	})
+	if err != nil {
+		return false, err
+	}
+	return canceled, nil
+}
+
+// cancelNotifyEnabled 判断是否走「状态翻转 + PG 通知」路径：只有 PG 方言实现了 NOTIFY。
+func (c *Manager) cancelNotifyEnabled() bool {
+	return c.cfg != nil && strings.TrimSpace(c.cfg.CancelNotifyChannel) != "" &&
+		c.dialect == sourcedb.DialectPostgres
+}
+
+// WithLeaseTx 在事务内锁住任务行、校验仍持有租约，再执行 fn（转发给 DB Source）。
+//
+// 给「管理面也要做持租约事务」的场景用（例如 api 侧发布断点前校验运行态）；
+// 远程形态或非 DB Source 不支持时返回 asynctask.ErrInvalidConfig。
+func (c *Manager) WithLeaseTx(ctx context.Context, task *asynctask.AsyncTask, fn asynctask.EnsureFunc) error {
+	lt, ok := asynctask.Source(c.dbSrc).(asynctask.LeaseTxn)
+	if !ok {
+		return fmt.Errorf("%w: source does not support lease transaction", asynctask.ErrInvalidConfig)
+	}
+	return lt.WithLeaseTx(ctx, task, fn)
 }
 
 // Replay 重放一条终态任务（generation+1，回到 pending）。非终态返回 ErrNotReplayable。
@@ -435,9 +488,10 @@ func (c *Manager) Replay(ctx context.Context, id string) (*asynctask.AsyncTask, 
 		return nil, asynctask.ErrNotReplayable
 	}
 	now := c.dialect.NowValueExpr()
-	// generation+1，attempt 归零，清 lease/worker/started/finished，回到 pending。
+	// generation+1，attempt 与 failure_count 归零（新一轮 = 全新额度），
+	// 清 lease/worker/started/finished，回到 pending。
 	sql := fmt.Sprintf(`UPDATE %s
-SET status = 'pending', generation = generation + 1, attempt = 0,
+SET status = 'pending', generation = generation + 1, attempt = 0, failure_count = 0,
     next_run_at = %s, lease_until = NULL, worker_id = '', started_at = NULL,
     finished_at = NULL, duration_ms = 0
 WHERE id = ? AND status IN ('succeeded','failed','canceled','skipped')`,

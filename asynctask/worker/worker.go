@@ -48,6 +48,9 @@ type Worker struct {
 	// 类型级启停开关的本地缓存（TypeGateTTL 内有效）。
 	gateMu    sync.Mutex
 	gateCache map[string]gateCacheEntry
+
+	// cancelReg 是「本地活跃执行表」：Start 时创建，取消通知与定时补查据此定位在途执行。
+	cancelReg *cancelRegistry
 }
 
 // WorkerConfig 执行运行时配置。
@@ -85,7 +88,26 @@ type WorkerConfig struct {
 	TypeGate TypeGate
 	// TypeGateTTL worker 侧缓存开关状态的 TTL，默认 5s；<=0 每次查询（不缓存）。
 	TypeGateTTL time.Duration
+
+	// CancelWatcher 是取消通知监听器（可选，如 asynctask/cancelwatch 的 PGWatcher）。
+	//
+	// 接了它，Cancel 提交后由常驻监听器把在途执行立刻取消（感知从「一个续租周期」降到
+	// 亚秒级）。nil 时没有通知通道，但也不是「完全等同旧版」：只要 Source 实现
+	// asynctask.StatusReader，每次执行在登记后都会无条件复查一次状态（见 recheckOnRegister），
+	// 代价是每次执行多一次按主键的状态查询；补查定时器（CancelRecheckInterval）此时默认关闭。
+	// 它与取单唤醒（WakeSource）是两条独立通道，不要复用。
+	CancelWatcher asynctask.CancelWatcher
+
+	// CancelRecheckInterval 是「定时补查在途执行状态」的周期：监听断线/丢失通知时的兜底。
+	//
+	// 0 表示按默认策略：接了 CancelWatcher 则 DefaultCancelRecheckInterval（30s），否则关闭；
+	// 负数表示显式关闭。补查要求 Source 实现 asynctask.StatusReader（source/db 已实现），
+	// 未实现时本项无效。
+	CancelRecheckInterval time.Duration
 }
+
+// DefaultCancelRecheckInterval 是取消补查的默认周期（接了 CancelWatcher 且未显式配置时生效）。
+const DefaultCancelRecheckInterval = 30 * time.Second
 
 // TypeGate 是类型级启停开关接口（可选）。
 // 实现返回 (false, nil) 表示该类型被禁用、不应认领；返回错误时 worker 按 fail-open 视为启用。
@@ -164,6 +186,13 @@ func applyDefaults(c *WorkerConfig) {
 	}
 	if c.TypeGate != nil && c.TypeGateTTL == 0 {
 		c.TypeGateTTL = 5 * time.Second
+	}
+	// 取消补查：0 = 按「有没有通知监听器」决定默认值；负数 = 显式关闭。
+	if c.CancelRecheckInterval == 0 && c.CancelWatcher != nil {
+		c.CancelRecheckInterval = DefaultCancelRecheckInterval
+	}
+	if c.CancelRecheckInterval < 0 {
+		c.CancelRecheckInterval = 0
 	}
 }
 
@@ -274,7 +303,27 @@ func (w *Worker) Start(ctx context.Context) error {
 	types := append([]string(nil), w.order...)
 	w.mu.Unlock()
 
+	// 本地活跃执行表：每次 Start 重建，避免上一次运行的残留登记。
+	w.cancelReg = newCancelRegistry()
+
 	var wg sync.WaitGroup
+
+	// 取消通知监听与定时补查：只在本进程持有在途执行时有意义，随 fetchCtx 退出。
+	if w.cfg.CancelWatcher != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			w.cancelWatchLoop(fetchCtx)
+		}()
+	}
+	if w.cfg.CancelRecheckInterval > 0 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			w.cancelRecheckLoop(fetchCtx)
+		}()
+	}
+
 	for _, taskType := range types {
 		n := w.concurrencyFor(taskType)
 		// ready 里放的是「空闲执行槽的任务通道」，容量 = 槽数，启动即填满。

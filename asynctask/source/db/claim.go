@@ -19,6 +19,9 @@ type store struct {
 	db       *gorm.DB
 	dialect  Dialect
 	leaseTTL time.Duration
+	// reclaimHook 是「失权回收」的事务内钩子（可空）：下游在这里结清阶段预算预留额。
+	// 由 New 注入，不作为 newStore 的参数，避免改动既有测试构造点。
+	reclaimHook asynctask.RunReclaimHook
 }
 
 // newStore 构造内部 store。
@@ -69,6 +72,10 @@ func (s *store) claimBatch(ctx context.Context, taskType, workerID string, want 
 // 两支认领分批各走各的索引（① idx_core_async_task_claim、② idx_core_async_task_status_lease_until），
 // 合成一条 OR 会让两个索引无法同时生效，退化成按 task_type 区间逐行过滤（internals「认领」要点 1）。
 //
+// 认领的准入条件是 failure_count < max_attempts，**不是** attempt < max_attempts：
+// attempt 只是单调执行序号（一次执行一行 run），主动暂停同样会让它 +1，
+// 若拿它做准入，暂停就会被当成失败、把额度吃光（设计 §9.3 Y3）。
+//
 // ① 的索引是 (task_type, status, priority DESC, next_run_at)：ORDER BY 与索引列顺序/方向逐列一致，
 // 因此不需要排序。代价是 next_run_at 的谓词退化为索引内过滤——若积压了大量「未来才到期」的高优先级
 // 行，扫描会先跨过它们；这类积压目前不构成主要场景（延迟/退避行通常少数）。
@@ -84,7 +91,7 @@ func (s *store) claimSelectAndFlip(tx *gorm.DB, taskType, workerID string, want 
 	// 子查询走 idx_core_async_task_chain_id_step(chain_id, step)。
 	sql1 := fmt.Sprintf(`SELECT * FROM %s j
 WHERE j.task_type = ? AND j.status = 'pending' AND %s
-  AND j.attempt < j.max_attempts
+  AND j.failure_count < j.max_attempts
   AND (j.prev_step < 0 OR EXISTS (
         SELECT 1 FROM %s p
         WHERE p.chain_id = j.chain_id AND p.step = j.prev_step AND p.status = 'succeeded'))
@@ -94,7 +101,7 @@ LIMIT ?%s`, CoreAsyncTaskTableName, s.dialect.colLE("next_run_at"), CoreAsyncTas
 	// ② 执行中但租约过期（接管）：走 idx_core_async_task_status_lease_until
 	sql2 := fmt.Sprintf(`SELECT * FROM %s
 WHERE status = 'running' AND %s AND task_type = ?
-  AND attempt < max_attempts
+  AND failure_count < max_attempts
 ORDER BY lease_until
 LIMIT ?%s`, CoreAsyncTaskTableName, s.dialect.colLT("lease_until"), lock)
 
@@ -121,6 +128,7 @@ LIMIT ?%s`, CoreAsyncTaskTableName, s.dialect.colLT("lease_until"), lock)
 
 	// 一次翻转：status='running', worker_id=?, attempt=attempt+1,
 	// lease_until=now+LeaseTTL, started_at=COALESCE(started_at, now)。
+	// failure_count 不动：它只在「可重试失败 / 失权回收」时由 Save 与 reaper 累加。
 	// 带状态守卫：SELECT 与 UPDATE 之间若该行被 Cancel（SQLite 无行锁时可能发生），
 	// 不能把它翻回 running「复活」执行。
 	updSQL := fmt.Sprintf(`UPDATE %s

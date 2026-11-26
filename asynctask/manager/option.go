@@ -3,6 +3,8 @@ package manager
 import (
 	"context"
 	"time"
+
+	"github.com/ygpkg/yg-go/asynctask"
 )
 
 // Notifier 是通知器形态下「发布唤醒信号 + 消费唤醒信号」的接口（poll+notify 形态）。
@@ -75,4 +77,20 @@ func WithLeaseTTL(d time.Duration) Option {
 // WithRetention 覆盖终态记录保留时长（0 不清理）。
 func WithRetention(d time.Duration) Option {
 	return optionFunc(func(o *newOptions) { o.Retention = d })
+}
+
+// WithCancelNotifyChannel 开启取消通知：Cancel 在状态翻转事务内 pg_notify 该通道（PG 方言）。
+//
+// 通道名要与执行侧 asynctask/cancelwatch 的配置一致；空串表示关闭（默认）。
+func WithCancelNotifyChannel(channel string) Option {
+	return optionFunc(func(o *newOptions) { o.CancelNotifyChannel = channel })
+}
+
+// WithReclaimHook 注入失权回收结算钩子（下游在同一事务里按预留额结清阶段预算）。
+func WithReclaimHook(hook asynctask.RunReclaimHook) Option {
+	return optionFunc(func(o *newOptions) {
+		if hook != nil {
+			o.ReclaimHook = hook
+		}
+	})
 }

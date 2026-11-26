@@ -296,17 +296,26 @@ func (s *Source) Save(ctx context.Context, task *asynctask.AsyncTask, r asynctas
 	}
 	workerID = s.cfg.WorkerID
 
-	body, _ := json.Marshal(wire.CallbackRequest{
-		TaskID:     taskID,
-		WorkerID:   workerID,
-		Status:     string(r.Outcome),
-		Failure:    string(r.Failure),
-		Result:     r.Payload,
-		Error:      errMsg,
-		DurationMS: r.Duration.Milliseconds(),
-	})
+	// 暂停的恢复参数（仅 paused 有意义）：中心侧据此写 next_run_at。
+	//
+	// PauseUntilMS 必须先判零值再填：零值 time.Time 的 UnixMilli() 是 -6795364578871（不是 0），
+	// 而 omitempty 对非零 int64 不起作用——不判零会让每次成功/失败回调都带一个负数噪声字段。
+	body := wire.CallbackRequest{
+		TaskID:      taskID,
+		WorkerID:    workerID,
+		Status:      string(r.Outcome),
+		Failure:     string(r.Failure),
+		Result:      r.Payload,
+		Error:       errMsg,
+		DurationMS:  r.Duration.Milliseconds(),
+		PauseReason: r.PauseReason,
+	}
+	if !r.PauseUntil.IsZero() {
+		body.PauseUntilMS = r.PauseUntil.UnixMilli()
+	}
 
-	return s.postCallback(ctx, body)
+	raw, _ := json.Marshal(body)
+	return s.postCallback(ctx, raw)
 }
 
 // postCallback POST Callback，按配置重试。

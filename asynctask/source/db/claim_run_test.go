@@ -227,23 +227,26 @@ func TestCleanupIncludesTimeout(t *testing.T) {
 	}
 }
 
-// TestReapDeadAsyncTask 次数用尽 + 租约过期 → 判死，任务卡在 running 的形态被解除。
+// TestReapDeadAsyncTask 失败额度用尽 + 租约过期 → 判死，任务卡在 running 的形态被解除。
+//
+// 额度用尽由 failure_count 表达：先认领一次（attempt=1）后崩溃，回收器把这次失权计成一次失败，
+// 此时 max_attempts=1 → 额度用尽，两支认领 SQL 都不会再选中它。
 func TestReapDeadAsyncTask(t *testing.T) {
 	_, gdb := newLeaseTestSource(t)
 	ctx := context.Background()
 	id := seedPending(t, gdb, "t", 1)
 	s := newStore(gdb, DialectSQLite, time.Minute)
-	// 直接翻转成 running/attempt=1（认领一次后崩溃）。
+	// 直接翻转成 running/attempt=1（认领一次后崩溃），并把 failure_count 置成回收器结清后的值。
 	if _, err := s.claimBatch(ctx, "t", "w-1", 1); err != nil {
 		t.Fatalf("claim: %v", err)
 	}
-	if err := gdb.Exec(`UPDATE core_async_task SET lease_until = ? WHERE id = ?`,
+	if err := gdb.Exec(`UPDATE core_async_task SET lease_until = ?, failure_count = 1 WHERE id = ?`,
 		time.Now().Add(-time.Minute), id).Error; err != nil {
 		t.Fatalf("expire lease: %v", err)
 	}
-	// 次数用尽（attempt=1 >= max_attempts=1）后，认领侧两支 SQL 都不会再选中它。
+	// 额度用尽（failure_count=1 >= max_attempts=1）后，认领侧两支 SQL 都不会再选中它。
 	if rows, err := s.claimBatch(ctx, "t", "w-2", 1); err != nil || len(rows) != 0 {
-		t.Fatalf("次数用尽后不该再被认领: rows=%d err=%v", len(rows), err)
+		t.Fatalf("额度用尽后不该再被认领: rows=%d err=%v", len(rows), err)
 	}
 	if _, dead, err := s.reap(ctx, 10); err != nil {
 		t.Fatalf("reap: %v", err)

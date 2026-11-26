@@ -41,6 +41,24 @@ type Config struct {
 	FailFastChain       bool
 	Backoff             asynctask.Backoff // 默认指数：5s 起、上限 10m、抖动 ±20%；可替换
 	NotifierQueuePrefix string            // 默认 "gasync"（<prefix>:<task_type>）
+
+	// CancelNotifyChannel 是取消通知的 PG 通道名（可选，默认空=不发通知）。
+	//
+	// 语义（设计 §9.1）：Cancel 在**翻转状态的同一个事务内**执行
+	// `SELECT pg_notify(<channel>, <json>)`，执行侧的常驻监听器（asynctask/cancelwatch）
+	// 收到后按 (task_id, generation, attempt) 取消对应的在途执行，把取消感知从
+	// 「等一个续租周期（20s）」压到「网络往返」。
+	//
+	// 与唤醒（Notifier/WakeSource）是两条独立通道：唤醒只回答「有没有新任务」，
+	// 取消只回答「这次执行要停」，不要复用同一个通道（两者消费方与去重口径都不同）。
+	//
+	// 只在 PostgreSQL 方言下生效（MySQL/SQLite 无 LISTEN/NOTIFY）；
+	// 留空表示保持旧行为（只翻转状态，靠续租/补查发现）。
+	CancelNotifyChannel string
+
+	// ReclaimHook 是「失权回收结算」钩子（可选）：回收器关闭一次失权执行时在同一事务内回调，
+	// 供下游按预留额结清阶段预算（设计 §9.2）。实现必须幂等；为空保持旧行为。
+	ReclaimHook asynctask.RunReclaimHook
 }
 
 // defaultConfig 返回带契约默认值的 Config。

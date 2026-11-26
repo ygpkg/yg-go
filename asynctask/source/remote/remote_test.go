@@ -344,6 +344,64 @@ func TestSave_FailureStillCallbacks(t *testing.T) {
 	}
 }
 
+// TestSave_PauseFieldsOnlyWhenPaused 验证暂停字段只在真暂停时出现：
+//   - 非 paused 结局的 JSON 不带 pause_until_ms / pause_reason（零值 time.Time 的 UnixMilli()
+//     是负数，判零缺失时 omitempty 挡不住，会混进每一次成功/失败回调）；
+//   - paused 结局带上恢复时刻与原因（中心侧据此写 next_run_at）。
+func TestSave_PauseFieldsOnlyWhenPaused(t *testing.T) {
+	pauseUntil := time.UnixMilli(1_700_000_000_000)
+	cases := []struct {
+		name       string
+		result     asynctask.Result
+		wantPaused bool
+	}{
+		{"succeeded", asynctask.Result{Outcome: asynctask.OutcomeSucceeded}, false},
+		{"failed", asynctask.Result{Outcome: asynctask.OutcomeFailed}, false},
+		{
+			"paused",
+			asynctask.Result{
+				Outcome:     asynctask.OutcomePaused,
+				PauseUntil:  pauseUntil,
+				PauseReason: "budget exhausted",
+			},
+			true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFakeCenter(t)
+			f.on("/Callback", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
+			s := newSource(t, f)
+
+			if err := s.Save(context.Background(), &asynctask.AsyncTask{ID: "asyncTask-1"}, c.result, nil); err != nil {
+				t.Fatalf("Save: %v", err)
+			}
+			cb := f.lastCallback()
+			until, hasUntil := cb["pause_until_ms"]
+			_, hasReason := cb["pause_reason"]
+			if !c.wantPaused {
+				if hasUntil {
+					t.Errorf("non-paused callback must not carry pause_until_ms, got %v", until)
+				}
+				if hasReason {
+					t.Error("non-paused callback must not carry pause_reason")
+				}
+				return
+			}
+			if !hasUntil {
+				t.Fatalf("paused callback must carry pause_until_ms, got %v", cb)
+			}
+			// map[string]any 里 JSON 数字解成 float64。
+			if got, _ := until.(float64); int64(got) != pauseUntil.UnixMilli() {
+				t.Errorf("pause_until_ms = %v, want %d", until, pauseUntil.UnixMilli())
+			}
+			if cb["pause_reason"] != "budget exhausted" {
+				t.Errorf("pause_reason = %v, want budget exhausted", cb["pause_reason"])
+			}
+		})
+	}
+}
+
 // TestSave_HookErrorDoesNotBlockCallback 钩子报错仍要回传，且被吞为 nil 返回。
 func TestSave_HookErrorDoesNotBlockCallback(t *testing.T) {
 	f := newFakeCenter(t)

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS core_async_task (
   prev_step     integer      NOT NULL DEFAULT -1,
   generation    integer      NOT NULL DEFAULT 1,
   attempt       integer      NOT NULL DEFAULT 0,
+  failure_count integer      NOT NULL DEFAULT 0,
   max_attempts  integer      NOT NULL DEFAULT 3,
   timeout_ms    bigint       NOT NULL DEFAULT 0,
   next_run_at   datetime     NOT NULL,

@@ -61,14 +61,31 @@ func TestCanCancel(t *testing.T) {
 }
 
 func TestHasRemainingAttempts(t *testing.T) {
-	if !(&AsyncTask{MaxAttempts: 0, Attempt: 99}).HasRemainingAttempts() {
+	if !(&AsyncTask{MaxAttempts: 0, FailureCount: 99}).HasRemainingAttempts() {
 		t.Fatal("MaxAttempts<=0 means unlimited")
 	}
-	if (&AsyncTask{MaxAttempts: 3, Attempt: 3}).HasRemainingAttempts() {
-		t.Fatal("attempt==max means no remaining")
+	// 判断依据是 FailureCount（失败额度）而不是 Attempt（执行序号）：
+	// attempt 很大但没失败过，仍然「有剩余」——暂停不消耗额度。
+	if (&AsyncTask{MaxAttempts: 3, Attempt: 9, FailureCount: 2}).HasRemainingAttempts() {
+		t.Fatal("本次是第 3 次失败，额度用尽，不该再重试")
 	}
-	if !(&AsyncTask{MaxAttempts: 3, Attempt: 2}).HasRemainingAttempts() {
-		t.Fatal("attempt<max means remaining")
+	if !(&AsyncTask{MaxAttempts: 3, Attempt: 9, FailureCount: 1}).HasRemainingAttempts() {
+		t.Fatal("本次是第 2 次失败，仍有额度")
+	}
+	if !(&AsyncTask{MaxAttempts: 3, Attempt: 5}).HasRemainingAttempts() {
+		t.Fatal("attempt 不影响失败额度：从未失败时仍有额度")
+	}
+}
+
+func TestClaimable(t *testing.T) {
+	if !(&AsyncTask{MaxAttempts: 0, FailureCount: 99}).Claimable() {
+		t.Fatal("MaxAttempts<=0 means unlimited")
+	}
+	if (&AsyncTask{MaxAttempts: 2, FailureCount: 2}).Claimable() {
+		t.Fatal("failure_count==max 不该再被认领")
+	}
+	if !(&AsyncTask{MaxAttempts: 2, FailureCount: 1, Attempt: 7}).Claimable() {
+		t.Fatal("暂停后 attempt>max 仍可认领")
 	}
 }
 

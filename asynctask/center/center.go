@@ -89,13 +89,17 @@ func (c *Center) Callback(ctx context.Context, req wire.CallbackRequest) error {
 		return asynctask.ErrLeaseLost
 	}
 	res := asynctask.Result{
-		Outcome:  outcome,
-		Failure:  asynctask.FailureKind(req.Failure),
-		Payload:  req.Result,
-		Duration: time.Duration(req.DurationMS) * time.Millisecond,
+		Outcome:     outcome,
+		Failure:     asynctask.FailureKind(req.Failure),
+		Payload:     req.Result,
+		Duration:    time.Duration(req.DurationMS) * time.Millisecond,
+		PauseReason: req.PauseReason,
 	}
 	if res.Duration < 0 {
 		res.Duration = 0
+	}
+	if req.PauseUntilMS > 0 {
+		res.PauseUntil = time.UnixMilli(req.PauseUntilMS)
 	}
 	if req.Error != "" {
 		res.Err = errors.New(req.Error)

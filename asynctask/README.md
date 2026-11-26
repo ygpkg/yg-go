@@ -15,6 +15,7 @@ asynctask                        契约内核：AsyncTask / AsyncTaskRun / Async
 │                                Source 接口 / Status / FailureKind / Outcome / Result / Backoff /
 │                                错误哨兵（前缀 asynctask: ）/ 日志适配（logger.go）
 ├── wire                         远程协议（端点路径常量 + JSON 类型，客户端/服务端共用一份，只依赖根包）
+├── cancelwatch                  取消通知监听器：PG LISTEN/NOTIFY 实现（abort 快路径，只负责「快」）
 ├── center                       远程中心服务端参考实现：Fetch / Heartbeat / Callback / Release（只依赖 manager，不含 HTTP）
 ├── manager                      任务中心门面：Submit/SubmitAfter/Get/GetRuns/List/ListRuns/Cancel/Replay/Stats、
 │                                类型启停、租约判活、Notifier 抽象、维护循环、SchemaModels、DDL（asynctask/ddl）
@@ -48,7 +49,20 @@ asynctask                        契约内核：AsyncTask / AsyncTaskRun / Async
 | `Handler` | 业务处理器，唯一必须实现 `Execute(ctx, *asynctask.AsyncTask) error` |
 | `Manager` | 任务中心门面：提交、查询、取消、重放、统计、类型启停 |
 
-**状态机**：`pending → running → succeeded / failed / timeout / canceled / skipped`；`running` 失败可按退避回 `pending`（重试），租约过期可被他人接管；终态可 `Replay`（`generation+1`）。状态值见 `asynctask.StatusPending` 等常量，失败分类见 `asynctask.FailureKind`。
+**状态机**：`pending → running → succeeded / failed / timeout / canceled / skipped`；`running` 失败可按退避回 `pending`（重试），主动让出（paused）也回 `pending`，租约过期可被他人接管；终态可 `Replay`（`generation+1`）。状态值见 `asynctask.StatusPending` 等常量，失败分类见 `asynctask.FailureKind`。
+
+**执行身份（attempt）与失败额度（failure_count）是两件事**（设计 §9.3 Y3）：
+
+| 列 | 语义 | 何时变化 |
+|---|---|---|
+| `generation` | 重放轮次 | 仅 `Replay` +1（新一轮 = 全新额度） |
+| `attempt` | **单调执行序号**：一次认领 +1，一次执行对应一行 `core_async_task_run`；也是「晚到结果/晚到取消认不认得出自己」的定位依据 | 每次认领 +1；暂停后下一次认领同样 +1 |
+| `failure_count` | **可重试失败次数**（准入条件 `failure_count < max_attempts`） | 可重试失败 +1、失权回收 +1、终结失败 +1；**暂停不加** |
+
+两者分开的原因：暂停（主动让出）既要「留一条 run 记录」，又不能吃掉重试额度。
+把 `attempt` 当次数用，连续暂停会被误判成连续失败；只留 `failure_count` 又会让 run 无法唯一定位。
+`AsyncTask.HasRemainingAttempts()`（本次失败后还能否重试）与 `AsyncTask.Claimable()`（是否能再被认领）
+都按 `failure_count` 判。
 
 **所有权（租约）语义**：
 
@@ -231,7 +245,10 @@ if err != nil {
 
 ### 根包 `asynctask`
 
-- `AsyncTask`：`Bind(v)` 反序列化 payload；`IsStuck(now)` / `CanCancel()` / `HasRemainingAttempts()`。
+- `AsyncTask`：`Bind(v)` 反序列化 payload；`IsStuck(now)` / `CanCancel()` / `HasRemainingAttempts()`（按失败额度） / `Claimable()`。
+- 暂停/取消/结算的契约类型：`OutcomePaused` + `Result.PauseUntil` / `Result.PauseReason`；
+  `CancelSignal`（`Encode` / `DecodeCancelSignal` / `Match`）与可选接口 `CancelWatcher`；
+  可选扩展接口 `StatusReader`（取消补查）与 `LeaseTxn`（持租约事务，给下游同事务结算）；`RunReclaimHook`（失权回收结算钩子）。
 - `AsyncTaskSpec`：`Type`（必填）、`Payload`、`Priority`、`MaxAttempts`、`Timeout`、`RunAt`/`Delay`、`UniqKey`、`BizType`/`BizID`、`ChainID`/`Step`、`Labels`、`RequestID`。
 - `AsyncTaskCond`（列表查询）：`Page`/`PageSize`/`Type`/`Status`/`BizType`/`BizID`/`ChainID`/`Labels`/`CreatedAfter`/`CreatedBefore`/`OrderBy`。
 - `Source` 接口、`Result`/`Outcome`、`EnsureFunc`、`WithTx`/`TxFromContext`、`Backoff`、`Logger`/`DefaultLogger`、错误哨兵（前缀 `asynctask:`，如 `ErrLeaseLost` / `ErrNotify` / `ErrNoAsyncTask` / `ErrInvalidConfig` / `ErrPayloadTooLarge`）。
@@ -243,7 +260,8 @@ if err != nil {
 ```go
 import sourcedb "github.com/ygpkg/yg-go/asynctask/source/db"
 
-func New(cfg Config) (*Source, error) // Config{DB *gorm.DB, LeaseTTL, Backoff, WorkerID, FailFastChain, MaxResultBytes}
+func New(cfg Config) (*Source, error) // Config{DB *gorm.DB, LeaseTTL, Backoff, WorkerID, FailFastChain, MaxResultBytes, ReclaimHook}
+// 可选扩展（断言即用）：asynctask.StatusReader.TaskStatus / asynctask.LeaseTxn.WithLeaseTx
 func (s *Source) Store() Store        // 只读查询（GetAsyncTask/ListAsyncTask/GetActiveByUniqKey/GetLatestBySubject/StatsByStatus/...）
 // Source 仅实现 asynctask.Source：Fetch / Renew / Release / Save / Close；不含 Submit（提交走 manager）
 ```
@@ -262,8 +280,36 @@ func (s *Source) Store() Store        // 只读查询（GetAsyncTask/ListAsyncTa
 
 - `New(src asynctask.Source, cfg *WorkerConfig) *Worker`；`Register(type, handler, opts...)`（必须在 `Start` 前）；`Start(ctx) error`（同步非阻塞）/ `Shutdown(ctx) error` / `Run(ctx) error`（阻塞兼容层）。
 - `Handler` / `HandlerFunc`；`HandlerOption`：`WithHandlerTimeout` / `WithHandlerConcurrency`。
-- 控制流哨兵：`worker.ErrSkip`（不执行直接 skipped）/ `worker.ErrNoRetry`（立即 failed，不消耗剩余次数）。
-- `WorkerConfig`：`Concurrency` / `ShutdownTimeout` / `WorkerID` / `Logger`（`asynctask.Logger`，默认 `asynctask.DefaultLogger()`）/ `EventHandler` / `LeaseTTL` / `PollInterval` / `FallbackPollInterval` / `WakeSource` / `HealthReporter` / `HealthReportInterval` / `TypeGate` / `TypeGateTTL`。
+- 控制流哨兵：`worker.ErrSkip`（不执行直接 skipped）/ `worker.ErrNoRetry`（立即 failed，不消耗剩余次数）/ `worker.ErrPause`（主动让出，不消耗失败额度）。
+- 暂停：`worker.Pause(retryAfter, reason)` 返回 `*PauseError`；handler 可实现可选接口 `worker.PauseLifecycle`（`OnPause`）在**结算事务内**结算阶段预留额。
+- `WorkerConfig`：`Concurrency` / `ShutdownTimeout` / `WorkerID` / `Logger`（`asynctask.Logger`，默认 `asynctask.DefaultLogger()`）/ `EventHandler` / `LeaseTTL` / `PollInterval` / `FallbackPollInterval` / `WakeSource` / `HealthReporter` / `HealthReportInterval` / `TypeGate` / `TypeGateTTL` / `CancelWatcher` / `CancelRecheckInterval`。
+
+### `cancelwatch`（取消快路径）
+
+```go
+import "github.com/ygpkg/yg-go/asynctask/cancelwatch"
+
+watcher, err := cancelwatch.New(cancelwatch.Config{
+    DSN:     "<PG DSN>",                  // LISTEN 需要一条独占连接
+    Channel: "asynctask_cancel",          // 与 manager.Config.CancelNotifyChannel 一致
+})
+// WorkerConfig.CancelWatcher = watcher；退出时 watcher.Close()
+```
+
+使用注意：
+
+- `Watch` **首次调用同步建连 + LISTEN**：DSN 配错（指向 MySQL 端口、通道名非法、库不可达）会在
+  `Watch` 返回错误，而不是静默地每 3s 重试一次。之后断线仍由内部循环重连。
+- `Close` 只停监听，**不关闭信号通道**：消费方（worker）靠自己的 `ctx` 退出。因此可以把
+  `watcher.Close()` 和 `worker.Shutdown()` 按任意顺序调用，但不要指望 `Close` 去唤醒消费循环。
+- 一个 watcher 对应一个执行期：监听循环跟随首次 `Watch` 的 `ctx`，ctx 结束即退出且不会再重建。
+  重复 `Start`/`Stop` worker 时需要重新构造 watcher（`worker.Start` 对已停机的实例本身返回
+  `ErrWorkerStopped`）。取消的正确性在 watcher 缺席时由「登记后复查 + 定时补查」兜底。
+
+**取消语义**（设计 §9.1）：`Manager.Cancel` 在状态翻转事务内 `pg_notify`，
+worker 的常驻监听器按 `(task_id, generation, attempt)` 查「本地活跃执行表」并取消匹配执行；
+登记后立刻复查 DB（注册竞态）、定时补查（`CancelRecheckInterval`，默认 30s）兜住漏通知，
+续租失权仍是最外层兜底。唤醒（`WakeSource`/`Notifier`）是另一条通道，不要复用。
 
 ### `wire` / `center` / `source/remote`
 
@@ -286,8 +332,8 @@ func (s *Source) Store() Store        // 只读查询（GetAsyncTask/ListAsyncTa
 
 | 表名 | 说明 |
 |---|---|
-| `core_async_task` | 任务实体（id、task_type、status、priority、payload、uniq_key、biz_type/biz_id、**company_id/subject_kind/subject_id**、chain_id/step/prev_step、labels、generation/attempt/max_attempts、next_run_at/lease_until、各时间与 request id） |
-| `core_async_task_run` | 单次尝试记录（id、async_task_id、generation/attempt、status、failure_kind、起止、耗时、result、error、request id） |
+| `core_async_task` | 任务实体（id、task_type、status、priority、payload、uniq_key、biz_type/biz_id、**company_id/subject_kind/subject_id**、chain_id/step/prev_step、labels、generation/**attempt（执行序号）**/**failure_count（失败额度）**/max_attempts、next_run_at/lease_until、各时间与 request id） |
+| `core_async_task_run` | 单次尝试记录（id、async_task_id、generation/attempt、status、failure_kind、起止、耗时、result、error、request id）；`status='paused'` 表示这次执行是主动让出 |
 | `core_async_task_type` | 任务类型开关（id、task_type 唯一、enabled；**无行=启用**，fail-open） |
 
 幂等键的唯一性范围是**活跃期**而不是整行生命期：PG/SQLite 用部分唯一索引
@@ -301,6 +347,38 @@ MySQL 用 STORED 生成列 `uniq_key_active` + 唯一键模拟。因此**终态�
 
 - **建表/升级**：`manager.New` 不会建表。新库请执行 `ddl.Postgres()` / `ddl.MySQL()`；
   本改造之前（v1.27.5 及更早）建过表的库请执行设计文档 §9 的升级片段（加 3 列 + 2 索引、删旧全局唯一索引、建 `uk_core_async_task_uniq_active`）。
+- **v1.27.12 起新增列 `failure_count`**（执行身份与预算：失败重试计数，与 `attempt` 执行序号分离）。
+  新库直接跑三份 DDL 即可（列已内含）；**已有库**按方言补列：
+
+  ```sql
+  -- PostgreSQL 12+：ddl/postgres.sql 里已带这句（幂等，重放安全），无需手工执行
+  ALTER TABLE core_async_task ADD COLUMN IF NOT EXISTS failure_count integer NOT NULL DEFAULT 0;
+
+  -- MySQL 8 / SQLite：没有 ADD COLUMN IF NOT EXISTS，只能一次性执行（列已存在时会报错，属预期）
+  ALTER TABLE core_async_task ADD COLUMN failure_count int NOT NULL DEFAULT 0;      -- MySQL 8
+  ALTER TABLE core_async_task ADD COLUMN failure_count integer NOT NULL DEFAULT 0;  -- SQLite 3
+
+  -- 一次性回填（三种方言都要，且只执行一次）：存量行按旧口径 = attempt 回填，
+  -- 否则老任务的失败额度会被放宽成 max_attempts 次全新重试。
+  -- 注意：不能写进可重放的 DDL 文件，重跑会覆盖新语义下真实的 failure_count。
+  UPDATE core_async_task SET failure_count = attempt WHERE failure_count = 0 AND attempt > 0;
+  ```
+
+  注意：`attempt` 的语义同时收窄为「单调执行序号」（不再是重试次数）。存量 `running` 行回填后
+  行为与旧版一致；不回填则它们会多出若干次重试机会。
+- **暂停（主动让出）**：handler 返回 `worker.Pause(retryAfter, reason)`；结算在同一事务内完成
+  （核验租约 → 收尾 run（finishRun）→ 结算钩子 → 任务回 pending；钩子失败则整个事务回滚，
+  任务仍 running、租约到期后由回收器按预留额结算），`failure_count` 不变、`attempt` 不归零。
+  想在同事务里结算自己的预算/断点，实现 `worker.PauseLifecycle`。
+- **自定义 `asynctask.Source` 必须在 `Save` 里处理 `asynctask.OutcomePaused`**（本地 `source/db`
+  已处理；远程形态由 `center` 转发，无需接入方处理）。沿用旧契约「default → failed」的实现会把
+  主动让出记成一次失败，吃掉重试额度。
+- **持租约事务**：`src.(asynctask.LeaseTxn).WithLeaseTx(ctx, task, fn)`——失权返回 `ErrLeaseLost` 且不调用 `fn`；
+  `fn` 内用 `asynctask.TxFromContext(ctx)` 取 `*gorm.DB`。装饰过的 Source 需要自己转发该接口。
+- **取消通知**：`manager.New(..., manager.WithCancelNotifyChannel("asynctask_cancel"))` +
+  `worker.WorkerConfig.CancelWatcher`（见上）。不配则没有通知通道，取消由「登记后复查 +
+  续租失权 / 定时补查」发现——比通知慢（一个续租周期量级），但不丢；注意 `recheckOnRegister`
+  是无条件执行的，Source 实现 `StatusReader` 时每次执行登记后会多一次按主键状态查询。
 - **注入写主库**：`manager.New` / `source/db.New` 传入的 `*gorm.DB` 必须是**写主库**；读写分离下注入从库会让认领读到延迟数据、幂等回查读不到刚插入的行。
 - **handler 必须幂等**：租约过期被接管、停机超时被接管都会重跑；用 `AsyncTask.ID` + `Generation` + `Attempt` 做幂等键。
 - **handler 必须响应 `ctx.Done()`**：超时/取消通过取消 ctx 表达；忽略它会在超时后继续跑完。

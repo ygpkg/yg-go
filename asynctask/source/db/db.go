@@ -34,6 +34,11 @@ type Config struct {
 	// result 是业务快照、不是回调载荷：需要更完整诊断的调用方显式调大（如 16 KiB），
 	// 并在写入前自行校验编码后的字节数，不要指望这里兜底或报错。
 	MaxResultBytes int
+	// ReclaimHook 是「失权回收结算」钩子（可选）：回收器关闭一次失权执行时，
+	// 在同一个事务里回调它，供下游按**预留额**结清阶段预算（设计 §9.2）。
+	//
+	// 不注入时行为不变（回收器只收口 run 行与失败额度）。实现必须幂等。
+	ReclaimHook asynctask.RunReclaimHook
 }
 
 // DefaultMaxResultBytes 是 Config.MaxResultBytes 的默认值（4096 字节，即 4 KiB），
@@ -64,8 +69,11 @@ func New(cfg Config) (*Source, error) {
 		cfg.MaxResultBytes = DefaultMaxResultBytes
 	}
 	dialect := DetectDialect(cfg.DB.Dialector.Name())
+	st := newStore(cfg.DB, dialect, cfg.LeaseTTL)
+	// 回收钩子挂在 store 上：回收器（store.reapStaleRuns）在失权结算事务里回调它。
+	st.reclaimHook = cfg.ReclaimHook
 	return &source{
-		store:          newStore(cfg.DB, dialect, cfg.LeaseTTL),
+		store:          st,
 		db:             cfg.DB,
 		dialect:        dialect,
 		backoff:        cfg.Backoff,

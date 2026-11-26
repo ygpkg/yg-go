@@ -24,15 +24,17 @@ const (
 
 // Task 是跨网络的任务子集：只传执行所需字段，避免把根包实体整体序列化。
 type Task struct {
-	ID          string `json:"id"`
-	Type        string `json:"type"`
-	Priority    int    `json:"priority"`
-	Payload     []byte `json:"payload"`
-	Attempt     int    `json:"attempt"`
-	MaxAttempts int    `json:"max_attempts"`
-	TimeoutMS   int64  `json:"timeout_ms"`
-	RequestID   string `json:"request_id"`
-	TraceID     string `json:"trace_id"`
+	ID       string `json:"id"`
+	Type     string `json:"type"`
+	Priority int    `json:"priority"`
+	Payload  []byte `json:"payload"`
+	Attempt  int    `json:"attempt"`
+	// FailureCount 是可重试失败次数（准入判据）；远端 worker 用它判断「本次失败后还能否重试」。
+	FailureCount int    `json:"failure_count,omitempty"`
+	MaxAttempts  int    `json:"max_attempts"`
+	TimeoutMS    int64  `json:"timeout_ms"`
+	RequestID    string `json:"request_id"`
+	TraceID      string `json:"trace_id"`
 }
 
 // FromAsyncTask 把任务实体转成跨网络载荷。
@@ -41,15 +43,16 @@ func FromAsyncTask(t *asynctask.AsyncTask) *Task {
 		return nil
 	}
 	return &Task{
-		ID:          t.ID,
-		Type:        t.Type,
-		Priority:    t.Priority,
-		Payload:     t.Payload,
-		Attempt:     t.Attempt,
-		MaxAttempts: t.MaxAttempts,
-		TimeoutMS:   t.Timeout.Milliseconds(),
-		RequestID:   t.RequestID,
-		TraceID:     t.TraceID,
+		ID:           t.ID,
+		Type:         t.Type,
+		Priority:     t.Priority,
+		Payload:      t.Payload,
+		Attempt:      t.Attempt,
+		FailureCount: t.FailureCount,
+		MaxAttempts:  t.MaxAttempts,
+		TimeoutMS:    t.Timeout.Milliseconds(),
+		RequestID:    t.RequestID,
+		TraceID:      t.TraceID,
 	}
 }
 
@@ -59,16 +62,17 @@ func (w *Task) ToAsyncTask() *asynctask.AsyncTask {
 		return nil
 	}
 	return &asynctask.AsyncTask{
-		ID:          w.ID,
-		Type:        w.Type,
-		Status:      asynctask.StatusRunning,
-		Priority:    w.Priority,
-		Payload:     w.Payload,
-		Attempt:     w.Attempt,
-		MaxAttempts: w.MaxAttempts,
-		Timeout:     time.Duration(w.TimeoutMS) * time.Millisecond,
-		RequestID:   w.RequestID,
-		TraceID:     w.TraceID,
+		ID:           w.ID,
+		Type:         w.Type,
+		Status:       asynctask.StatusRunning,
+		Priority:     w.Priority,
+		Payload:      w.Payload,
+		Attempt:      w.Attempt,
+		FailureCount: w.FailureCount,
+		MaxAttempts:  w.MaxAttempts,
+		Timeout:      time.Duration(w.TimeoutMS) * time.Millisecond,
+		RequestID:    w.RequestID,
+		TraceID:      w.TraceID,
 	}
 }
 
@@ -92,17 +96,22 @@ type HeartbeatRequest struct {
 
 // CallbackRequest 是 Callback 的请求体：一次执行结果的回传。
 //
-// Status 取 asynctask.Outcome（succeeded/failed/skipped/canceled），Failure 是可选的
+// Status 取 asynctask.Outcome（succeeded/failed/skipped/canceled/paused），Failure 是可选的
 // 失败分类（handler_error/timeout/panic/...），有了它中心才能把 timeout 记成
 // StatusTimeout 而不是普通的 failed。DurationMS 是可选的本次执行耗时。
+//
+// PauseUntilMS / PauseReason 只在 Status=paused 时有意义（主动让出的恢复时间与原因）；
+// 二者都是可选字段，旧中心/旧 worker 不认识也不会影响其它结局。
 type CallbackRequest struct {
-	TaskID     string `json:"task_id"`
-	WorkerID   string `json:"worker_id"`
-	Status     string `json:"status"`
-	Failure    string `json:"failure,omitempty"`
-	Result     []byte `json:"result,omitempty"`
-	Error      string `json:"error,omitempty"`
-	DurationMS int64  `json:"duration_ms,omitempty"`
+	TaskID       string `json:"task_id"`
+	WorkerID     string `json:"worker_id"`
+	Status       string `json:"status"`
+	Failure      string `json:"failure,omitempty"`
+	Result       []byte `json:"result,omitempty"`
+	Error        string `json:"error,omitempty"`
+	DurationMS   int64  `json:"duration_ms,omitempty"`
+	PauseUntilMS int64  `json:"pause_until_ms,omitempty"`
+	PauseReason  string `json:"pause_reason,omitempty"`
 }
 
 // ReleaseRequest 是 Release 的请求体：主动放弃所有权。
@@ -114,7 +123,8 @@ type ReleaseRequest struct {
 // ParseOutcome 把回传的 status 解析成 Outcome。
 func ParseOutcome(s string) (asynctask.Outcome, bool) {
 	switch asynctask.Outcome(s) {
-	case asynctask.OutcomeSucceeded, asynctask.OutcomeFailed, asynctask.OutcomeSkipped, asynctask.OutcomeCanceled:
+	case asynctask.OutcomeSucceeded, asynctask.OutcomeFailed, asynctask.OutcomeSkipped,
+		asynctask.OutcomeCanceled, asynctask.OutcomePaused:
 		return asynctask.Outcome(s), true
 	default:
 		return "", false
