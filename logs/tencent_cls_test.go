@@ -232,3 +232,44 @@ func TestCloseWithinReportsCloseErrorAndPendingTogether(t *testing.T) {
 		t.Fatalf("pending logs must be reported together with the close error, got %v", err)
 	}
 }
+
+// TestCloseTimeoutStillDrainsAfterRelease pins that a timeout only ends the
+// wait: batches already handed to the SDK are still delivered afterwards.
+func TestCloseTimeoutStillDrainsAfterRelease(t *testing.T) {
+	release := make(chan struct{})
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		<-release
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	cfg := cls.GetDefaultAsyncProducerClientConfig()
+	cfg.Endpoint = strings.TrimPrefix(server.URL, "http://")
+	cfg.AccessKeyID, cfg.AccessKeySecret = "test-id", "test-key"
+	cfg.LingerMs = 100
+	producer, err := cls.NewAsyncProducerClient(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	producer.Start()
+	writer := &tencentClsWriteWyncer{client: producer, topicID: "test-topic"}
+	if _, err := writer.Write([]byte(`{"msg":"held log"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.closeWithin(50 * time.Millisecond); err == nil {
+		t.Fatal("expected the drain budget to expire while the endpoint is held")
+	}
+	close(release)
+	deadline := time.Now().Add(2 * time.Second)
+	for writer.pending.Load() > 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := writer.pending.Load(); got != 0 {
+		t.Fatalf("expected pending to drain after release, still %d", got)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Fatalf("expected the held log to be delivered once, got %d", got)
+	}
+}

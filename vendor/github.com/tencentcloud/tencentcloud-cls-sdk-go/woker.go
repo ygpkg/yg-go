@@ -74,8 +74,8 @@ func (worker *Worker) sendToServer(producerBatch *ProducerBatch) {
 			} else {
 				producerBatch.nextRetryMs = GetTimeMs(time.Now().UnixNano()) + producerBatch.maxRetryIntervalInMs
 			}
-			// yg-go patch: a refused push means the final drain already ran, so
-			// report the batch as terminally failed instead of stranding it.
+			// yg-go patch: a refused push means the retry queue is sealed, so the
+			// batch would never be drained again. Report it as terminally failed.
 			if !worker.retryQueue.sendToRetryQueue(producerBatch, worker.retryQueueShutDownFlag) {
 				worker.executeFailedCallback(producerBatch)
 			}

@@ -110,7 +110,7 @@ Authorization: Bearer ${module}-${TOKEN}
 
 `ApplyConfig` 成功后会关闭被替换的出口。调用前应停止使用被替换组的旧 logger 实例；库内的 gorm / es 适配器（`GetGorm`、`GetESLogger`）在每次写入时重新解析分组，因此会跟随新配置，应用自己缓存的 `*zap.SugaredLogger` 需要重新获取。已有调用方可以继续使用 `ReloadConfig`，它保留配置失败时 panic 的行为，已发出的 logger 实例可用到退出。
 
-应用结束业务工作后调用 `logs.Shutdown(ctx)`。同一批出口只关闭一次。CLS 的关闭结果用 `errors.Join` 把 SDK 错误、仍在排空、累计投递失败合并成一个 error 返回，属于文本诊断，不提供分类用的 sentinel；`errors.Is/As` 只能匹配被包装的底层错误。首次调用会取 `ctx` 的剩余时长作为排空预算（旧 `logs.Close()` 用 500 ms），等待结果可被 `ctx` 取消；预算只覆盖排空阶段，等待阻塞中的日志写入不计入，而一次写入在 SDK 背压下最长会卡 `max_block_sec` 秒。排空预算从「停止新写入」起算，SDK 侧还有最多 100 ms 的轮询粒度，所以后台收尾可能晚于 `ctx` 的 deadline，没有硬上限。正常端点实测约 100–300 ms，仅供参考，不是保证。
+应用结束业务工作后调用 `logs.Shutdown(ctx)`。同一批出口只关闭一次。CLS 的关闭结果用 `errors.Join` 把 SDK 错误、仍在排空、累计投递失败合并成一个 error 返回，属于文本诊断，不提供分类用的 sentinel；`errors.Is/As` 只能匹配被包装的底层错误。首次调用会取 `ctx` 的剩余时长作为排空预算（`ctx` 无 deadline 时用 500 ms，有 deadline 时至少 1 ms）；等待结果可被 `ctx` 取消；预算只覆盖排空阶段，等待阻塞中的日志写入不计入，而一次写入在 SDK 背压下最长会卡 `max_block_sec` 秒。排空预算从「停止新写入」起算，SDK 侧还有最多 100 ms 的轮询粒度，所以后台收尾可能晚于 `ctx` 的 deadline，没有硬上限。超时返回的是当时的快照，后台投递完成后不会刷新已返回的错误。正常端点实测约 100–300 ms（无日志时约 78 µs），仅供参考，不是保证。
 
 CLS 配置可显式设置 `tencent_cls.max_block_sec: 0`，发送积压时立即丢弃，并按 2 的幂采样在 stderr 上报累计拒绝数。省略时沿用 5 秒：此时积压超过阈值后，业务 goroutine 会在同步写日志时卡在 SDK 背压里，单次最多 5 秒（不是整次日志调用的硬上限）；对延迟敏感的服务建议显式设 0 并监控拒绝数。
 
