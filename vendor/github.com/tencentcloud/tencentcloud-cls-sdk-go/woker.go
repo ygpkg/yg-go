@@ -48,11 +48,12 @@ func (worker *Worker) sendToServer(producerBatch *ProducerBatch) {
 		}
 	} else {
 		if worker.retryQueueShutDownFlag.Load() {
-			if len(producerBatch.callBackList) > 0 {
-				for _, callBack := range producerBatch.callBackList {
-					worker.addErrorMessageToBatchAttempt(producerBatch, err)
-					callBack.Fail(producerBatch.result)
-				}
+			// yg-go patch: one failed attempt per batch, and release the batch bytes
+			// like the success and terminal-failure paths do. Keep while vendoring.
+			worker.addErrorMessageToBatchAttempt(producerBatch, err)
+			asyncAtomic.AddInt64(&worker.producer.producerLogGroupSize, -producerBatch.totalDataSize)
+			for _, callBack := range producerBatch.callBackList {
+				callBack.Fail(producerBatch.result)
 			}
 			return
 		}

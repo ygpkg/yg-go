@@ -146,12 +146,26 @@ func (producer *AsyncProducerClient) Close(timeoutMs int64) error {
 	startCloseTime := time.Now()
 	producer.sendCloseProducerSignal()
 	producer.timerTaskWaitGroup.Wait()
-	producer.threadPool.shutDownFlag.Store(true)
+	// yg-go patch: a worker that was mid-send when the shutdown started can push
+	// its batch to the retry queue after the timer's final scan, and the pool may
+	// stop before such a batch is queued. Keep draining the retry queue while any
+	// send is still in flight, and only stop the pool when taskCount==0 (no
+	// sendToServer running, so nothing can be added any more) and both queues are
+	// empty. Keep while vendoring.
 	for {
-		if atomic.LoadInt64(&producer.timerTask.worker.taskCount) == 0 && !producer.threadPool.hasTask() {
+		if batchList := producer.timerTask.retryQueue.getRetryBatch(true); len(batchList) > 0 {
+			for _, batch := range batchList {
+				producer.threadPool.addTask(batch)
+			}
+		}
+		if atomic.LoadInt64(&producer.timerTask.worker.taskCount) == 0 &&
+			!producer.threadPool.hasTask() &&
+			producer.timerTask.retryQueue.Len() == 0 {
+			producer.threadPool.shutDownFlag.Store(true)
 			return nil
 		}
 		if time.Since(startCloseTime) > time.Duration(timeoutMs)*time.Millisecond {
+			producer.threadPool.shutDownFlag.Store(true)
 			return errors.New("the producer timeout closes, and some of the cached data may not be sent properly")
 		}
 		time.Sleep(100 * time.Millisecond)

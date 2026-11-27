@@ -131,6 +131,9 @@ func TestTencentCLSShutdownWaitsForDelivery(t *testing.T) {
 	if err := ApplyConfig("test", cfg); err != nil {
 		t.Fatal(err)
 	}
+	// Let the timer enter its linger sleep, otherwise a shutdown that lands
+	// before the first sleep would finish fast even without the wake-up patch.
+	time.Sleep(200 * time.Millisecond)
 	Info("last line")
 	// 1s is below the SDK linger (2s), so this only passes when Close wakes the
 	// timer instead of sleeping it out.
@@ -206,7 +209,9 @@ func TestCloseWithinReportsCloseErrorAndPendingTogether(t *testing.T) {
 	cfg := cls.GetDefaultAsyncProducerClientConfig()
 	cfg.Endpoint = strings.TrimPrefix(server.URL, "http://")
 	cfg.AccessKeyID, cfg.AccessKeySecret = "test-id", "test-key"
-	cfg.LingerMs = 100
+	// Tiny batches keep one send in flight and another queued, so the SDK close
+	// check always observes work and the dequeue gap cannot return nil.
+	cfg.LingerMs, cfg.MaxBatchSize = 100, 1
 	producer, err := cls.NewAsyncProducerClient(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -214,8 +219,10 @@ func TestCloseWithinReportsCloseErrorAndPendingTogether(t *testing.T) {
 	producer.Start()
 	writer := &tencentClsWriteWyncer{client: producer, topicID: "test-topic"}
 	log := []byte(`{"msg":"slow log"}`)
-	if _, err := writer.Write(log); err != nil {
-		t.Fatal(err)
+	for i := 0; i < 3; i++ {
+		if _, err := writer.Write(log); err != nil {
+			t.Fatal(err)
+		}
 	}
 	err = writer.closeWithin(50 * time.Millisecond)
 	if err == nil || !strings.Contains(err.Error(), "close tencent CLS producer") {
