@@ -1,5 +1,7 @@
 package tencentcloud_cls_sdk_go
 
+import "fmt"
+
 // AsyncProducerClientConfig Producer Config
 type AsyncProducerClientConfig struct {
 	TotalSizeLnBytes    int64
@@ -13,14 +15,19 @@ type AsyncProducerClientConfig struct {
 	BaseRetryBackoffMs  int64
 	MaxRetryBackoffMs   int64
 	Endpoint            string
+	region              Region      // 地域
+	networkType         NetworkType // 网络类型
 	AccessKeyID         string
 	AccessKeySecret     string
 	AccessToken         string
-	Source              string
-	Timeout             int
-	IdleConn            int
-	CompressType        string
-	HostName            string
+	// Uin 弱鉴权（免密）账号 ID，与 AccessKeyID/AccessKeySecret 二选一填写。
+	// 两者同时填写时以 AccessKeyID/AccessKeySecret 为准（走强鉴权），Uin 被忽略。
+	Uin          string
+	Source       string
+	Timeout      int
+	IdleConn     int
+	CompressType string
+	HostName     string
 }
 
 // GetDefaultAsyncProducerClientConfig 获取默认的Producer Config
@@ -39,4 +46,11 @@ func GetDefaultAsyncProducerClientConfig() *AsyncProducerClientConfig {
 		Timeout:             10000,
 		IdleConn:            50,
 	}
+}
+
+// SetEndpointByRegionAndNetworkType 根据地域和网络类型设置域名
+func (config *AsyncProducerClientConfig) SetEndpointByRegionAndNetworkType(region Region, networkType NetworkType) {
+	config.region = region
+	config.networkType = networkType
+	config.Endpoint = fmt.Sprintf("%s.%s", config.region, config.networkType)
 }

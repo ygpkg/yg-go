@@ -13,10 +13,6 @@ type TimerSendLogTask struct {
 	worker         *Worker
 	logAccumulator *Accumulator
 	threadPool     *SendThreadPool
-	// yg-go patch: closed by notifyShutDown so Close can wake the linger sleep
-	// instead of waiting out the remaining LingerMs. Keep while vendoring.
-	shutDownNotify chan struct{}
-	notifyOnce     sync.Once
 }
 
 func NewTimerSendLogTask(logAccumulator *Accumulator, retryQueue *LogSendRetryQueue, ioWorker *Worker, threadPool *SendThreadPool) *TimerSendLogTask {
@@ -26,29 +22,8 @@ func NewTimerSendLogTask(logAccumulator *Accumulator, retryQueue *LogSendRetryQu
 		worker:         ioWorker,
 		logAccumulator: logAccumulator,
 		threadPool:     threadPool,
-		shutDownNotify: make(chan struct{}),
 	}
 	return timerTask
-}
-
-// yg-go patch: interruptible replacement for time.Sleep in run().
-func (timerTask *TimerSendLogTask) sleep(d time.Duration) {
-	if d <= 0 {
-		return
-	}
-	timer := time.NewTimer(d)
-	defer timer.Stop()
-	select {
-	case <-timerTask.shutDownNotify:
-	case <-timer.C:
-	}
-}
-
-// yg-go patch: wakes run() so the pending batches are flushed at once.
-func (timerTask *TimerSendLogTask) notifyShutDown() {
-	timerTask.notifyOnce.Do(func() {
-		close(timerTask.shutDownNotify)
-	})
 }
 
 func (timerTask *TimerSendLogTask) sendToServer(key string, batch *ProducerBatch, config *AsyncProducerClientConfig) {
@@ -86,8 +61,7 @@ func (timerTask *TimerSendLogTask) run(moverWaitGroup *sync.WaitGroup, config *A
 
 		retryProducerBatchList := timerTask.retryQueue.getRetryBatch(timerTask.shutDownFlag.Load())
 		if retryProducerBatchList == nil {
-			// yg-go patch: was time.Sleep; interruptible so Close does not block.
-			timerTask.sleep(time.Duration(sleepMs) * time.Millisecond)
+			time.Sleep(time.Duration(sleepMs) * time.Millisecond)
 		} else {
 			count := len(retryProducerBatchList)
 			for i := 0; i < count; i++ {

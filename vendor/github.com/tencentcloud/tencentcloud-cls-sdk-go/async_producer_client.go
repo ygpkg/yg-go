@@ -18,11 +18,8 @@ type AsyncProducerClient struct {
 	timerTaskWaitGroup        *sync.WaitGroup
 	sendThreadPoolWaitGroup   *sync.WaitGroup
 	producerLogGroupSize      int64
-	// yg-go patch: batches created minus batches reached a terminal state. Close
-	// waits on this single value instead of combining queue and task snapshots.
-	outstandingBatches int64
-	Client             *CLSClient
-	producerHash       string
+	Client                    *CLSClient
+	producerHash              string
 }
 
 // NewAsyncProducerClient 初始化Async Producer Client
@@ -38,6 +35,7 @@ func NewAsyncProducerClient(asyncProducerClientConfig *AsyncProducerClientConfig
 			SecretID:    asyncProducerClientConfig.AccessKeyID,
 			SecretKEY:   asyncProducerClientConfig.AccessKeySecret,
 			SecretToken: asyncProducerClientConfig.AccessToken,
+			Uin:         asyncProducerClientConfig.Uin,
 		},
 	})
 	if err != nil {
@@ -97,44 +95,18 @@ func validateProducerConfig(producerConfig *AsyncProducerClientConfig) *AsyncPro
 }
 
 func (producer *AsyncProducerClient) SendLog(topicId string, log *Log, callback CallBack) error {
-	err := producer.waitTime()
-	if err != nil {
-		return err
-	}
+	// 背压判定与 log 写入现已下沉到 accumulator 的临界区，
+	// 避免原 waitTime（无锁快照）与 append（持锁写）之间的 check-then-act race。
 	return producer.logAccumulator.addLogToProducerBatch(topicId, log, callback)
 }
 
 func (producer *AsyncProducerClient) SendLogList(topicId string, logList []*Log, callback CallBack) (err error) {
-	err = producer.waitTime()
-	if err != nil {
-		return err
-	}
 	return producer.logAccumulator.addLogToProducerBatch(topicId, logList, callback)
 }
 
+// waitTime 已完全下沉到 Accumulator.addLogToProducerBatch 中以保证判额和累加
+// 处于同一个临界区。本方法仅为保留字面兼容，目前已不再被调用。
 func (producer *AsyncProducerClient) waitTime() error {
-	if producer.asyncProducerClientConfig.MaxBlockSec > 0 {
-		for i := 0; i < producer.asyncProducerClientConfig.MaxBlockSec; i++ {
-			if atomic.LoadInt64(&producer.producerLogGroupSize) > producer.asyncProducerClientConfig.TotalSizeLnBytes {
-				time.Sleep(time.Second)
-			} else {
-				return nil
-			}
-		}
-		return errors.New("over producer set maximum blocking time")
-	} else if producer.asyncProducerClientConfig.MaxBlockSec == 0 {
-		if atomic.LoadInt64(&producer.producerLogGroupSize) > producer.asyncProducerClientConfig.TotalSizeLnBytes {
-			return errors.New("over producer set maximum blocking time")
-		}
-	} else if producer.asyncProducerClientConfig.MaxBlockSec < 0 {
-		for {
-			if atomic.LoadInt64(&producer.producerLogGroupSize) > producer.asyncProducerClientConfig.TotalSizeLnBytes {
-				time.Sleep(time.Second)
-			} else {
-				return nil
-			}
-		}
-	}
 	return nil
 }
 
@@ -149,24 +121,12 @@ func (producer *AsyncProducerClient) Close(timeoutMs int64) error {
 	startCloseTime := time.Now()
 	producer.sendCloseProducerSignal()
 	producer.timerTaskWaitGroup.Wait()
-	// yg-go patch: a worker that was mid-send when the shutdown started can push
-	// its batch to the retry queue after the timer's final scan, and the pool may
-	// stop before such a batch is queued. Keep re-dispatching retry batches and
-	// wait on the single outstanding-batch counter (queued, in flight and
-	// awaiting retry all count), which cannot be observed half-updated like the
-	// popTask/taskCount pair can. Keep while vendoring.
+	producer.threadPool.shutDownFlag.Store(true)
 	for {
-		if batchList := producer.timerTask.retryQueue.getRetryBatch(true); len(batchList) > 0 {
-			for _, batch := range batchList {
-				producer.threadPool.addTask(batch)
-			}
-		}
-		if atomic.LoadInt64(&producer.outstandingBatches) == 0 {
-			producer.threadPool.shutDownFlag.Store(true)
+		if atomic.LoadInt64(&producer.timerTask.worker.taskCount) == 0 && !producer.threadPool.hasTask() {
 			return nil
 		}
 		if time.Since(startCloseTime) > time.Duration(timeoutMs)*time.Millisecond {
-			producer.threadPool.shutDownFlag.Store(true)
 			return errors.New("the producer timeout closes, and some of the cached data may not be sent properly")
 		}
 		time.Sleep(100 * time.Millisecond)
@@ -177,6 +137,4 @@ func (producer *AsyncProducerClient) sendCloseProducerSignal() {
 	producer.timerTask.shutDownFlag.Store(true)
 	producer.logAccumulator.shutDownFlag.Store(true)
 	producer.timerTask.worker.retryQueueShutDownFlag.Store(true)
-	// yg-go patch: wake the timer's linger sleep so Close flushes immediately.
-	producer.timerTask.notifyShutDown()
 }

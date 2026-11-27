@@ -32,12 +32,12 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
-	github.com/tencentcloud/tencentcloud-cls-sdk-go v1.0.11
+	github.com/tencentcloud/tencentcloud-cls-sdk-go v1.0.18
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.1063
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/sms v1.0.1063
 	github.com/tencentyun/cos-go-sdk-v5 v0.7.58
 	github.com/xen0n/go-workwx v1.7.0
-	go.uber.org/zap v1.27.0
+	go.uber.org/zap v1.28.0
 	golang.org/x/crypto v0.41.0
 	golang.org/x/net v0.43.0
 	golang.org/x/sync v0.16.0
@@ -101,6 +101,7 @@ require (
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
+	github.com/golang/snappy v1.0.0 // indirect
 	github.com/google/go-querystring v1.0.0 // indirect
 	github.com/hashicorp/go-version v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

@@ -7,6 +7,7 @@ import (
 	"math"
 	"net"
 	"strings"
+	"time"
 
 	"go.uber.org/atomic"
 	"google.golang.org/protobuf/proto"
@@ -37,8 +38,8 @@ func GetLogSizeCalculate(log *Log) (int, error) {
 	count := len(logContent)
 
 	for i := 0; i < count; i++ {
-		if len(*logContent[i].Value) > 1*1024*1024 {
-			return 0, fmt.Errorf("content value can not be than 1M")
+		if len(*logContent[i].Value) > 10*1024*1024 {
+			return 0, fmt.Errorf("content value can not be than 10M")
 		}
 		sizeInBytes += len(*logContent[i].Value)
 		sizeInBytes += len(*logContent[i].Key)
@@ -80,13 +81,13 @@ func GetLocalIP() (string, error) {
 func GenerateProducerHash(instanceID string) string {
 	table := crc64.MakeTable(crc64.ECMA)
 	hash := crc64.Checksum([]byte(instanceID), table)
-	hashString := fmt.Sprintf("%016x", hash)
-	return strings.ToUpper(hashString)
+	hashString := fmt.Sprintf("%08x", hash)
+	return strings.ToUpper(fmt.Sprintf("%s%08x", hashString, time.Now().Unix()))
 }
 
 func generatePackageId(producerHash string, batchId *atomic.Int64) string {
 	if batchId.Load() >= math.MaxInt64 {
 		batchId.Store(0)
 	}
-	return strings.ToUpper(fmt.Sprintf("%s-%x", producerHash, batchId.Inc()))
+	return strings.ToUpper(fmt.Sprintf("%s-%016x", producerHash, batchId.Inc()))
 }

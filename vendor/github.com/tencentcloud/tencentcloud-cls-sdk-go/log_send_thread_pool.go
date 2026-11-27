@@ -51,24 +51,19 @@ func (threadPool *SendThreadPool) hasTask() bool {
 func (threadPool *SendThreadPool) start(ioWorkerWaitGroup *sync.WaitGroup, ioThreadPoolwait *sync.WaitGroup) {
 	defer ioThreadPoolwait.Done()
 	for {
-		task := threadPool.popTask()
-		if task == nil {
+		if task := threadPool.popTask(); task != nil {
+			threadPool.worker.startSendTask(ioWorkerWaitGroup)
+			go func(producerBatch *ProducerBatch) {
+				defer threadPool.worker.closeSendTask(ioWorkerWaitGroup)
+				threadPool.worker.sendToServer(producerBatch)
+			}(task)
+		} else {
 			if !threadPool.shutDownFlag.Load() {
 				time.Sleep(100 * time.Millisecond)
-				continue
-			}
-			// yg-go patch: a batch can be queued between the empty pop and observing
-			// the stop flag. The closer sets that flag only after everything is
-			// sealed, so one more look is enough to never exit with work left.
-			if task = threadPool.popTask(); task == nil {
+			} else {
 				break
 			}
 		}
-		threadPool.worker.startSendTask(ioWorkerWaitGroup)
-		go func(producerBatch *ProducerBatch) {
-			defer threadPool.worker.closeSendTask(ioWorkerWaitGroup)
-			threadPool.worker.sendToServer(producerBatch)
-		}(task)
 	}
 
 }

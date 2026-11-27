@@ -40,8 +40,8 @@ func (worker *Worker) sendToServer(producerBatch *ProducerBatch) {
 			producerBatch.result.attemptList = append(producerBatch.result.attemptList, attempt)
 		}
 		producerBatch.result.successful = true
-		asyncAtomic.AddInt64(&worker.producer.producerLogGroupSize, -producerBatch.totalDataSize)
-		asyncAtomic.AddInt64(&worker.producer.outstandingBatches, -1)
+		// 释放该 batch 在 accumulator 入口预扣的配额（与 accountedSize 口径一致，避免长期漂移）
+		asyncAtomic.AddInt64(&worker.producer.producerLogGroupSize, -producerBatch.accountedSize)
 		if len(producerBatch.callBackList) > 0 {
 			for _, callBack := range producerBatch.callBackList {
 				callBack.Success(producerBatch.result)
@@ -49,14 +49,9 @@ func (worker *Worker) sendToServer(producerBatch *ProducerBatch) {
 		}
 	} else {
 		if worker.retryQueueShutDownFlag.Load() {
-			// yg-go patch: one failed attempt per batch, and release the batch bytes
-			// like the success and terminal-failure paths do. Keep while vendoring.
+			// 只追加一次 attempt，避免多回调场景下重复累加 attemptCount / attemptList
 			worker.addErrorMessageToBatchAttempt(producerBatch, err)
-			asyncAtomic.AddInt64(&worker.producer.producerLogGroupSize, -producerBatch.totalDataSize)
-			asyncAtomic.AddInt64(&worker.producer.outstandingBatches, -1)
-			for _, callBack := range producerBatch.callBackList {
-				callBack.Fail(producerBatch.result)
-			}
+			worker.executeFailedCallback(producerBatch)
 			return
 		}
 
@@ -74,11 +69,7 @@ func (worker *Worker) sendToServer(producerBatch *ProducerBatch) {
 			} else {
 				producerBatch.nextRetryMs = GetTimeMs(time.Now().UnixNano()) + producerBatch.maxRetryIntervalInMs
 			}
-			// yg-go patch: a refused push means the retry queue is sealed, so the
-			// batch would never be drained again. Report it as terminally failed.
-			if !worker.retryQueue.sendToRetryQueue(producerBatch, worker.retryQueueShutDownFlag) {
-				worker.executeFailedCallback(producerBatch)
-			}
+			worker.retryQueue.sendToRetryQueue(producerBatch)
 		} else {
 			worker.executeFailedCallback(producerBatch)
 		}
@@ -107,8 +98,8 @@ func (worker *Worker) startSendTask(ioWorkerWaitGroup *sync.WaitGroup) {
 }
 
 func (worker *Worker) executeFailedCallback(producerBatch *ProducerBatch) {
-	asyncAtomic.AddInt64(&worker.producer.producerLogGroupSize, -producerBatch.totalDataSize)
-	asyncAtomic.AddInt64(&worker.producer.outstandingBatches, -1)
+	// 释放该 batch 在 accumulator 入口预扣的配额（与成功路径口径一致）
+	asyncAtomic.AddInt64(&worker.producer.producerLogGroupSize, -producerBatch.accountedSize)
 	if len(producerBatch.callBackList) > 0 {
 		for _, callBack := range producerBatch.callBackList {
 			callBack.Fail(producerBatch.result)

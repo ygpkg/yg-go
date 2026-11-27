@@ -3,6 +3,7 @@ package tencentcloud_cls_sdk_go
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/pierrec/lz4"
@@ -21,8 +24,16 @@ const (
 	logUri          = "/structuredlog"
 )
 
+// 弱鉴权（免密）相关请求头，字面量与服务端 consts.ClsAuthMode / consts.ClsUIN 保持一致
+const (
+	headerAuthMode = "x-cls-auth-mode"
+	headerUin      = "X-CLS-Uin"
+	authModeWeak   = "weak"
+)
+
 type Options struct {
 	Host         string
+	Scheme       string
 	Timeout      int
 	IdleConn     int
 	CompressType string
@@ -33,6 +44,15 @@ type Credentials struct {
 	SecretID    string
 	SecretKEY   string
 	SecretToken string
+	// Uin 弱鉴权（免密）账号 ID，与 SecretID/SecretKEY 二选一填写。
+	// 两者同时填写时以 SecretID/SecretKEY 为准（走强鉴权），Uin 被忽略。
+	Uin string
+}
+
+// isWeakAuth 判断当前是否走弱鉴权（免密）模式。
+// 仅当 SecretID/SecretKEY 不齐全时才为弱鉴权，即 AK/SK 优先。
+func (options *Options) isWeakAuth() bool {
+	return options.Credentials.SecretID == "" || options.Credentials.SecretKEY == ""
 }
 
 func (options *Options) withTimeoutDefault() {
@@ -52,8 +72,15 @@ func (options *Options) validateOptions() *CLSError {
 		return NewError(-1, "", MISSING_HOST, errors.New("host cannot be empty"))
 	}
 
-	if options.Credentials.SecretID == "" || options.Credentials.SecretKEY == "" {
-		return NewError(-1, "", MISS_ACCESS_KEY_ID, errors.New("SecretID or SecretKEY cannot be empty"))
+	// AK/SK 齐全走强鉴权；否则要求填写合法的 Uin 走弱鉴权（免密）
+	if options.isWeakAuth() {
+		if options.Credentials.Uin == "" {
+			return NewError(-1, "", MISS_ACCESS_KEY_ID,
+				errors.New("SecretID or SecretKEY cannot be empty, or set Uin to use weak authorization"))
+		}
+		if _, err := strconv.ParseUint(options.Credentials.Uin, 10, 64); err != nil {
+			return NewError(-1, "", INVALID_UIN, errors.New("uin must be a digits-only string"))
+		}
 	}
 
 	if options.CompressType == "" {
@@ -64,6 +91,12 @@ func (options *Options) validateOptions() *CLSError {
 }
 
 func (client *CLSClient) ResetSecretToken(secretID string, secretKEY string, secretToken string) *CLSError {
+	// 弱鉴权模式下不使用密钥，忽略本次调用以避免静默切换鉴权模式
+	if client.options.isWeakAuth() {
+		GetZapLoggerAdapter().Warn("ResetSecretToken ignored in weak auth mode",
+			Field{Key: "uin", Value: client.options.Credentials.Uin})
+		return nil
+	}
 	if secretID == "" {
 		return NewError(-1, "", MISS_ACCESS_KEY_ID, errors.New("secretID cannot be empty"))
 	}
@@ -91,20 +124,36 @@ func NewCLSClient(options *Options) (*CLSClient, *CLSError) {
 	if err := options.validateOptions(); err != nil {
 		return nil, err
 	}
+	// 确保Host包含正确的协议头
+	if strings.HasPrefix(options.Host, "http://") {
+		options.Scheme = "http"
+		options.Host = strings.TrimPrefix(options.Host, "http://")
+	} else if strings.HasPrefix(options.Host, "https://") {
+		options.Scheme = "https"
+		options.Host = strings.TrimPrefix(options.Host, "https://")
+	} else {
+		options.Scheme = "http"
+	}
 	client.options = options
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   time.Duration(options.Timeout) * time.Millisecond,
+			KeepAlive: 300 * time.Second,
+		}).DialContext,
+		MaxIdleConns:        options.IdleConn,
+		MaxIdleConnsPerHost: options.IdleConn,
+		MaxConnsPerHost:     options.IdleConn,
+		IdleConnTimeout:     time.Duration(300) * time.Second,
+	}
+	if options.Scheme == "https" {
+		transport.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: true,
+		}
+	}
 	client.client = &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   time.Duration(options.Timeout) * time.Millisecond,
-				KeepAlive: 300 * time.Second,
-			}).DialContext,
-			MaxIdleConns:        options.IdleConn,
-			MaxIdleConnsPerHost: options.IdleConn,
-			MaxConnsPerHost:     options.IdleConn,
-			IdleConnTimeout:     time.Duration(300) * time.Second,
-		},
-		Timeout: time.Duration(options.Timeout) * time.Millisecond,
+		Transport: transport,
+		Timeout:   time.Duration(options.Timeout) * time.Millisecond,
 	}
 	return client, nil
 }
@@ -149,14 +198,27 @@ func (client *CLSClient) zstdCompress(body []byte, params url.Values, urlReport 
 	return req, nil
 }
 
+func (client *CLSClient) deflateCompress(body []byte, params url.Values, urlReport string) (*http.Request, *CLSError) {
+	data, err := DeflateCompress(body)
+	if err != nil {
+		return nil, NewError(-1, "", BAD_REQUEST, err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, urlReport, bytes.NewBuffer(data))
+	if err != nil {
+		return nil, NewError(-1, "", BAD_REQUEST, err)
+	}
+	req.URL.RawQuery = params.Encode()
+	req.Header.Add("x-cls-compress-type", "deflate")
+	return req, nil
+}
+
 // Send cls实际发送接口
 func (client *CLSClient) Send(ctx context.Context, topicId string, group ...*LogGroup) *CLSError {
 	params := url.Values{"topic_id": []string{topicId}}
 	headers := url.Values{"Host": {client.options.Host}, "Content-Type": {"application/x-protobuf"}}
-	authorization := signature(client.options.Credentials.SecretID, client.options.Credentials.SecretKEY, http.MethodPost,
-		logUri, params, headers, 300)
 
-	urlReport := fmt.Sprintf("http://%s/structuredlog", client.options.Host)
+	urlReport := fmt.Sprintf("%s://%s/structuredlog", client.options.Scheme, client.options.Host)
 
 	var logGroupList LogGroupList
 	for _, item := range group {
@@ -171,6 +233,10 @@ func (client *CLSClient) Send(ctx context.Context, topicId string, group ...*Log
 		if req, clsErr = client.zstdCompress(body, params, urlReport); clsErr != nil {
 			return clsErr
 		}
+	} else if client.options.CompressType == "deflate" {
+		if req, clsErr = client.deflateCompress(body, params, urlReport); clsErr != nil {
+			return clsErr
+		}
 	} else {
 		if req, clsErr = client.lz4Compress(body, params, urlReport); clsErr != nil {
 			return clsErr
@@ -179,12 +245,21 @@ func (client *CLSClient) Send(ctx context.Context, topicId string, group ...*Log
 
 	req.Header.Add("Host", client.options.Host)
 	req.Header.Add("Content-Type", "application/x-protobuf")
-	req.Header.Add("Authorization", authorization)
 	req.Header.Add("User-Agent", getUserAgent())
 
-	if client.options.Credentials.SecretToken != "" {
-		req.Header.Add("X-Cls-Token", client.options.Credentials.SecretToken)
+	if client.options.isWeakAuth() {
+		// 弱鉴权（免密）：只带明文身份头，不计算签名、不带 Authorization/Token
+		req.Header.Add(headerAuthMode, authModeWeak)
+		req.Header.Add(headerUin, client.options.Credentials.Uin)
+	} else {
+		authorization := signature(client.options.Credentials.SecretID, client.options.Credentials.SecretKEY,
+			http.MethodPost, logUri, params, headers, 300)
+		req.Header.Add("Authorization", authorization)
+		if client.options.Credentials.SecretToken != "" {
+			req.Header.Add("X-Cls-Token", client.options.Credentials.SecretToken)
+		}
 	}
+
 	req = req.WithContext(ctx)
 	resp, err := client.client.Do(req)
 	if err != nil {

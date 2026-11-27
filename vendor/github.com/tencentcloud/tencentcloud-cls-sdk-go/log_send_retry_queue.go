@@ -4,8 +4,6 @@ import (
 	"container/heap"
 	"sync"
 	"time"
-
-	"go.uber.org/atomic"
 )
 
 // LogSendRetryQueue RetryQueue cache ProducerBatch and retry latter
@@ -21,19 +19,12 @@ func NewRetryQueue() *LogSendRetryQueue {
 	return &retryQueue
 }
 
-// yg-go patch: returns false when the producer is shutting down. The flag is read
-// under the heap lock and the final drain takes the same lock, so a batch can no
-// longer be pushed after the drain has run. Keep while vendoring.
-func (retryQueue *LogSendRetryQueue) sendToRetryQueue(producerBatch *ProducerBatch, shutDownFlag *atomic.Bool) bool {
+func (retryQueue *LogSendRetryQueue) sendToRetryQueue(producerBatch *ProducerBatch) {
 	retryQueue.mutex.Lock()
 	defer retryQueue.mutex.Unlock()
-	if shutDownFlag != nil && shutDownFlag.Load() {
-		return false
-	}
 	if producerBatch != nil {
 		heap.Push(retryQueue, producerBatch)
 	}
-	return true
 }
 
 func (retryQueue *LogSendRetryQueue) getRetryBatch(moverShutDownFlag bool) (producerBatchList []*ProducerBatch) {
