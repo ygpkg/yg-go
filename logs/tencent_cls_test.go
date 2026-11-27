@@ -132,17 +132,18 @@ func TestTencentCLSShutdownWaitsForDelivery(t *testing.T) {
 	if err := ApplyConfig("test", cfg); err != nil {
 		t.Fatal(err)
 	}
-	// Let the timer enter its linger sleep, otherwise a shutdown that lands
-	// before the first sleep would finish fast even without the wake-up patch.
+	// The timer only flushes a pending batch after LingerMs (2s by default) and
+	// upstream's Close blocks until that sleep ends, so closing this writer is
+	// bounded by the SDK linger rather than by the context. See README.
 	time.Sleep(200 * time.Millisecond)
 	Info("last line")
-	// 1s is below the SDK linger (2s), so this only passes when Close wakes the
-	// timer instead of sleeping it out.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+	start := time.Now()
 	if err := Shutdown(ctx); err != nil {
 		t.Fatal(err)
 	}
+	t.Logf("shutdown took %v, bounded by the SDK linger", time.Since(start).Round(time.Millisecond))
 	select {
 	case <-delivered:
 	default:
@@ -174,17 +175,17 @@ func TestTencentCLSDropsWhenFullAndReportsDeliveryFailure(t *testing.T) {
 	cfg := cls.GetDefaultAsyncProducerClientConfig()
 	cfg.Endpoint = strings.TrimPrefix(server.URL, "http://")
 	cfg.AccessKeyID, cfg.AccessKeySecret = "test-id", "test-key"
-	// A 1-byte budget means the first enqueued batch already fills it. This also
-	// pins the vendored accounting fix: if batch creation stops charging
-	// producerLogGroupSize, the second write is accepted again.
-	cfg.MaxBlockSec, cfg.TotalSizeLnBytes, cfg.LingerMs = 0, 1, 100
+	// The SDK reserves the incoming log size before appending, so a budget of
+	// exactly one log admits the first enqueue and rejects the second. (A 1-byte
+	// budget would reject even the first one.)
+	log := []byte(`{"msg":"test log"}`)
+	cfg.MaxBlockSec, cfg.TotalSizeLnBytes, cfg.LingerMs = 0, int64(len(log)), 100
 	producer, err := cls.NewAsyncProducerClient(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	writer := &tencentClsWriteWyncer{client: producer, topicID: "test-topic", dropOnFull: true}
 	// Keep the timer stopped until the writes finish so nothing drains in between.
-	log := []byte(`{"msg":"test log"}`)
 	n1, err1 := writer.Write(log)
 	n2, err2 := writer.Write(log)
 	rejected, pending := writer.rejected.Load(), writer.pending.Load()

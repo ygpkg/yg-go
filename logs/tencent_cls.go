@@ -157,14 +157,17 @@ func (c *tencentClsWriteWyncer) closeWithin(timeout time.Duration) error {
 
 		deadline := time.Now().Add(timeout)
 		var errs []error
+		// The upstream SDK waits in timerTaskWaitGroup.Wait() until its timer
+		// leaves the LingerMs sleep, so this budget cannot shorten that phase
+		// (default 2s). Closing this writer is best effort; see README「日志初始化与退出」.
 		if err := c.client.Close(max(1, time.Until(deadline).Milliseconds())); err != nil {
 			errs = append(errs, fmt.Errorf("close tencent CLS producer: %w", err))
 		}
 
 		// Keep confirming terminal callbacks while budget remains, even after the
 		// SDK close failed: batches already handed to the worker pool usually
-		// still finish. SDK v1.0.11 can also observe an empty queue between a
-		// worker dequeuing a batch and registering it as in-flight.
+		// still finish. The SDK can also observe an empty queue between a worker
+		// dequeuing a batch and registering it as in-flight.
 		for c.pending.Load() > 0 {
 			remaining := time.Until(deadline)
 			if remaining <= 0 {
