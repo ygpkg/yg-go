@@ -34,7 +34,7 @@ func NewAccumulator(config *AsyncProducerClientConfig, worker *Worker, threadPoo
 	}
 }
 
-func (accumulator *Accumulator) addOrSendProducerBatch(topicId string, producerBatch *ProducerBatch, log interface{}, callback CallBack) {
+func (accumulator *Accumulator) addOrSendProducerBatch(topicId string, producerBatch *ProducerBatch, log interface{}, callback CallBack, logSize int64) {
 	totalDataCount := producerBatch.getLogGroupCount() + 1
 	if producerBatch.totalDataSize > accumulator.producerConfig.MaxBatchSize &&
 		producerBatch.totalDataSize < 5242880 &&
@@ -51,6 +51,11 @@ func (accumulator *Accumulator) addOrSendProducerBatch(topicId string, producerB
 			producerBatch.addProducerBatchCallBack(callback)
 		}
 	} else {
+		// yg-go patch: the caller charged this log to the outgoing batch, but it
+		// goes into the new batch instead. Take the charge back so each batch is
+		// accounted for the logs it actually carries. Keep while vendoring.
+		asyncAtomic.AddInt64(&producerBatch.totalDataSize, -logSize)
+		asyncAtomic.AddInt64(&accumulator.producer.producerLogGroupSize, -logSize)
 		accumulator.innerSendToServer(topicId, producerBatch)
 		accumulator.createNewProducerBatch(log, callback, topicId)
 	}
@@ -59,11 +64,21 @@ func (accumulator *Accumulator) addOrSendProducerBatch(topicId string, producerB
 func (accumulator *Accumulator) createNewProducerBatch(logType interface{}, callback CallBack, topicId string) {
 	if item, ok := logType.(*Log); ok {
 		newProducerBatch := NewProducerBatch(topicId, accumulator.producerConfig, callback, item, generatePackageId(accumulator.producerHash, accumulator.batchID))
-		accumulator.logTopicData[topicId] = newProducerBatch
+		accumulator.trackNewBatch(topicId, newProducerBatch)
 	} else if logList, ok := logType.([]*Log); ok {
 		newProducerBatch := NewProducerBatch(topicId, accumulator.producerConfig, callback, logList, generatePackageId(accumulator.producerHash, accumulator.batchID))
-		accumulator.logTopicData[topicId] = newProducerBatch
+		accumulator.trackNewBatch(topicId, newProducerBatch)
 	}
+}
+
+// yg-go patch: addLogToProducerBatch only charges logs appended to an existing
+// batch, while the worker deducts the whole batch when it finishes. Without
+// charging the first log as well, producerLogGroupSize drifted negative and the
+// MaxBlockSec backpressure stopped triggering. Keep while vendoring.
+func (accumulator *Accumulator) trackNewBatch(topicId string, batch *ProducerBatch) {
+	accumulator.logTopicData[topicId] = batch
+	asyncAtomic.AddInt64(&accumulator.producer.producerLogGroupSize, batch.totalDataSize)
+	asyncAtomic.AddInt64(&accumulator.producer.outstandingBatches, 1)
 }
 
 func (accumulator *Accumulator) innerSendToServer(topicId string, producerBatch *ProducerBatch) {
@@ -72,12 +87,14 @@ func (accumulator *Accumulator) innerSendToServer(topicId string, producerBatch 
 }
 
 func (accumulator *Accumulator) addLogToProducerBatch(topicId string, logData interface{}, callback CallBack) error {
+	defer accumulator.lock.Unlock()
+	accumulator.lock.Lock()
+	// yg-go patch: check under the lock, otherwise a concurrent Close can drain
+	// the pending batches between this check and the insert, stranding the new
+	// batch. Keep while vendoring.
 	if accumulator.shutDownFlag.Load() {
 		return errors.New("producer has shutdown and cannot write to new logs")
 	}
-
-	defer accumulator.lock.Unlock()
-	accumulator.lock.Lock()
 	if mlog, ok := logData.(*Log); ok {
 		if producerBatch, ok := accumulator.logTopicData[topicId]; ok == true {
 			logSize, err := GetLogSizeCalculate(mlog)
@@ -86,7 +103,7 @@ func (accumulator *Accumulator) addLogToProducerBatch(topicId string, logData in
 			}
 			asyncAtomic.AddInt64(&producerBatch.totalDataSize, int64(logSize))
 			asyncAtomic.AddInt64(&accumulator.producer.producerLogGroupSize, int64(logSize))
-			accumulator.addOrSendProducerBatch(topicId, producerBatch, mlog, callback)
+			accumulator.addOrSendProducerBatch(topicId, producerBatch, mlog, callback, int64(logSize))
 		} else {
 			accumulator.createNewProducerBatch(mlog, callback, topicId)
 		}
@@ -98,7 +115,7 @@ func (accumulator *Accumulator) addLogToProducerBatch(topicId string, logData in
 			}
 			asyncAtomic.AddInt64(&producerBatch.totalDataSize, int64(logListSize))
 			asyncAtomic.AddInt64(&accumulator.producer.producerLogGroupSize, int64(logListSize))
-			accumulator.addOrSendProducerBatch(topicId, producerBatch, logList, callback)
+			accumulator.addOrSendProducerBatch(topicId, producerBatch, logList, callback, int64(logListSize))
 		} else {
 			accumulator.createNewProducerBatch(logList, callback, topicId)
 		}

@@ -148,28 +148,35 @@ func (c *tencentClsWriteWyncer) Close() error {
 
 func (c *tencentClsWriteWyncer) closeWithin(timeout time.Duration) error {
 	c.closeOnce.Do(func() {
-		deadline := time.Now().Add(timeout)
+		// Stop new writes first. Waiting for the write lock is not charged to the
+		// drain budget: an in-flight write can sit in SDK backpressure for up to
+		// MaxBlockSec. The caller bound is separate (see Shutdown).
 		c.writeMu.Lock()
 		c.closed = true
 		c.writeMu.Unlock()
+
+		deadline := time.Now().Add(timeout)
+		var errs []error
 		if err := c.client.Close(max(1, time.Until(deadline).Milliseconds())); err != nil {
-			c.closeErr = fmt.Errorf("close tencent CLS producer: %w", err)
-			return
+			errs = append(errs, fmt.Errorf("close tencent CLS producer: %w", err))
 		}
 
-		// SDK v1.0.11 can observe an empty queue between a worker dequeuing a
-		// batch and registering it as in-flight. Confirm terminal callbacks too.
+		// Keep confirming terminal callbacks while budget remains, even after the
+		// SDK close failed: batches already handed to the worker pool usually
+		// still finish. SDK v1.0.11 can also observe an empty queue between a
+		// worker dequeuing a batch and registering it as in-flight.
 		for c.pending.Load() > 0 {
 			remaining := time.Until(deadline)
 			if remaining <= 0 {
-				c.closeErr = errors.New("tencent CLS delivery still pending at shutdown")
-				return
+				errs = append(errs, errors.New("tencent CLS delivery still pending at shutdown"))
+				break
 			}
 			time.Sleep(min(remaining, 10*time.Millisecond))
 		}
 		if failed := c.failed.Load(); failed > 0 {
-			c.closeErr = fmt.Errorf("tencent CLS delivery failed for %d logs during writer lifetime", failed)
+			errs = append(errs, fmt.Errorf("tencent CLS delivery failed for %d logs during writer lifetime", failed))
 		}
+		c.closeErr = errors.Join(errs...)
 	})
 	return c.closeErr
 }

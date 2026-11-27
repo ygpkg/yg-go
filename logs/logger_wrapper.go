@@ -341,7 +341,8 @@ func closeWritersWithin(writers []io.Closer, timeout time.Duration) error {
 	return err
 }
 
-// Close closes managed writers using the SDK compatibility timeout.
+// Close is the legacy entry point: it drains managed writers with the SDK
+// compatibility timeout and reports failures on stderr. Prefer Shutdown(ctx).
 func Close() {
 	if err := Shutdown(context.Background()); err != nil {
 		fmt.Fprintf(os.Stderr, "close log writers: %v\n", err)

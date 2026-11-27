@@ -11,17 +11,18 @@ import (
 
 // GetGorm 获取gorm日志
 func GetGorm(lgrName string) glogger.Interface {
-	lw := Get(lgrName)
-
-	return &gormLogger{
-		l: lw.Desugar().WithOptions(zap.AddCallerSkip(2)).Sugar(),
-	}
+	return &gormLogger{name: lgrName}
 }
 
 var _ glogger.Interface = (*gormLogger)(nil)
 
 type gormLogger struct {
-	l *zap.SugaredLogger
+	name string
+}
+
+// logger 每次写入时解析分组, 使配置热重载后自动切到新的日志出口.
+func (g *gormLogger) logger() *zap.SugaredLogger {
+	return Get(g.name).Desugar().WithOptions(zap.AddCallerSkip(2)).Sugar()
 }
 
 func (g *gormLogger) LogMode(level glogger.LogLevel) glogger.Interface {
@@ -41,6 +42,7 @@ func (g *gormLogger) Error(_ context.Context, msg string, data ...interface{}) {
 }
 
 func (g *gormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	l := g.logger()
 	reqID, ok := ctx.Value(string(contextKeyRequestID)).(string)
 	if !ok {
 		reqID = ""
@@ -48,14 +50,14 @@ func (g *gormLogger) Trace(ctx context.Context, begin time.Time, fc func() (stri
 	elapsed := time.Since(begin)
 	sql, rows := fc()
 	if err != nil {
-		g.l.With(
+		l.With(
 			zap.String(string(contextKeyRequestID), reqID),
 			zap.String("elapsed", fmt.Sprintf("%vms", elapsed.Nanoseconds()/1e6)),
 			zap.Int64("rows", rows),
 			zap.Error(err),
 		).Warn(sql)
 	} else {
-		g.l.With(
+		l.With(
 			zap.String(string(contextKeyRequestID), reqID),
 			zap.String("elapsed", fmt.Sprintf("%vms", elapsed.Nanoseconds()/1e6)),
 			zap.Int64("rows", rows),

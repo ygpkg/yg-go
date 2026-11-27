@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -131,8 +132,13 @@ func TestTencentCLSShutdownWaitsForDelivery(t *testing.T) {
 	if err := ApplyConfig("test", cfg); err != nil {
 		t.Fatal(err)
 	}
+	// Let the timer enter its linger sleep, otherwise a shutdown that lands
+	// before the first sleep would finish fast even without the wake-up patch.
+	time.Sleep(200 * time.Millisecond)
 	Info("last line")
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	// 1s is below the SDK linger (2s), so this only passes when Close wakes the
+	// timer instead of sleeping it out.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	if err := Shutdown(ctx); err != nil {
 		t.Fatal(err)
@@ -168,25 +174,108 @@ func TestTencentCLSDropsWhenFullAndReportsDeliveryFailure(t *testing.T) {
 	cfg := cls.GetDefaultAsyncProducerClientConfig()
 	cfg.Endpoint = strings.TrimPrefix(server.URL, "http://")
 	cfg.AccessKeyID, cfg.AccessKeySecret = "test-id", "test-key"
+	// A 1-byte budget means the first enqueued batch already fills it. This also
+	// pins the vendored accounting fix: if batch creation stops charging
+	// producerLogGroupSize, the second write is accepted again.
 	cfg.MaxBlockSec, cfg.TotalSizeLnBytes, cfg.LingerMs = 0, 1, 100
 	producer, err := cls.NewAsyncProducerClient(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	writer := &tencentClsWriteWyncer{client: producer, topicID: "test-topic", dropOnFull: true}
-	// Keep the timer stopped until the writes finish so capacity cannot change between them.
+	// Keep the timer stopped until the writes finish so nothing drains in between.
 	log := []byte(`{"msg":"test log"}`)
 	n1, err1 := writer.Write(log)
 	n2, err2 := writer.Write(log)
-	// The SDK starts accounting for a batch when a second log is appended.
-	n3, err3 := writer.Write(log)
 	rejected, pending := writer.rejected.Load(), writer.pending.Load()
 	producer.Start()
 	closeErr := writer.closeWithin(time.Second)
-	if err1 != nil || err2 != nil || err3 != nil || n1 != len(log) || n2 != len(log) || n3 != len(log) || rejected != 1 || pending != 2 {
-		t.Fatalf("expected two queued logs and one drop, got %d queued, %d rejected, write errors %v, %v and %v", pending, rejected, err1, err2, err3)
+	if err1 != nil || err2 != nil || n1 != len(log) || n2 != len(log) || rejected != 1 || pending != 1 {
+		t.Fatalf("expected one queued log and one drop, got %d queued, %d rejected, write errors %v and %v", pending, rejected, err1, err2)
 	}
-	if closeErr == nil || !strings.Contains(closeErr.Error(), "delivery failed for 2 logs") {
+	if closeErr == nil || !strings.Contains(closeErr.Error(), "delivery failed for 1 logs") {
 		t.Fatalf("expected delivery failure on close, got %v", closeErr)
+	}
+}
+
+// TestCloseWithinReportsCloseErrorAndPendingTogether pins that a failed SDK
+// close does not hide the logs that are still queued.
+func TestCloseWithinReportsCloseErrorAndPendingTogether(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(300 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	cfg := cls.GetDefaultAsyncProducerClientConfig()
+	cfg.Endpoint = strings.TrimPrefix(server.URL, "http://")
+	cfg.AccessKeyID, cfg.AccessKeySecret = "test-id", "test-key"
+	// Tiny batches keep one send in flight and another queued, so the SDK close
+	// check always observes work and the dequeue gap cannot return nil.
+	cfg.LingerMs, cfg.MaxBatchSize = 100, 1
+	producer, err := cls.NewAsyncProducerClient(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	producer.Start()
+	writer := &tencentClsWriteWyncer{client: producer, topicID: "test-topic"}
+	log := []byte(`{"msg":"slow log"}`)
+	for i := 0; i < 3; i++ {
+		if _, err := writer.Write(log); err != nil {
+			t.Fatal(err)
+		}
+	}
+	err = writer.closeWithin(50 * time.Millisecond)
+	if err == nil || !strings.Contains(err.Error(), "close tencent CLS producer") {
+		t.Fatalf("expected SDK close error, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "still pending") {
+		t.Fatalf("pending logs must be reported together with the close error, got %v", err)
+	}
+}
+
+// TestCloseTimeoutStillDrainsAfterRelease pins that a timeout only ends the
+// wait: batches already handed to the SDK are still delivered afterwards.
+func TestCloseTimeoutStillDrainsAfterRelease(t *testing.T) {
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
+	var hits atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		<-release
+		hits.Add(1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+	// Runs before server.Close (LIFO), so a failing assertion cannot leave the
+	// handler blocked and hang the cleanup.
+	defer unblock()
+
+	cfg := cls.GetDefaultAsyncProducerClientConfig()
+	cfg.Endpoint = strings.TrimPrefix(server.URL, "http://")
+	cfg.AccessKeyID, cfg.AccessKeySecret = "test-id", "test-key"
+	cfg.LingerMs = 100
+	producer, err := cls.NewAsyncProducerClient(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	producer.Start()
+	writer := &tencentClsWriteWyncer{client: producer, topicID: "test-topic"}
+	if _, err := writer.Write([]byte(`{"msg":"held log"}`)); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.closeWithin(50 * time.Millisecond); err == nil {
+		t.Fatal("expected the drain budget to expire while the endpoint is held")
+	}
+	unblock()
+	deadline := time.Now().Add(2 * time.Second)
+	for writer.pending.Load() > 0 && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := writer.pending.Load(); got != 0 {
+		t.Fatalf("expected pending to drain after release, still %d", got)
+	}
+	if got := hits.Load(); got != 1 {
+		t.Fatalf("expected the held log to be delivered once, got %d", got)
 	}
 }

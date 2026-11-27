@@ -41,6 +41,7 @@ func (worker *Worker) sendToServer(producerBatch *ProducerBatch) {
 		}
 		producerBatch.result.successful = true
 		asyncAtomic.AddInt64(&worker.producer.producerLogGroupSize, -producerBatch.totalDataSize)
+		asyncAtomic.AddInt64(&worker.producer.outstandingBatches, -1)
 		if len(producerBatch.callBackList) > 0 {
 			for _, callBack := range producerBatch.callBackList {
 				callBack.Success(producerBatch.result)
@@ -48,11 +49,13 @@ func (worker *Worker) sendToServer(producerBatch *ProducerBatch) {
 		}
 	} else {
 		if worker.retryQueueShutDownFlag.Load() {
-			if len(producerBatch.callBackList) > 0 {
-				for _, callBack := range producerBatch.callBackList {
-					worker.addErrorMessageToBatchAttempt(producerBatch, err)
-					callBack.Fail(producerBatch.result)
-				}
+			// yg-go patch: one failed attempt per batch, and release the batch bytes
+			// like the success and terminal-failure paths do. Keep while vendoring.
+			worker.addErrorMessageToBatchAttempt(producerBatch, err)
+			asyncAtomic.AddInt64(&worker.producer.producerLogGroupSize, -producerBatch.totalDataSize)
+			asyncAtomic.AddInt64(&worker.producer.outstandingBatches, -1)
+			for _, callBack := range producerBatch.callBackList {
+				callBack.Fail(producerBatch.result)
 			}
 			return
 		}
@@ -71,7 +74,11 @@ func (worker *Worker) sendToServer(producerBatch *ProducerBatch) {
 			} else {
 				producerBatch.nextRetryMs = GetTimeMs(time.Now().UnixNano()) + producerBatch.maxRetryIntervalInMs
 			}
-			worker.retryQueue.sendToRetryQueue(producerBatch)
+			// yg-go patch: a refused push means the retry queue is sealed, so the
+			// batch would never be drained again. Report it as terminally failed.
+			if !worker.retryQueue.sendToRetryQueue(producerBatch, worker.retryQueueShutDownFlag) {
+				worker.executeFailedCallback(producerBatch)
+			}
 		} else {
 			worker.executeFailedCallback(producerBatch)
 		}
@@ -101,6 +108,7 @@ func (worker *Worker) startSendTask(ioWorkerWaitGroup *sync.WaitGroup) {
 
 func (worker *Worker) executeFailedCallback(producerBatch *ProducerBatch) {
 	asyncAtomic.AddInt64(&worker.producer.producerLogGroupSize, -producerBatch.totalDataSize)
+	asyncAtomic.AddInt64(&worker.producer.outstandingBatches, -1)
 	if len(producerBatch.callBackList) > 0 {
 		for _, callBack := range producerBatch.callBackList {
 			callBack.Fail(producerBatch.result)
