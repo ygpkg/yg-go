@@ -78,6 +78,7 @@ func (accumulator *Accumulator) createNewProducerBatch(logType interface{}, call
 func (accumulator *Accumulator) trackNewBatch(topicId string, batch *ProducerBatch) {
 	accumulator.logTopicData[topicId] = batch
 	asyncAtomic.AddInt64(&accumulator.producer.producerLogGroupSize, batch.totalDataSize)
+	asyncAtomic.AddInt64(&accumulator.producer.outstandingBatches, 1)
 }
 
 func (accumulator *Accumulator) innerSendToServer(topicId string, producerBatch *ProducerBatch) {

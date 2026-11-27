@@ -18,8 +18,11 @@ type AsyncProducerClient struct {
 	timerTaskWaitGroup        *sync.WaitGroup
 	sendThreadPoolWaitGroup   *sync.WaitGroup
 	producerLogGroupSize      int64
-	Client                    *CLSClient
-	producerHash              string
+	// yg-go patch: batches created minus batches reached a terminal state. Close
+	// waits on this single value instead of combining queue and task snapshots.
+	outstandingBatches int64
+	Client             *CLSClient
+	producerHash       string
 }
 
 // NewAsyncProducerClient 初始化Async Producer Client
@@ -148,19 +151,17 @@ func (producer *AsyncProducerClient) Close(timeoutMs int64) error {
 	producer.timerTaskWaitGroup.Wait()
 	// yg-go patch: a worker that was mid-send when the shutdown started can push
 	// its batch to the retry queue after the timer's final scan, and the pool may
-	// stop before such a batch is queued. Keep draining the retry queue while any
-	// send is still in flight, and only stop the pool when taskCount==0 (no
-	// sendToServer running, so nothing can be added any more) and both queues are
-	// empty. Keep while vendoring.
+	// stop before such a batch is queued. Keep re-dispatching retry batches and
+	// wait on the single outstanding-batch counter (queued, in flight and
+	// awaiting retry all count), which cannot be observed half-updated like the
+	// popTask/taskCount pair can. Keep while vendoring.
 	for {
 		if batchList := producer.timerTask.retryQueue.getRetryBatch(true); len(batchList) > 0 {
 			for _, batch := range batchList {
 				producer.threadPool.addTask(batch)
 			}
 		}
-		if atomic.LoadInt64(&producer.timerTask.worker.taskCount) == 0 &&
-			!producer.threadPool.hasTask() &&
-			producer.timerTask.retryQueue.Len() == 0 {
+		if atomic.LoadInt64(&producer.outstandingBatches) == 0 {
 			producer.threadPool.shutDownFlag.Store(true)
 			return nil
 		}
