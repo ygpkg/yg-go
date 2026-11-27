@@ -15,55 +15,65 @@ const (
 )
 
 // With 设置日志字段, 返回一个新的日志对象,参数为键值对, 如: With("key", "value")
-func With(args ...interface{}) *zap.SugaredLogger { return logger.With(args...) }
+func With(args ...interface{}) *zap.SugaredLogger { return defaultLogger.Load().With(args...) }
 
 // Sync 同步日志缓冲区
-func Sync() error { return logger.Sync() }
+func Sync() error { return defaultLogger.Load().Sync() }
 
 // Debug 调试
-func Debug(args ...interface{}) { logger.Debug(args...) }
+func Debug(args ...interface{}) { defaultLogger.Load().Debug(args...) }
 
 // Info 提示信息
-func Info(args ...interface{}) { logger.Info(args...) }
+func Info(args ...interface{}) { defaultLogger.Load().Info(args...) }
 
 // Warn 警告信息
-func Warn(args ...interface{}) { logger.Warn(args...) }
+func Warn(args ...interface{}) { defaultLogger.Load().Warn(args...) }
 
 // Error 错误信息
-func Error(args ...interface{}) { logger.Error(args...) }
+func Error(args ...interface{}) { defaultLogger.Load().Error(args...) }
 
 // Fatal 致命错误
-func Fatal(args ...interface{}) { logger.Fatal(args...) }
+func Fatal(args ...interface{}) { defaultLogger.Load().Fatal(args...) }
 
 // Debugf 调试
-func Debugf(template string, args ...interface{}) { logger.Debugf(template, args...) }
+func Debugf(template string, args ...interface{}) { defaultLogger.Load().Debugf(template, args...) }
 
 // Infof 提示信息
-func Infof(template string, args ...interface{}) { logger.Infof(template, args...) }
+func Infof(template string, args ...interface{}) { defaultLogger.Load().Infof(template, args...) }
 
 // Warnf 警告信息
-func Warnf(template string, args ...interface{}) { logger.Warnf(template, args...) }
+func Warnf(template string, args ...interface{}) { defaultLogger.Load().Warnf(template, args...) }
 
 // Errorf 错误信息
-func Errorf(template string, args ...interface{}) { logger.Errorf(template, args...) }
+func Errorf(template string, args ...interface{}) { defaultLogger.Load().Errorf(template, args...) }
 
 // Fatalf 致命错误
-func Fatalf(template string, args ...interface{}) { logger.Fatalf(template, args...) }
+func Fatalf(template string, args ...interface{}) { defaultLogger.Load().Fatalf(template, args...) }
 
 // Debugw 调试
-func Debugw(msg string, keysAndValues ...interface{}) { logger.Debugw(msg, keysAndValues...) }
+func Debugw(msg string, keysAndValues ...interface{}) {
+	defaultLogger.Load().Debugw(msg, keysAndValues...)
+}
 
 // Infow 提示信息
-func Infow(msg string, keysAndValues ...interface{}) { logger.Infow(msg, keysAndValues...) }
+func Infow(msg string, keysAndValues ...interface{}) {
+	defaultLogger.Load().Infow(msg, keysAndValues...)
+}
 
 // Warnw 警告信息
-func Warnw(msg string, keysAndValues ...interface{}) { logger.Warnw(msg, keysAndValues...) }
+func Warnw(msg string, keysAndValues ...interface{}) {
+	defaultLogger.Load().Warnw(msg, keysAndValues...)
+}
 
 // Errorw 错误信息
-func Errorw(msg string, keysAndValues ...interface{}) { logger.Errorw(msg, keysAndValues...) }
+func Errorw(msg string, keysAndValues ...interface{}) {
+	defaultLogger.Load().Errorw(msg, keysAndValues...)
+}
 
 // Fatalw 致命错误
-func Fatalw(msg string, keysAndValues ...interface{}) { logger.Fatalw(msg, keysAndValues...) }
+func Fatalw(msg string, keysAndValues ...interface{}) {
+	defaultLogger.Load().Fatalw(msg, keysAndValues...)
+}
 
 // DebugContext 调试
 func DebugContext(ctx context.Context, args ...interface{}) { LoggerFromContext(ctx).Debug(args...) }
@@ -130,13 +140,13 @@ func WithContextFields(ctx context.Context, fields ...interface{}) context.Conte
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	l := logger
+	l := defaultLogger.Load()
 	val := ctx.Value(contextKeyLogger)
 	if val != nil {
 		var ok bool
 		l, ok = val.(*zap.SugaredLogger)
 		if !ok {
-			l = logger
+			l = defaultLogger.Load()
 		}
 	}
 	l = l.With(fields...)
@@ -174,26 +184,26 @@ func SetContextLogger(ctx context.Context, l *zap.SugaredLogger) {
 // LoggerFromContext 获取日志上下文
 func LoggerFromContext(ctx context.Context) *zap.SugaredLogger {
 	if ctx == nil {
-		return logger
+		return defaultLogger.Load()
 	}
 	if gctx, ok := ctx.(*gin.Context); ok {
 		val, ok := gctx.Get(string(contextKeyLogger))
 		if !ok {
-			return logger
+			return defaultLogger.Load()
 		}
 		l, ok := val.(*zap.SugaredLogger)
 		if !ok {
-			return logger
+			return defaultLogger.Load()
 		}
 		return l
 	}
 	val := ctx.Value(contextKeyLogger)
 	if val == nil {
-		return logger
+		return defaultLogger.Load()
 	}
 	l, ok := val.(*zap.SugaredLogger)
 	if !ok {
-		return logger
+		return defaultLogger.Load()
 	}
 	return l
 }

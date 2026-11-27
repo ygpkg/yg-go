@@ -1,10 +1,15 @@
 package logs
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/ygpkg/yg-go/config"
 	"go.uber.org/zap"
@@ -12,17 +17,17 @@ import (
 )
 
 type loggerWrapper struct {
-	module, name string
-	core         zapcore.Core
-	logger       *zap.SugaredLogger
+	closers []io.Closer
+	logger  *zap.SugaredLogger
 }
 
 var (
-	closerList []io.Closer = []io.Closer{}
-	loggers                = map[string]*loggerWrapper{
-		"default": {name: "default"},
-	}
-	loggersLock = new(sync.RWMutex)
+	configurationGate = make(chan struct{}, 1)
+	standaloneClosers []io.Closer
+	closing           *shutdownResult
+	loggers           = make(map[string]*loggerWrapper)
+	loggersLock       sync.RWMutex
+	defaultLogger     atomic.Pointer[zap.SugaredLogger]
 
 	stdcfg = zapcore.EncoderConfig{
 		TimeKey:        "ts",
@@ -52,124 +57,184 @@ var (
 		EncodeDuration: zapcore.SecondsDurationEncoder,
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
-
-	logger *zap.SugaredLogger
-
-	// accessCore = zapcore.NewTee(zapcore.NewCore(
-	// 	zapcore.NewJSONEncoder(accessCfg),
-	// 	zapcore.Lock(os.Stdout),
-	// 	zap.NewAtomicLevelAt(zapcore.InfoLevel)))
-	// accessLogger = zap.New(accessCore, zap.AddCaller(), zap.AddCallerSkip(2)).Sugar()
 )
 
 func init() {
-	loggersLock.Lock()
-	lg := loggers["default"]
-	lg.load("-", []config.LogConfig{})
-	logger = lg.logger
-	loggersLock.Unlock()
+	lw, _ := buildLogger("-", "default", nil, nil)
+	loggers["default"] = lw
+	defaultLogger.Store(lw.logger)
 }
 
 // Get 获取日志实例
-func Get(lgr string) *zap.SugaredLogger {
+func Get(name string) *zap.SugaredLogger {
 	loggersLock.RLock()
 	defer loggersLock.RUnlock()
-	lw := loggers[lgr]
-	if lw == nil {
-		if lgr != "" && lgr != "default" {
-			return logger.Named(lgr)
-		}
-		return logger
+	if lw := loggers[name]; lw != nil {
+		return lw.logger
 	}
-	return lw.logger
+	logger := defaultLogger.Load()
+	if name != "" && name != "default" {
+		return logger.Named(name)
+	}
+	return logger
 }
 
-// ReloadConfig .
+// ConfigError identifies the failed writer without exposing its configuration values.
+type ConfigError struct {
+	Group  string
+	Index  int
+	Writer string
+	Err    error
+}
+
+func (e *ConfigError) Error() string {
+	return fmt.Sprintf("logger %q entry %d (%q): %v", e.Group, e.Index, e.Writer, e.Err)
+}
+
+func (e *ConfigError) Unwrap() error { return e.Err }
+
+// ReloadConfig applies the configuration and panics on configuration errors for compatibility.
 func ReloadConfig(module string, cfg config.LogsConfig) error {
-	loggersLock.Lock()
-	defer loggersLock.Unlock()
-	for name, cfgs := range cfg {
-		if lw, ok := loggers[name]; !ok {
-			loggers[name] = newLoggerWrapper(module, name, cfgs)
-		} else {
-			lw.load(module, cfgs)
+	if err := applyConfig(module, cfg, newTencentClsSyncer, true); err != nil {
+		panic(err)
+	}
+	return nil
+}
+
+// ApplyConfig updates named logger groups together. Call at startup or after
+// stopping use of any logger instances obtained from groups being replaced.
+func ApplyConfig(module string, cfg config.LogsConfig) error {
+	return applyConfig(module, cfg, newTencentClsSyncer, false)
+}
+
+func applyConfig(module string, cfg config.LogsConfig, newCLS func(config.TencentCLSConfig) (managedSyncer, error), keepReplaced bool) error {
+	configurationGate <- struct{}{}
+	defer func() { <-configurationGate }()
+	if closing != nil {
+		select {
+		case <-closing.done:
+		default:
+			return errors.New("logs shutdown in progress")
 		}
 	}
-	logger = loggers["default"].logger
+	names := make([]string, 0, len(cfg))
+	for name := range cfg {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		for i, entry := range cfg[name] {
+			if err := validateLogConfig(entry); err != nil {
+				return &ConfigError{name, i, entry.Writer, err}
+			}
+		}
+	}
+	pending := make(map[string]*loggerWrapper, len(cfg))
+	var created []io.Closer
+	for _, name := range names {
+		lw, err := buildLogger(module, name, cfg[name], newCLS)
+		created = append(created, lw.closers...)
+		if err != nil {
+			if cleanup := closeWriters(created); cleanup != nil {
+				return errors.Join(err, fmt.Errorf("discard new log writers: %w", cleanup))
+			}
+			return err
+		}
+		pending[name] = lw
+	}
+	var retired []io.Closer
+	loggersLock.Lock()
+	for name, lw := range pending {
+		if old := loggers[name]; old != nil {
+			retired = append(retired, old.closers...)
+		}
+		loggers[name] = lw
+	}
+	defaultLogger.Store(loggers["default"].logger)
+	loggersLock.Unlock()
+	if len(pending) > 0 {
+		closing = nil
+	}
+	if keepReplaced {
+		// Legacy callers may retain loggers after ReloadConfig.
+		standaloneClosers = append(standaloneClosers, retired...)
+	} else if err := closeWriters(retired); err != nil {
+		fmt.Fprintf(os.Stderr, "close replaced log writers: %v\n", err)
+	}
 	return nil
 }
 
 // Desugar 获取底层zap.Logger
-func Desugar() *zap.Logger { return logger.Desugar() }
+func Desugar() *zap.Logger { return defaultLogger.Load().Desugar() }
 
 // Named 获取并设置命名日志实例
-func Named(name string) *zap.SugaredLogger {
-	return logger.Named(name)
-}
+func Named(name string) *zap.SugaredLogger { return defaultLogger.Load().Named(name) }
 
 // RequestLogger 接口请求日志 需要配置access日志
-func RequestLogger(reqid string) *zap.SugaredLogger {
-	return Get("access").Named(reqid)
-}
+func RequestLogger(reqid string) *zap.SugaredLogger { return Get("access").Named(reqid) }
 
-func newLoggerWrapper(module, name string, cfgs []config.LogConfig) *loggerWrapper {
-	lw := &loggerWrapper{
-		module: module,
-		name:   name,
+func validateLogConfig(cfg config.LogConfig) error {
+	switch cfg.Encoder {
+	case "", "std", "default", "access":
+	default:
+		return errors.New("unsupported encoder")
 	}
-	lw.load(module, cfgs)
-	return lw
+	switch cfg.Writer {
+	case "", "console", "stdout", "workwx":
+	case "file":
+		if cfg.Logger == nil {
+			return errors.New("missing file writer configuration")
+		}
+	case "tencentcls", "tencent", "cls":
+		if cfg.TencentCLS == nil {
+			return errors.New("missing tencent_cls")
+		}
+		return validateTencentCLS(*cfg.TencentCLS)
+	default:
+		return errors.New("unsupported writer")
+	}
+	return nil
 }
 
-// loggerWrapper
-func (lw *loggerWrapper) load(module string, cfgs []config.LogConfig) {
-	lw.module = module
+type managedSyncer interface {
+	zapcore.WriteSyncer
+	io.Closer
+}
+
+func buildLogger(module, name string, cfgs []config.LogConfig, newCLS func(config.TencentCLSConfig) (managedSyncer, error)) (*loggerWrapper, error) {
+	lw := &loggerWrapper{}
 	if len(cfgs) == 0 {
-		cfgs = []config.LogConfig{
-			{},
-		}
+		cfgs = []config.LogConfig{{}}
 	}
 	cores := make([]zapcore.Core, 0, len(cfgs))
-	for _, lcfg := range cfgs {
-		edr := getLoggerEncoder(lcfg.Encoder)
-		lvl := zap.NewAtomicLevelAt(lcfg.Level)
+	for i, cfg := range cfgs {
 		var syncer zapcore.WriteSyncer
-		switch lcfg.Writer {
+		switch cfg.Writer {
 		case "file":
-			syncer = zapcore.AddSync(lcfg.Logger)
+			syncer = zapcore.AddSync(cfg.Logger)
 		case "workwx":
-			wxLgr := NewWorkwxSyncer(lcfg.Key)
-			syncer = zapcore.AddSync(wxLgr)
-		case "console", "stdout", "":
-			syncer = zapcore.Lock(os.Stdout)
-		// case "aliyunsls", "aliyun", "sls":
-		// 	slsLgr := NewAliyunSlsSyncer(*lcfg.AliyunSLS)
-		// 	syncer = zapcore.AddSync(slsLgr)
+			syncer = NewWorkwxSyncer(cfg.Key)
 		case "tencentcls", "tencent", "cls":
-			clsLgr, err := NewTencentClsSyncer(*lcfg.TencentCLS)
+			writer, err := newCLS(*cfg.TencentCLS)
 			if err != nil {
-				panic(err)
+				return lw, &ConfigError{name, i, cfg.Writer, err}
 			}
-			syncer = zapcore.AddSync(clsLgr)
+			lw.closers = append(lw.closers, writer)
+			syncer = writer
 		default:
-			panic(fmt.Errorf("unsupport logger writer (%s)", lcfg.Encoder))
+			syncer = zapcore.Lock(os.Stdout)
 		}
-		core := zapcore.NewCore(edr, syncer, lvl)
-		cores = append(cores, core)
+		cores = append(cores, zapcore.NewCore(getLoggerEncoder(cfg.Encoder), syncer, zap.NewAtomicLevelAt(cfg.Level)))
 	}
-
-	opts := []zap.Option{zap.AddCaller(), zap.AddCallerSkip(1)}
 	fields := []zap.Field{}
-	if module != "-" && lw.name != "" {
+	if module != "-" && name != "" {
 		fields = append(fields, zap.String("module", module))
 	}
-	if lw.name != "default" {
-		fields = append(fields, zap.String("logger", lw.name))
+	if name != "default" {
+		fields = append(fields, zap.String("logger", name))
 	}
-	opts = append(opts, zap.Fields(fields...))
-
-	lw.core = zapcore.NewTee(cores...)
-	lw.logger = zap.New(lw.core, opts...).Sugar()
+	lw.logger = zap.New(zapcore.NewTee(cores...), zap.AddCaller(), zap.AddCallerSkip(1), zap.Fields(fields...)).Sugar()
+	return lw, nil
 }
 
 func getLoggerEncoder(edr string) zapcore.Encoder {
@@ -183,22 +248,102 @@ func getLoggerEncoder(edr string) zapcore.Encoder {
 	return zapcore.NewJSONEncoder(stdcfg)
 }
 
-func getDefaultLoggerWrapper() *loggerWrapper {
-	return loggers["default"]
-}
-
 // SetLevel 设置默认日志级别
 func SetLevel(lvl zapcore.Level) {
 	core := zapcore.NewTee(zapcore.NewCore(
 		zapcore.NewJSONEncoder(stdcfg),
 		zapcore.Lock(os.Stdout),
 		zap.NewAtomicLevelAt(lvl)))
-	logger = zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1)).Sugar()
+	defaultLogger.Store(zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1)).Sugar())
 }
 
-// Close 关闭日志
+type shutdownResult struct {
+	done chan struct{}
+	err  error
+}
+
+const legacyCloseTimeout = 500 * time.Millisecond
+
+// Shutdown switches the global logger to stdout and closes managed writers once.
+// A canceled context stops waiting. Writer cleanup can continue in the background.
+func Shutdown(ctx context.Context) error {
+	select {
+	case configurationGate <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	result := closing
+	if result == nil {
+		result = &shutdownResult{done: make(chan struct{})}
+		closing = result
+		timeout := legacyCloseTimeout
+		if deadline, ok := ctx.Deadline(); ok {
+			timeout = max(time.Millisecond, time.Until(deadline))
+		}
+		writers := standaloneClosers
+		standaloneClosers = nil
+		loggersLock.Lock()
+		for _, lw := range loggers {
+			writers = append(writers, lw.closers...)
+		}
+		fallback, _ := buildLogger("-", "default", nil, nil)
+		loggers = map[string]*loggerWrapper{"default": fallback}
+		defaultLogger.Store(fallback.logger)
+		loggersLock.Unlock()
+		if len(writers) == 0 {
+			close(result.done)
+		} else {
+			go func() {
+				result.err = closeWritersWithin(writers, timeout)
+				close(result.done)
+			}()
+		}
+	}
+	<-configurationGate
+	select {
+	case <-result.done:
+		return result.err
+	default:
+	}
+	select {
+	case <-result.done:
+		return result.err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func closeWriters(writers []io.Closer) error {
+	return closeWritersWithin(writers, legacyCloseTimeout)
+}
+
+type timedCloser interface {
+	closeWithin(time.Duration) error
+}
+
+func closeWritersWithin(writers []io.Closer, timeout time.Duration) error {
+	results := make(chan error, len(writers))
+	for _, writer := range writers {
+		go func() {
+			if timed, ok := writer.(timedCloser); ok {
+				results <- timed.closeWithin(timeout)
+				return
+			}
+			results <- writer.Close()
+		}()
+	}
+	var err error
+	for range writers {
+		if result := <-results; result != nil {
+			err = errors.Join(err, result)
+		}
+	}
+	return err
+}
+
+// Close closes managed writers using the SDK compatibility timeout.
 func Close() {
-	for _, c := range closerList {
-		c.Close()
+	if err := Shutdown(context.Background()); err != nil {
+		fmt.Fprintf(os.Stderr, "close log writers: %v\n", err)
 	}
 }
