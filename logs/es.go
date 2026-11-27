@@ -12,9 +12,8 @@ import (
 )
 
 func GetESLogger(cfg ESLoggerConfig) *ESLogger {
-	lw := Get(cfg.LoggerName)
 	return &ESLogger{
-		l:             lw.Desugar().WithOptions(zap.AddCallerSkip(5)).Sugar(),
+		name:          cfg.LoggerName,
 		slowThreshold: cfg.SlowThreshold,
 	}
 }
@@ -25,12 +24,18 @@ type ESLoggerConfig struct {
 }
 
 type ESLogger struct {
-	l             *zap.SugaredLogger
+	name          string
 	slowThreshold time.Duration
+}
+
+// logger 每次写入时解析分组, 使配置热重载后自动切到新的日志出口.
+func (e *ESLogger) logger() *zap.SugaredLogger {
+	return Get(e.name).Desugar().WithOptions(zap.AddCallerSkip(5)).Sugar()
 }
 
 func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error, start time.Time, dur time.Duration) error {
 	ctx := req.Context()
+	l := e.logger()
 
 	reqID, ok := ctx.Value(string(contextKeyRequestID)).(string)
 	if !ok {
@@ -68,7 +73,7 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 			zap.Error(err),
 			zap.Int(ralCodeKey, realCode),
 		)
-		e.l.With(fields...).Error(dslBody)
+		l.With(fields...).Error(dslBody)
 		return err
 	}
 
@@ -81,7 +86,7 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 		}()
 		if readErr != nil {
 			fields = append(fields, zap.Error(readErr))
-			e.l.With(fields...).Error(dslBody)
+			l.With(fields...).Error(dslBody)
 			return nil
 		}
 
@@ -100,15 +105,15 @@ func (e *ESLogger) LogRoundTrip(req *http.Request, res *http.Response, err error
 
 	// Exists API（HEAD /_doc/{id}）：404 表示文档不存在，属正常结果，不当作错误日志
 	if (method == http.MethodHead || method == http.MethodGet) && realCode == http.StatusNotFound {
-		e.l.With(fields...).Debug(dslBody)
+		l.With(fields...).Debug(dslBody)
 	} else if realCode != 200 && realCode != 201 {
-		e.l.With(fields...).Error(dslBody)
+		l.With(fields...).Error(dslBody)
 	} else {
-		e.l.With(fields...).Debug(dslBody)
+		l.With(fields...).Debug(dslBody)
 	}
 
 	if e.slowThreshold > 0 && dur > e.slowThreshold {
-		e.l.With(fields...).Warnf("slow dsl: %s", dslBody)
+		l.With(fields...).Warnf("slow dsl: %s", dslBody)
 	}
 	return nil
 }

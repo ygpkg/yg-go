@@ -108,8 +108,10 @@ Authorization: Bearer ${module}-${TOKEN}
 
 启动时调用 `logs.ApplyConfig(module, cfg)` 并处理返回的错误。`logs.ConfigError` 提供失败的 logger 组、条目索引和 writer 名。配置失败时，已有 logger 继续可用。应用可决定中止启动、移除可选出口或回落 stdout。
 
-`ApplyConfig` 成功后会关闭被替换的出口。调用前应停止使用被替换组的旧 logger 实例。已有调用方可以继续使用 `ReloadConfig`，它保留配置失败时 panic 的行为，已发出的 logger 实例可用到退出。
+`ApplyConfig` 成功后会关闭被替换的出口。调用前应停止使用被替换组的旧 logger 实例；库内的 gorm / es 适配器（`GetGorm`、`GetESLogger`）在每次写入时重新解析分组，因此会跟随新配置，应用自己缓存的 `*zap.SugaredLogger` 需要重新获取。已有调用方可以继续使用 `ReloadConfig`，它保留配置失败时 panic 的行为，已发出的 logger 实例可用到退出。
 
-应用结束业务工作后调用 `logs.Shutdown(ctx)`。同一批出口只关闭一次，CLS 关闭结果包含 SDK 错误及已入队日志的投递结果。截止时间限制调用方等待，后台资源清理仍可能继续。旧 `logs.Close()` 使用 500 ms SDK 关闭参数。
+应用结束业务工作后调用 `logs.Shutdown(ctx)`。同一批出口只关闭一次，CLS 关闭结果包含 SDK 错误、已入队日志的投递结果和累计投递失败数。排空预算以 `ctx` 的 deadline 为上限（旧 `logs.Close()` 用 500 ms），只覆盖排空阶段，等待阻塞中的日志写入不计入；调用方等待严格受 `ctx` 限制，超时后后台清理仍可能继续。关闭信号会唤醒 CLS SDK 的 linger 等待，正常端点下排空约 100–300 ms。
 
-CLS 配置可显式设置 `tencent_cls.max_block_sec: 0`，发送积压时立即丢弃并在 stderr 报告累计拒绝数。省略时沿用 5 秒设置。
+CLS 配置可显式设置 `tencent_cls.max_block_sec: 0`，发送积压时立即丢弃，并按 2 的幂采样在 stderr 上报累计拒绝数。省略时沿用 5 秒设置。
+
+> 维护注意：`vendor/github.com/tencentcloud/tencentcloud-cls-sdk-go/` 带两处本地补丁（关闭时唤醒 timer、批次记账对称，均以 `yg-go patch:` 标注）。`go mod vendor` 会覆盖它们，`go test ./logs/` 会因此失败，需要按注释重新施加。

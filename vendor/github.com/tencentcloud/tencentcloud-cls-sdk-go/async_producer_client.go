@@ -162,4 +162,6 @@ func (producer *AsyncProducerClient) sendCloseProducerSignal() {
 	producer.timerTask.shutDownFlag.Store(true)
 	producer.logAccumulator.shutDownFlag.Store(true)
 	producer.timerTask.worker.retryQueueShutDownFlag.Store(true)
+	// yg-go patch: wake the timer's linger sleep so Close flushes immediately.
+	producer.timerTask.notifyShutDown()
 }

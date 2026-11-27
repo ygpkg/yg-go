@@ -59,11 +59,20 @@ func (accumulator *Accumulator) addOrSendProducerBatch(topicId string, producerB
 func (accumulator *Accumulator) createNewProducerBatch(logType interface{}, callback CallBack, topicId string) {
 	if item, ok := logType.(*Log); ok {
 		newProducerBatch := NewProducerBatch(topicId, accumulator.producerConfig, callback, item, generatePackageId(accumulator.producerHash, accumulator.batchID))
-		accumulator.logTopicData[topicId] = newProducerBatch
+		accumulator.trackNewBatch(topicId, newProducerBatch)
 	} else if logList, ok := logType.([]*Log); ok {
 		newProducerBatch := NewProducerBatch(topicId, accumulator.producerConfig, callback, logList, generatePackageId(accumulator.producerHash, accumulator.batchID))
-		accumulator.logTopicData[topicId] = newProducerBatch
+		accumulator.trackNewBatch(topicId, newProducerBatch)
 	}
+}
+
+// yg-go patch: addLogToProducerBatch only charges logs appended to an existing
+// batch, while the worker deducts the whole batch when it finishes. Without
+// charging the first log as well, producerLogGroupSize drifted negative and the
+// MaxBlockSec backpressure stopped triggering. Keep while vendoring.
+func (accumulator *Accumulator) trackNewBatch(topicId string, batch *ProducerBatch) {
+	accumulator.logTopicData[topicId] = batch
+	asyncAtomic.AddInt64(&accumulator.producer.producerLogGroupSize, batch.totalDataSize)
 }
 
 func (accumulator *Accumulator) innerSendToServer(topicId string, producerBatch *ProducerBatch) {
