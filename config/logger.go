@@ -60,4 +60,6 @@ type TencentCLSConfig struct {
 	TencentConfig `yaml:",inline"`
 
 	TopicID string `yaml:"topic_id"`
+	// MaxBlockSec controls enqueue backpressure. Nil keeps the five-second default.
+	MaxBlockSec *int `yaml:"max_block_sec,omitempty"`
 }

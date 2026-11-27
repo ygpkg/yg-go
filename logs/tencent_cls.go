@@ -2,8 +2,13 @@ package logs
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/url"
+	"os"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	cls "github.com/tencentcloud/tencentcloud-cls-sdk-go"
@@ -11,41 +16,78 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const (
-	tencentClsMaxBatchSize = 20
-)
-
 type tencentClsWriteWyncer struct {
-	client *cls.AsyncProducerClient
-	cfg    config.TencentCLSConfig
-	sync.Mutex
+	client     *cls.AsyncProducerClient
+	topicID    string
+	rejected   atomic.Uint64
+	pending    atomic.Int64
+	failed     atomic.Uint64
+	writeMu    sync.RWMutex
+	closeOnce  sync.Once
+	closed     bool
+	closeErr   error
+	dropOnFull bool
 }
 
-var (
-	_ zapcore.WriteSyncer = (*tencentClsWriteWyncer)(nil)
-)
+func validateTencentCLS(cfg config.TencentCLSConfig) error {
+	for _, field := range []struct{ name, value string }{
+		{"endpoint", cfg.Endpoint}, {"secret_id", cfg.SecretID},
+		{"secret_key", cfg.SecretKey}, {"topic_id", cfg.TopicID},
+	} {
+		if strings.TrimSpace(field.value) == "" {
+			return fmt.Errorf("missing tencent_cls.%s", field.name)
+		}
+	}
+	endpoint, err := url.Parse("http://" + cfg.Endpoint)
+	if err != nil || endpoint.Hostname() == "" || endpoint.Host != cfg.Endpoint {
+		return errors.New("invalid tencent_cls.endpoint: expected a host with optional port")
+	}
+	if cfg.MaxBlockSec != nil && *cfg.MaxBlockSec < 0 {
+		return errors.New("tencent_cls.max_block_sec must be nonnegative")
+	}
+	return nil
+}
 
-// NewTencentClsSyncer 阿里云日志服务
+// NewTencentClsSyncer creates a standalone CLS writer managed by Shutdown.
 func NewTencentClsSyncer(cfg config.TencentCLSConfig) (zapcore.WriteSyncer, error) {
+	if err := validateTencentCLS(cfg); err != nil {
+		return nil, err
+	}
+	configurationGate <- struct{}{}
+	defer func() { <-configurationGate }()
+	if closing != nil {
+		select {
+		case <-closing.done:
+		default:
+			return nil, errors.New("logs shutdown in progress")
+		}
+	}
+	writer, err := newTencentClsSyncer(cfg)
+	if err != nil {
+		return nil, err
+	}
+	standaloneClosers = append(standaloneClosers, writer)
+	closing = nil
+	return writer, nil
+}
+
+func newTencentClsSyncer(cfg config.TencentCLSConfig) (managedSyncer, error) {
 	producerConfig := cls.GetDefaultAsyncProducerClientConfig()
 	producerConfig.Endpoint = cfg.Endpoint
 	producerConfig.AccessKeyID = cfg.SecretID
 	producerConfig.AccessKeySecret = cfg.SecretKey
 	producerConfig.MaxBlockSec = 5
+	if cfg.MaxBlockSec != nil {
+		producerConfig.MaxBlockSec = *cfg.MaxBlockSec
+	}
 
-	producerInstance, err := cls.NewAsyncProducerClient(producerConfig)
+	producer, err := cls.NewAsyncProducerClient(producerConfig)
 	if err != nil {
-		fmt.Println("create tencent cls producer failed:", err)
-		return nil, err
+		// SDK errors are not part of the public diagnostic contract.
+		return nil, errors.New("initialize tencent CLS producer")
 	}
-	producerInstance.Start()
-
-	log := &tencentClsWriteWyncer{
-		client: producerInstance,
-		cfg:    cfg,
-	}
-	closerList = append(closerList, log)
-	return log, nil
+	producer.Start()
+	return &tencentClsWriteWyncer{client: producer, topicID: cfg.TopicID, dropOnFull: producerConfig.MaxBlockSec == 0}, nil
 }
 
 func (c *tencentClsWriteWyncer) Sync() error {
@@ -67,23 +109,67 @@ func (c *tencentClsWriteWyncer) Write(p []byte) (n int, err error) {
 	}
 	log := cls.NewCLSLog(time.Now().Unix(), addLogMap)
 
-	err = c.client.SendLog(c.cfg.TopicID, log, c)
+	c.writeMu.RLock()
+	defer c.writeMu.RUnlock()
+	if c.closed {
+		return 0, errors.New("tencent CLS writer closed")
+	}
+	c.pending.Add(1)
+	err = c.client.SendLog(c.topicID, log, c)
 	if err != nil {
-		fmt.Println("send tencent cls message failed:", err)
-		return 0, err
+		c.pending.Add(-1)
+		if count := c.rejected.Add(1); count&(count-1) == 0 {
+			fmt.Fprintf(os.Stderr, "tencent CLS enqueue rejected (total=%d)\n", count)
+		}
+		if c.dropOnFull {
+			return len(p), nil
+		}
+		return 0, errors.New("tencent CLS enqueue rejected")
 	}
 
 	return len(p), nil
 }
 
-func (c *tencentClsWriteWyncer) Success(result *cls.Result) {
-	// fmt.Println("send tencent cls message success:", result)
+func (c *tencentClsWriteWyncer) Success(*cls.Result) {
+	c.pending.Add(-1)
 }
-func (c *tencentClsWriteWyncer) Fail(result *cls.Result) {
-	fmt.Println("send tencent cls message failed:", result)
+
+func (c *tencentClsWriteWyncer) Fail(*cls.Result) {
+	count := c.failed.Add(1)
+	if count&(count-1) == 0 {
+		fmt.Fprintf(os.Stderr, "tencent CLS delivery failed (total=%d)\n", count)
+	}
+	c.pending.Add(-1)
 }
 
 func (c *tencentClsWriteWyncer) Close() error {
-	c.client.Close(500)
-	return nil
+	return c.closeWithin(legacyCloseTimeout)
+}
+
+func (c *tencentClsWriteWyncer) closeWithin(timeout time.Duration) error {
+	c.closeOnce.Do(func() {
+		deadline := time.Now().Add(timeout)
+		c.writeMu.Lock()
+		c.closed = true
+		c.writeMu.Unlock()
+		if err := c.client.Close(max(1, time.Until(deadline).Milliseconds())); err != nil {
+			c.closeErr = fmt.Errorf("close tencent CLS producer: %w", err)
+			return
+		}
+
+		// SDK v1.0.11 can observe an empty queue between a worker dequeuing a
+		// batch and registering it as in-flight. Confirm terminal callbacks too.
+		for c.pending.Load() > 0 {
+			remaining := time.Until(deadline)
+			if remaining <= 0 {
+				c.closeErr = errors.New("tencent CLS delivery still pending at shutdown")
+				return
+			}
+			time.Sleep(min(remaining, 10*time.Millisecond))
+		}
+		if failed := c.failed.Load(); failed > 0 {
+			c.closeErr = fmt.Errorf("tencent CLS delivery failed for %d logs during writer lifetime", failed)
+		}
+	})
+	return c.closeErr
 }

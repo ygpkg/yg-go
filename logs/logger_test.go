@@ -38,7 +38,7 @@ func TestLoggerSetLevel(t *testing.T) {
 }
 
 func TestWithContextLogger(t *testing.T) {
-	ctx := WithContextLogger(nil, logger.Named("with-context-logger"))
+	ctx := WithContextLogger(nil, Named("with-context-logger"))
 	DebugContext(ctx, "DebugContext: Hello, world")
 	DebugContextf(ctx, "DebugfContextf: Hello, %s", "world")
 	InfoContext(ctx, "InfoContext: Hello, world")

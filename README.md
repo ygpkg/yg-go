@@ -102,3 +102,14 @@ Authorization: Bearer ${module}-${TOKEN}
 
 
 
+
+
+## 日志初始化与退出
+
+启动时调用 `logs.ApplyConfig(module, cfg)` 并处理返回的错误。`logs.ConfigError` 提供失败的 logger 组、条目索引和 writer 名。配置失败时，已有 logger 继续可用。应用可决定中止启动、移除可选出口或回落 stdout。
+
+`ApplyConfig` 成功后会关闭被替换的出口。调用前应停止使用被替换组的旧 logger 实例。已有调用方可以继续使用 `ReloadConfig`，它保留配置失败时 panic 的行为，已发出的 logger 实例可用到退出。
+
+应用结束业务工作后调用 `logs.Shutdown(ctx)`。同一批出口只关闭一次，CLS 关闭结果包含 SDK 错误及已入队日志的投递结果。截止时间限制调用方等待，后台资源清理仍可能继续。旧 `logs.Close()` 使用 500 ms SDK 关闭参数。
+
+CLS 配置可显式设置 `tencent_cls.max_block_sec: 0`，发送积压时立即丢弃并在 stderr 报告累计拒绝数。省略时沿用 5 秒设置。
