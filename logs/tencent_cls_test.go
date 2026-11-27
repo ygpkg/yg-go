@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -237,6 +238,8 @@ func TestCloseWithinReportsCloseErrorAndPendingTogether(t *testing.T) {
 // wait: batches already handed to the SDK are still delivered afterwards.
 func TestCloseTimeoutStillDrainsAfterRelease(t *testing.T) {
 	release := make(chan struct{})
+	var releaseOnce sync.Once
+	unblock := func() { releaseOnce.Do(func() { close(release) }) }
 	var hits atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		<-release
@@ -244,6 +247,9 @@ func TestCloseTimeoutStillDrainsAfterRelease(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
+	// Runs before server.Close (LIFO), so a failing assertion cannot leave the
+	// handler blocked and hang the cleanup.
+	defer unblock()
 
 	cfg := cls.GetDefaultAsyncProducerClientConfig()
 	cfg.Endpoint = strings.TrimPrefix(server.URL, "http://")
@@ -261,7 +267,7 @@ func TestCloseTimeoutStillDrainsAfterRelease(t *testing.T) {
 	if err := writer.closeWithin(50 * time.Millisecond); err == nil {
 		t.Fatal("expected the drain budget to expire while the endpoint is held")
 	}
-	close(release)
+	unblock()
 	deadline := time.Now().Add(2 * time.Second)
 	for writer.pending.Load() > 0 && time.Now().Before(deadline) {
 		time.Sleep(10 * time.Millisecond)
