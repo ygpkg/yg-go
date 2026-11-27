@@ -2,7 +2,6 @@ package logs
 
 import (
 	"context"
-	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -27,7 +26,7 @@ func (w *captureWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if w.closed {
-		return 0, errors.New("capture writer closed")
+		return 0, io.ErrClosedPipe
 	}
 	w.lines = append(w.lines, string(p))
 	return len(p), nil
